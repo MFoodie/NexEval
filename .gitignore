@@ -1,0 +1,23 @@
+# Node
+client/node_modules/
+client/dist/
+npm-debug.log*
+
+# Java
+server/target/
+server/build/
+server/.gradle/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
