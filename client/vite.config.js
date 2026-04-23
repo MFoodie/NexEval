@@ -1,15 +1,23 @@
 import { defineConfig } from "vite";
+import basicSsl from "@vitejs/plugin-basic-ssl";
 import vue from "@vitejs/plugin-vue";
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), basicSsl()],
   server: {
     port: 5173,
+    https: true,
     proxy: {
       "/ws": {
-        target: "ws://localhost:8080",
+        target: "https://localhost:8443",
         changeOrigin: true,
-        ws: true
+        ws: true,
+        secure: false
+      },
+      "/avatar": {
+        target: "https://localhost:8443",
+        changeOrigin: true,
+        secure: false
       }
     }
   }

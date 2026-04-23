@@ -1,12 +1,36 @@
 spring:
   application:
     name: nexeval-api
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/sedb?useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8443}
+  ssl:
+    enabled: ${SSL_ENABLED:true}
+    key-store: ${SSL_KEY_STORE:file:./certs/nexeval.p12}
+    key-store-password: ${SSL_KEY_STORE_PASSWORD:changeit}
+    key-store-type: ${SSL_KEY_STORE_TYPE:PKCS12}
+    key-alias: ${SSL_KEY_ALIAS:nexeval}
+  http2:
+    enabled: true
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+
+nexeval:
+  security:
+    allowed-origins: ${ALLOWED_ORIGINS:https://localhost:5173}

@@ -2,6 +2,7 @@ package com.nexeval.ws;
 
 import com.nexeval.dto.AnswerRequest;
 import com.nexeval.service.CatExamService;
+import com.nexeval.service.UserAuthService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -27,11 +28,18 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
   private final ExamWebSocketHub hub;
   private final ObjectMapper objectMapper;
   private final CatExamService catExamService;
+  private final UserAuthService userAuthService;
 
-  public ExamWebSocketHandler(ExamWebSocketHub hub, ObjectMapper objectMapper, CatExamService catExamService) {
+  public ExamWebSocketHandler(
+    ExamWebSocketHub hub,
+    ObjectMapper objectMapper,
+    CatExamService catExamService,
+    UserAuthService userAuthService
+  ) {
     this.hub = hub;
     this.objectMapper = objectMapper;
     this.catExamService = catExamService;
+    this.userAuthService = userAuthService;
   }
 
   @Override
@@ -110,6 +118,21 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
       Object responsePayload;
 
       switch (action) {
+        case "LOGIN":
+          responsePayload = userAuthService.login(
+            requireText(payload, "account"),
+            requireText(payload, "password")
+          );
+          break;
+        case "UPDATE_PROFILE":
+          responsePayload = userAuthService.updateProfile(
+            requireText(payload, "userId"),
+            requireText(payload, "name"),
+            requireText(payload, "phone"),
+            optionalText(payload, "email"),
+            optionalText(payload, "newPassword")
+          );
+          break;
         case "START_SESSION":
           responsePayload = handleStartSession(payload);
           break;
@@ -143,6 +166,10 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
       throw new IllegalArgumentException(fieldName + " is required");
     }
     return text;
+  }
+
+  private String optionalText(JsonNode payload, String fieldName) {
+    return payload.path(fieldName).asText("").trim();
   }
 
   private Map<String, Object> buildResponse(
