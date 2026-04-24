@@ -133,6 +133,15 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
             optionalText(payload, "newPassword")
           );
           break;
+        case "UPDATE_AVATAR":
+          responsePayload = userAuthService.updateAvatar(
+            requireText(payload, "userId"),
+            requireText(payload, "imageBase64")
+          );
+          break;
+        case "RESET_AVATAR":
+          responsePayload = userAuthService.resetAvatar(requireText(payload, "userId"));
+          break;
         case "START_SESSION":
           responsePayload = handleStartSession(payload);
           break;

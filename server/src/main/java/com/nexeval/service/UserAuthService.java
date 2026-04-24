@@ -3,8 +3,11 @@ package com.nexeval.service;
 import com.nexeval.dto.LoginResponse;
 import com.nexeval.model.UserAccount;
 import com.nexeval.repository.UserAccountRepository;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.Base64;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
@@ -83,6 +86,46 @@ public class UserAuthService {
     return toLoginResponse(account);
   }
 
+  public LoginResponse updateAvatar(String userId, String imageBase64) {
+    String id = normalizeRequired(userId, "userId");
+    String base64 = normalizeRequired(imageBase64, "imageBase64");
+
+    UserAccount account = userAccountRepository.findById(id)
+      .orElseThrow(() -> new IllegalArgumentException("用户不存在"));
+
+    byte[] imageBytes = decodeAvatar(base64);
+
+    try {
+      Files.createDirectories(avatarDirectory);
+      Files.write(
+        avatarDirectory.resolve(id + ".png"),
+        imageBytes,
+        StandardOpenOption.CREATE,
+        StandardOpenOption.TRUNCATE_EXISTING,
+        StandardOpenOption.WRITE
+      );
+    } catch (IOException ex) {
+      throw new IllegalStateException("头像保存失败", ex);
+    }
+
+    return toLoginResponse(account);
+  }
+
+  public LoginResponse resetAvatar(String userId) {
+    String id = normalizeRequired(userId, "userId");
+
+    UserAccount account = userAccountRepository.findById(id)
+      .orElseThrow(() -> new IllegalArgumentException("用户不存在"));
+
+    try {
+      Files.deleteIfExists(avatarDirectory.resolve(id + ".png"));
+    } catch (IOException ex) {
+      throw new IllegalStateException("恢复默认头像失败", ex);
+    }
+
+    return toLoginResponse(account);
+  }
+
   private String normalizeRequired(String value, String fieldName) {
     String text = value == null ? "" : value.trim();
     if (text.isBlank()) {
@@ -93,6 +136,26 @@ public class UserAuthService {
 
   private String normalizeNullable(String value) {
     return Objects.requireNonNullElse(value, "").trim();
+  }
+
+  private byte[] decodeAvatar(String imageBase64) {
+    String lower = imageBase64.toLowerCase();
+    if (!lower.startsWith("data:image/png;base64,")
+      && !lower.startsWith("data:image/jpeg;base64,")
+      && !lower.startsWith("data:image/jpg;base64,")) {
+      throw new IllegalArgumentException("仅支持 JPG 或 PNG 图片");
+    }
+
+    int comma = imageBase64.indexOf(',');
+    if (comma < 0 || comma == imageBase64.length() - 1) {
+      throw new IllegalArgumentException("图片数据格式错误");
+    }
+
+    try {
+      return Base64.getDecoder().decode(imageBase64.substring(comma + 1));
+    } catch (IllegalArgumentException ex) {
+      throw new IllegalArgumentException("图片数据格式错误");
+    }
   }
 
   private boolean verifyPassword(String rawPassword, String storedPassword) {

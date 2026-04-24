@@ -9,7 +9,17 @@
       <section class="card panel-card">
         <h2 class="panel-title">个人信息</h2>
         <div class="avatar-wrap">
-          <img :src="avatarUrl" alt="默认头像" class="avatar-image" />
+          <div class="avatar-click" @click="triggerAvatarPicker">
+            <img :src="avatarUrl" alt="默认头像" class="avatar-image" />
+            <div class="avatar-tip">点击修改头像</div>
+          </div>
+          <input
+            ref="avatarInputRef"
+            class="avatar-input"
+            type="file"
+            accept="image/png,image/jpeg"
+            @change="handleAvatarFileChange"
+          />
         </div>
         <el-descriptions :column="1" border>
           <el-descriptions-item label="卡号">{{ cardNo }}</el-descriptions-item>
@@ -20,6 +30,7 @@
         </el-descriptions>
 
         <div class="action-row">
+          <el-button :loading="avatarSaving" @click="handleResetAvatar">恢复默认头像</el-button>
           <el-button type="primary" plain @click="openEditDialog">修改信息</el-button>
           <el-button text type="danger" @click="handleLogout">退出登录</el-button>
         </div>
@@ -89,10 +100,12 @@ const userName = ref(loginInfo?.name || "-");
 const sex = ref(typeof loginInfo?.sex === "boolean" ? loginInfo.sex : null);
 const phone = ref(loginInfo?.phone || "-");
 const email = ref(loginInfo?.email || "-");
-const avatarUrl = ref(loginInfo?.avatarUrl || "/avatar/student_male.png");
+const avatarUrl = ref(withAvatarVersion(loginInfo?.avatarUrl || "/avatar/student_male.png"));
 const userId = ref(loginInfo?.cardNo || "");
 const starting = ref(false);
+const avatarSaving = ref(false);
 const wsStatus = ref("connecting");
+const avatarInputRef = ref(null);
 const sexText = computed(() => {
   if (sex.value === true) {
     return "男";
@@ -171,6 +184,15 @@ const passwordStrengthTagType = computed(() => {
 
 let wsClient = null;
 
+function withAvatarVersion(url) {
+  if (!url) {
+    return "/avatar/student_male.png";
+  }
+
+  const divider = url.includes("?") ? "&" : "?";
+  return `${url}${divider}t=${Date.now()}`;
+}
+
 function connectWebSocket() {
   wsClient = createExamSocket(null, {
     onOpen() {
@@ -188,6 +210,121 @@ function connectWebSocket() {
 function handleLogout() {
   clearLogin();
   router.push("/login");
+}
+
+function triggerAvatarPicker() {
+  avatarInputRef.value?.click();
+}
+
+async function handleAvatarFileChange(event) {
+  const file = event?.target?.files?.[0];
+  event.target.value = "";
+
+  if (!file) {
+    return;
+  }
+
+  if (!["image/png", "image/jpeg"].includes(file.type)) {
+    ElMessage.warning("仅支持 JPG 或 PNG 图片");
+    return;
+  }
+
+  if (file.size > 8 * 1024 * 1024) {
+    ElMessage.warning("图片不能超过 8MB");
+    return;
+  }
+
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket is not connected. Please wait for reconnect.");
+    return;
+  }
+
+  avatarSaving.value = true;
+  try {
+    const circlePngDataUrl = await cropImageToCirclePng(file, 256);
+    const profile = await wsClient.request("UPDATE_AVATAR", {
+      userId: cardNo.value,
+      imageBase64: circlePngDataUrl
+    }, 30000);
+
+    applyProfile(profile);
+    ElMessage.success("头像已更新");
+  } catch (error) {
+    ElMessage.error(error.message || "头像更新失败");
+  } finally {
+    avatarSaving.value = false;
+  }
+}
+
+async function handleResetAvatar() {
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket is not connected. Please wait for reconnect.");
+    return;
+  }
+
+  avatarSaving.value = true;
+  try {
+    const profile = await wsClient.request("RESET_AVATAR", {
+      userId: cardNo.value
+    });
+
+    applyProfile(profile);
+    ElMessage.success("已恢复默认头像");
+  } catch (error) {
+    ElMessage.error(error.message || "恢复默认头像失败");
+  } finally {
+    avatarSaving.value = false;
+  }
+}
+
+function cropImageToCirclePng(file, size = 256) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onerror = () => reject(new Error("读取图片失败"));
+    reader.onload = () => {
+      const image = new Image();
+
+      image.onerror = () => reject(new Error("解析图片失败"));
+      image.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+
+        if (!ctx) {
+          reject(new Error("浏览器不支持 Canvas"));
+          return;
+        }
+
+        const srcSize = Math.min(image.width, image.height);
+        const sx = (image.width - srcSize) / 2;
+        const sy = (image.height - srcSize) / 2;
+
+        ctx.clearRect(0, 0, size, size);
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(image, sx, sy, srcSize, srcSize, 0, 0, size, size);
+
+        resolve(canvas.toDataURL("image/png"));
+      };
+
+      image.src = String(reader.result || "");
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+function applyProfile(profile) {
+  userName.value = profile.name || "-";
+  phone.value = profile.phone || "-";
+  email.value = profile.email || "-";
+  sex.value = typeof profile.sex === "boolean" ? profile.sex : sex.value;
+  avatarUrl.value = withAvatarVersion(profile.avatarUrl || avatarUrl.value);
+  saveLogin(profile);
 }
 
 function openEditDialog() {
@@ -226,13 +363,7 @@ async function handleSaveProfile() {
       newPassword: editForm.value.newPassword
     });
 
-    userName.value = profile.name || "-";
-    phone.value = profile.phone || "-";
-    email.value = profile.email || "-";
-    sex.value = typeof profile.sex === "boolean" ? profile.sex : sex.value;
-    avatarUrl.value = profile.avatarUrl || avatarUrl.value;
-
-    saveLogin(profile);
+    applyProfile(profile);
     editVisible.value = false;
     ElMessage.success("个人信息已更新");
   } catch (error) {
@@ -299,6 +430,14 @@ onBeforeUnmount(() => {
   margin-bottom: 14px;
 }
 
+.avatar-click {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
 .avatar-image {
   width: 92px;
   height: 92px;
@@ -306,6 +445,15 @@ onBeforeUnmount(() => {
   border: 1px solid #dcdfe6;
   object-fit: cover;
   background: #ffffff;
+}
+
+.avatar-tip {
+  color: #909399;
+  font-size: 12px;
+}
+
+.avatar-input {
+  display: none;
 }
 
 .action-row {

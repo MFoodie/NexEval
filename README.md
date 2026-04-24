@@ -70,6 +70,7 @@ docker compose up -d
 
 - WS endpoint: /ws/exam or /ws/exam?sessionId={sessionId}
 - Request actions: LOGIN, START_SESSION, NEXT_QUESTION, SUBMIT_ANSWER
+- Request actions: LOGIN, START_SESSION, NEXT_QUESTION, SUBMIT_ANSWER, UPDATE_AVATAR, RESET_AVATAR
 - Response envelope: RESPONSE (requestId/action/success/payload)
 - Server events: CONNECTED, PONG, ANSWER_UPDATED, ERROR
 
@@ -82,6 +83,8 @@ docker compose up -d
   - student: student_male.png / student_female.png
   - teacher: teacher_male.png / teacher_female.png
   - admin: admin_male.png / admin_female.png
+- Custom avatar upload supports JPG/PNG, cropped to circular PNG and stored as {cardNo}.png in server/avatar/
+- Reset avatar deletes the custom {cardNo}.png file and falls back to default avatar
 
 Required table (already in your DB): users
 
