@@ -13,6 +13,8 @@ export function saveLogin(loginInfo) {
     phone: loginInfo?.phone || "",
     email: loginInfo?.email || "",
     avatarUrl: loginInfo?.avatarUrl || "",
+    studentInfo: loginInfo?.studentInfo || null,
+    teacherInfo: loginInfo?.teacherInfo || null,
     loginAt: Date.now()
   };
 

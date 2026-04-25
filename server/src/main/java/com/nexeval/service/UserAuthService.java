@@ -1,7 +1,13 @@
 package com.nexeval.service;
 
 import com.nexeval.dto.LoginResponse;
+import com.nexeval.dto.StudentInfo;
+import com.nexeval.dto.TeacherInfo;
+import com.nexeval.model.StudentProfile;
+import com.nexeval.model.TeacherProfile;
 import com.nexeval.model.UserAccount;
+import com.nexeval.repository.StudentProfileRepository;
+import com.nexeval.repository.TeacherProfileRepository;
 import com.nexeval.repository.UserAccountRepository;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -20,15 +26,21 @@ public class UserAuthService {
   private static final Pattern BCRYPT_HASH_PATTERN = Pattern.compile("^\\$2[aby]\\$\\d{2}\\$.{53}$");
 
   private final UserAccountRepository userAccountRepository;
+  private final StudentProfileRepository studentProfileRepository;
+  private final TeacherProfileRepository teacherProfileRepository;
   private final PasswordEncoder passwordEncoder;
   private final Path avatarDirectory;
 
   public UserAuthService(
     UserAccountRepository userAccountRepository,
+    StudentProfileRepository studentProfileRepository,
+    TeacherProfileRepository teacherProfileRepository,
     PasswordEncoder passwordEncoder,
     @Value("${nexeval.avatar.dir:./avatar}") String avatarDirectory
   ) {
     this.userAccountRepository = userAccountRepository;
+    this.studentProfileRepository = studentProfileRepository;
+    this.teacherProfileRepository = teacherProfileRepository;
     this.passwordEncoder = passwordEncoder;
     this.avatarDirectory = Path.of(avatarDirectory).toAbsolutePath().normalize();
   }
@@ -197,6 +209,20 @@ public class UserAuthService {
     String type = normalizeType(account.getType());
     String suffix = account.isSex() ? "male" : "female";
     String avatarUrl = resolveAvatarUrl(account.getId(), type, suffix);
+    StudentInfo studentInfo = null;
+    TeacherInfo teacherInfo = null;
+
+    if ("student".equals(type)) {
+      studentInfo = studentProfileRepository.findFirstById(account.getId())
+        .map(this::toStudentInfo)
+        .orElse(null);
+    }
+
+    if ("teacher".equals(type)) {
+      teacherInfo = teacherProfileRepository.findFirstById(account.getId())
+        .map(this::toTeacherInfo)
+        .orElse(null);
+    }
 
     return new LoginResponse(
       account.getId(),
@@ -205,8 +231,43 @@ public class UserAuthService {
       type,
       account.getPhone(),
       account.getEmail(),
-      avatarUrl
+      avatarUrl,
+      studentInfo,
+      teacherInfo
     );
+  }
+
+  private StudentInfo toStudentInfo(StudentProfile profile) {
+    return new StudentInfo(
+      profile.getSno(),
+      profile.getEnterYear(),
+      profile.getMajor(),
+      profile.getDepartment()
+    );
+  }
+
+  private TeacherInfo toTeacherInfo(TeacherProfile profile) {
+    return new TeacherInfo(
+      profile.getEid(),
+      profile.getEnterYear(),
+      toZhTitle(profile.getTitle()),
+      "-",
+      profile.getDepartment()
+    );
+  }
+
+  private String toZhTitle(String title) {
+    String normalized = normalizeNullable(title).toLowerCase();
+    if ("professor".equals(normalized)) {
+      return "教授";
+    }
+    if ("associate_professor".equals(normalized)) {
+      return "副教授";
+    }
+    if ("lecture".equals(normalized) || "lecturer".equals(normalized)) {
+      return "讲师";
+    }
+    return normalized.isBlank() ? "-" : normalized;
   }
 
   private String normalizeType(String type) {

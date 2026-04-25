@@ -7,6 +7,8 @@ public record LoginResponse(
 	String type,
 	String phone,
 	String email,
-	String avatarUrl
+	String avatarUrl,
+	StudentInfo studentInfo,
+	TeacherInfo teacherInfo
 ) {
 }

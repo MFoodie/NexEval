@@ -27,6 +27,18 @@
           <el-descriptions-item label="性别">{{ sexText }}</el-descriptions-item>
           <el-descriptions-item label="手机号">{{ phone }}</el-descriptions-item>
           <el-descriptions-item label="邮箱">{{ email }}</el-descriptions-item>
+          <template v-if="isStudent && studentInfo">
+            <el-descriptions-item label="学号">{{ studentInfo.sno || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="入学年份">{{ studentInfo.enterYear || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="专业">{{ studentInfo.major || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="学院">{{ studentInfo.department || '-' }}</el-descriptions-item>
+          </template>
+          <template v-if="isTeacher && teacherInfo">
+            <el-descriptions-item label="工号">{{ teacherInfo.eid || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="入职年份">{{ teacherInfo.enterYear || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="职称">{{ teacherInfo.title || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="学院">{{ teacherInfo.department || '-' }}</el-descriptions-item>
+          </template>
         </el-descriptions>
 
         <div class="action-row">
@@ -98,8 +110,11 @@ const loginInfo = getLogin();
 const cardNo = ref(loginInfo?.cardNo || "-");
 const userName = ref(loginInfo?.name || "-");
 const sex = ref(typeof loginInfo?.sex === "boolean" ? loginInfo.sex : null);
+const userType = ref(loginInfo?.type || "");
 const phone = ref(loginInfo?.phone || "-");
 const email = ref(loginInfo?.email || "-");
+const studentInfo = ref(loginInfo?.studentInfo || null);
+const teacherInfo = ref(loginInfo?.teacherInfo || null);
 const avatarUrl = ref(withAvatarVersion(loginInfo?.avatarUrl || "/avatar/student_male.png"));
 const userId = ref(loginInfo?.cardNo || "");
 const starting = ref(false);
@@ -128,6 +143,8 @@ const wsTagType = computed(() => {
 
   return "info";
 });
+const isStudent = computed(() => userType.value === "student");
+const isTeacher = computed(() => userType.value === "teacher");
 
 const editVisible = ref(false);
 const saving = ref(false);
@@ -322,7 +339,10 @@ function applyProfile(profile) {
   userName.value = profile.name || "-";
   phone.value = profile.phone || "-";
   email.value = profile.email || "-";
+  userType.value = profile.type || userType.value;
   sex.value = typeof profile.sex === "boolean" ? profile.sex : sex.value;
+  studentInfo.value = profile.studentInfo || null;
+  teacherInfo.value = profile.teacherInfo || null;
   avatarUrl.value = withAvatarVersion(profile.avatarUrl || avatarUrl.value);
   saveLogin(profile);
 }
