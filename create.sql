@@ -4,7 +4,7 @@ CREATE TABLE users (
     sex BOOLEAN NOT NULL,
     type ENUM('student', 'teacher', 'admin') NOT NULL,
     password VARCHAR(255) NOT NULL,
-    phone CHAR(11) NOT NULL,
+    phone CHAR(11) NOT NULL DEFAULT '00000000000',
     email VARCHAR(254),
     PRIMARY KEY (id)
 );
@@ -46,3 +46,27 @@ INSERT INTO teacher (id, eid, enteryear, title, department)
 VALUES 
     ('101010001', '09T10001', 2010, 'professor', '计算机学院'),
     ('101010002', '71T15002', 2015, 'associate_professor', '软件学院');
+
+CREATE TABLE course(
+    cno char(8),
+    cname varchar(20),
+    credit decimal(2,1),
+    PRIMARY KEY (cno)
+);
+
+CREATE TABLE class(
+    cno char(8),
+    eid char(8),
+    PRIMARY KEY (cno, eid),
+    FOREIGN KEY (eid) REFERENCES teacher(eid)
+);
+
+CREATE TABLE SC(
+    sno char(8),
+    cno char(8),
+    eid char(8),
+    grade tinyint unsigned,
+    PRIMARY KEY (sno,cno,eid),
+    FOREIGN KEY (sno) REFERENCES student(sno),
+    FOREIGN KEY (cno,eid) REFERENCES class(cno,eid)
+);

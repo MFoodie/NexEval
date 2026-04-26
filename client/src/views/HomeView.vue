@@ -2,7 +2,7 @@
   <section>
     <div class="dashboard-head card">
       <h1 class="card-title">在线考试系统</h1>
-      <p class="card-subtitle">请先确认个人信息，再进入考试。</p>
+      <p class="card-subtitle">{{ pageSubtitle }}</p>
     </div>
 
     <div class="dashboard-grid">
@@ -11,8 +11,8 @@
         <div class="avatar-wrap">
           <div class="avatar-click" @click="triggerAvatarPicker">
             <img :src="avatarUrl" alt="默认头像" class="avatar-image" />
-            <div class="avatar-tip">点击修改头像</div>
           </div>
+          <div class="avatar-tip">点击修改头像</div>
           <input
             ref="avatarInputRef"
             class="avatar-input"
@@ -25,7 +25,7 @@
           <el-descriptions-item label="卡号">{{ cardNo }}</el-descriptions-item>
           <el-descriptions-item label="姓名">{{ userName }}</el-descriptions-item>
           <el-descriptions-item label="性别">{{ sexText }}</el-descriptions-item>
-          <el-descriptions-item label="手机号">{{ phone }}</el-descriptions-item>
+          <el-descriptions-item label="手机号">{{ displayPhone }}</el-descriptions-item>
           <el-descriptions-item label="邮箱">{{ email }}</el-descriptions-item>
           <template v-if="isStudent && studentInfo">
             <el-descriptions-item label="学号">{{ studentInfo.sno || '-' }}</el-descriptions-item>
@@ -49,7 +49,7 @@
       </section>
 
       <section class="card panel-card">
-        <h2 class="panel-title">进入考试</h2>
+        <h2 class="panel-title">{{ actionPanelTitle }}</h2>
         <p class="ws-line">
           WebSocket:
           <el-tag size="small" :type="wsTagType">{{ wsStatus }}</el-tag>
@@ -60,7 +60,7 @@
             <el-input v-model="userId" disabled />
           </el-form-item>
 
-          <el-button type="primary" :loading="starting" @click="handleStartExam">进入考试</el-button>
+          <el-button type="primary" :loading="starting" @click="handleStartExam">{{ actionButtonText }}</el-button>
         </el-form>
       </section>
     </div>
@@ -145,6 +145,10 @@ const wsTagType = computed(() => {
 });
 const isStudent = computed(() => userType.value === "student");
 const isTeacher = computed(() => userType.value === "teacher");
+const displayPhone = computed(() => formatPhoneForDisplay(phone.value));
+const actionPanelTitle = computed(() => (isTeacher.value ? "考试批改" : "进入考试"));
+const actionButtonText = computed(() => (isTeacher.value ? "考试批改" : "进入考试"));
+const pageSubtitle = computed(() => (isTeacher.value ? "请先确认个人信息，再进入批改。" : "请先确认个人信息，再进入考试。"));
 
 const editVisible = ref(false);
 const saving = ref(false);
@@ -347,10 +351,23 @@ function applyProfile(profile) {
   saveLogin(profile);
 }
 
+function isAllZeroPhone(value) {
+  const text = String(value || "").trim();
+  return text !== "" && /^0+$/.test(text);
+}
+
+function formatPhoneForDisplay(value) {
+  const text = String(value || "").trim();
+  if (!text || text === "-" || isAllZeroPhone(text)) {
+    return "-";
+  }
+  return text;
+}
+
 function openEditDialog() {
   editForm.value = {
     name: userName.value === "-" ? "" : userName.value,
-    phone: phone.value === "-" ? "" : phone.value,
+    phone: phone.value === "-" || isAllZeroPhone(phone.value) ? "" : phone.value,
     email: email.value === "-" ? "" : email.value,
     newPassword: ""
   };
@@ -445,31 +462,32 @@ onBeforeUnmount(() => {
 }
 
 .avatar-wrap {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 14px;
+  width: 92px;
 }
 
 .avatar-click {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
+  position: relative;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  overflow: hidden;
   cursor: pointer;
+  border: 1px solid #dcdfe6;
 }
 
 .avatar-image {
   width: 92px;
   height: 92px;
   border-radius: 50%;
-  border: 1px solid #dcdfe6;
   object-fit: cover;
   background: #ffffff;
 }
 
 .avatar-tip {
-  color: #909399;
+  margin-top: 8px;
+  text-align: center;
   font-size: 12px;
+  color: #409eff;
 }
 
 .avatar-input {

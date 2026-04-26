@@ -3,6 +3,7 @@ package com.nexeval.service;
 import com.nexeval.dto.LoginResponse;
 import com.nexeval.dto.StudentInfo;
 import com.nexeval.dto.TeacherInfo;
+import com.nexeval.dto.AdminRegisterResponse;
 import com.nexeval.model.StudentProfile;
 import com.nexeval.model.TeacherProfile;
 import com.nexeval.model.UserAccount;
@@ -19,11 +20,14 @@ import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserAuthService {
 
   private static final Pattern BCRYPT_HASH_PATTERN = Pattern.compile("^\\$2[aby]\\$\\d{2}\\$.{53}$");
+  private static final String DEFAULT_PASSWORD = "123456";
+  private static final String DEFAULT_PHONE = "00000000000";
 
   private final UserAccountRepository userAccountRepository;
   private final StudentProfileRepository studentProfileRepository;
@@ -62,6 +66,49 @@ public class UserAuthService {
     }
 
     return toLoginResponse(account);
+  }
+
+  @Transactional
+  public AdminRegisterResponse registerUser(
+    String id,
+    String name,
+    String sexText,
+    String typeText,
+    String sno,
+    String studentEnterYearText,
+    String major,
+    String studentDepartment,
+    String eid,
+    String teacherEnterYearText,
+    String title,
+    String teacherDepartment
+  ) {
+    String userId = normalizeRequired(id, "id");
+    String userName = normalizeRequired(name, "name");
+    boolean sex = parseSex(sexText);
+    String type = normalizeTypeForRegister(typeText);
+
+    if (userAccountRepository.existsById(userId)) {
+      throw new IllegalArgumentException("卡号已存在");
+    }
+
+    UserAccount account = new UserAccount();
+    account.setId(userId);
+    account.setName(userName);
+    account.setSex(sex);
+    account.setType(type);
+    account.setPassword(passwordEncoder.encode(DEFAULT_PASSWORD));
+    account.setPhone(DEFAULT_PHONE);
+    account.setEmail(null);
+    userAccountRepository.save(account);
+
+    if ("student".equals(type)) {
+      registerStudentProfile(userId, sno, studentEnterYearText, major, studentDepartment);
+    } else {
+      registerTeacherProfile(userId, eid, teacherEnterYearText, title, teacherDepartment);
+    }
+
+    return new AdminRegisterResponse(userId, type, "注册成功，默认密码为123456");
   }
 
   public LoginResponse updateProfile(
@@ -203,6 +250,92 @@ public class UserAuthService {
     }
 
     return groups >= 3;
+  }
+
+  private void registerStudentProfile(
+    String userId,
+    String sno,
+    String enterYearText,
+    String major,
+    String department
+  ) {
+    String normalizedSno = normalizeRequired(sno, "sno");
+    int enterYear = parseYear(enterYearText, "enteryear");
+    String normalizedMajor = normalizeRequired(major, "major");
+    String normalizedDepartment = normalizeRequired(department, "department");
+
+    if (studentProfileRepository.existsById(normalizedSno)) {
+      throw new IllegalArgumentException("学号已存在");
+    }
+
+    StudentProfile profile = new StudentProfile();
+    profile.setId(userId);
+    profile.setSno(normalizedSno);
+    profile.setEnterYear(enterYear);
+    profile.setMajor(normalizedMajor);
+    profile.setDepartment(normalizedDepartment);
+    studentProfileRepository.save(profile);
+  }
+
+  private void registerTeacherProfile(
+    String userId,
+    String eid,
+    String enterYearText,
+    String title,
+    String department
+  ) {
+    String normalizedEid = normalizeRequired(eid, "eid");
+    int enterYear = parseYear(enterYearText, "enteryear");
+    String normalizedTitle = normalizeTitle(title);
+    String normalizedDepartment = normalizeRequired(department, "department");
+
+    if (teacherProfileRepository.existsById(normalizedEid)) {
+      throw new IllegalArgumentException("工号已存在");
+    }
+
+    TeacherProfile profile = new TeacherProfile();
+    profile.setId(userId);
+    profile.setEid(normalizedEid);
+    profile.setEnterYear(enterYear);
+    profile.setTitle(normalizedTitle);
+    profile.setDepartment(normalizedDepartment);
+    teacherProfileRepository.save(profile);
+  }
+
+  private String normalizeTypeForRegister(String value) {
+    String type = normalizeRequired(value, "type").toLowerCase();
+    if (!"teacher".equals(type) && !"student".equals(type)) {
+      throw new IllegalArgumentException("type 仅支持 teacher 或 student");
+    }
+    return type;
+  }
+
+  private boolean parseSex(String value) {
+    String text = normalizeRequired(value, "sex");
+    if ("男".equals(text)) {
+      return true;
+    }
+    if ("女".equals(text)) {
+      return false;
+    }
+    throw new IllegalArgumentException("sex 仅支持 男 或 女");
+  }
+
+  private int parseYear(String value, String fieldName) {
+    String text = normalizeRequired(value, fieldName);
+    try {
+      return Integer.parseInt(text);
+    } catch (NumberFormatException ex) {
+      throw new IllegalArgumentException(fieldName + " 必须是数字");
+    }
+  }
+
+  private String normalizeTitle(String value) {
+    String text = normalizeRequired(value, "title").toLowerCase();
+    if ("professor".equals(text) || "associate_professor".equals(text) || "lecture".equals(text)) {
+      return text;
+    }
+    throw new IllegalArgumentException("title 仅支持 professor、associate_professor、lecture");
   }
 
   private LoginResponse toLoginResponse(UserAccount account) {

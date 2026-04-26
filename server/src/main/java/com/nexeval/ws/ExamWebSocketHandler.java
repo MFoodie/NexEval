@@ -1,6 +1,7 @@
 package com.nexeval.ws;
 
 import com.nexeval.dto.AnswerRequest;
+import com.nexeval.service.AdminManagementService;
 import com.nexeval.service.CatExamService;
 import com.nexeval.service.UserAuthService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -29,17 +30,20 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
   private final ObjectMapper objectMapper;
   private final CatExamService catExamService;
   private final UserAuthService userAuthService;
+  private final AdminManagementService adminManagementService;
 
   public ExamWebSocketHandler(
     ExamWebSocketHub hub,
     ObjectMapper objectMapper,
     CatExamService catExamService,
-    UserAuthService userAuthService
+    UserAuthService userAuthService,
+    AdminManagementService adminManagementService
   ) {
     this.hub = hub;
     this.objectMapper = objectMapper;
     this.catExamService = catExamService;
     this.userAuthService = userAuthService;
+    this.adminManagementService = adminManagementService;
   }
 
   @Override
@@ -141,6 +145,41 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
           break;
         case "RESET_AVATAR":
           responsePayload = userAuthService.resetAvatar(requireText(payload, "userId"));
+          break;
+        case "REGISTER_USER":
+          responsePayload = userAuthService.registerUser(
+            requireText(payload, "id"),
+            requireText(payload, "name"),
+            requireText(payload, "sex"),
+            requireText(payload, "type"),
+            optionalText(payload, "sno"),
+            optionalText(payload, "studentEnterYear"),
+            optionalText(payload, "major"),
+            optionalText(payload, "studentDepartment"),
+            optionalText(payload, "eid"),
+            optionalText(payload, "teacherEnterYear"),
+            optionalText(payload, "title"),
+            optionalText(payload, "teacherDepartment")
+          );
+          break;
+        case "CREATE_COURSE":
+          responsePayload = adminManagementService.createCourse(
+            requireText(payload, "cno"),
+            requireText(payload, "cname"),
+            requireText(payload, "credit")
+          );
+          break;
+        case "CREATE_CLASS":
+          responsePayload = adminManagementService.createTeachingClass(
+            requireText(payload, "cno"),
+            requireText(payload, "eid")
+          );
+          break;
+        case "IMPORT_BATCH":
+          responsePayload = adminManagementService.importBatch(
+            requireText(payload, "importType"),
+            requireText(payload, "fileBase64")
+          );
           break;
         case "START_SESSION":
           responsePayload = handleStartSession(payload);

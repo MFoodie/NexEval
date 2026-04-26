@@ -84,7 +84,11 @@ async function handleLogin() {
 
     saveLogin(profile);
     ElMessage.success("登录成功");
-    router.push("/");
+    if (profile.type === "admin") {
+      router.push("/admin");
+    } else {
+      router.push("/");
+    }
   } catch (error) {
     ElMessage.error(error.message || "登录失败");
   } finally {
