@@ -622,7 +622,7 @@ onBeforeUnmount(() => {
 .home-shell {
   display: grid;
   grid-template-columns: 240px 1fr;
-  gap: 16px;
+  gap: 20px;
 }
 
 .home-sidebar {
@@ -641,7 +641,8 @@ onBeforeUnmount(() => {
   height: 80px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--ne-border);
+  box-shadow: var(--ne-shadow-soft);
   cursor: pointer;
 }
 
@@ -649,11 +650,12 @@ onBeforeUnmount(() => {
   margin-top: 10px;
   font-size: 16px;
   font-weight: 700;
+  color: var(--ne-text-strong);
 }
 
 .side-id {
   margin-top: 2px;
-  color: #6b7280;
+  color: var(--ne-text-muted);
   font-size: 13px;
 }
 
@@ -664,31 +666,41 @@ onBeforeUnmount(() => {
 }
 
 .side-item {
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
+  border: 1px solid var(--ne-border);
+  background: var(--ne-surface);
   border-radius: 10px;
   padding: 10px 12px;
   text-align: left;
   font-size: 14px;
   cursor: pointer;
+  color: var(--ne-text);
+  transition: all 0.2s ease;
+}
+
+.side-item:hover {
+  border-color: rgba(42, 92, 255, 0.35);
+  box-shadow: var(--ne-shadow-soft);
+  transform: translateY(-1px);
 }
 
 .side-item.active {
-  border-color: #2563eb;
-  color: #2563eb;
-  background: #eff5ff;
+  border-color: rgba(42, 92, 255, 0.6);
+  color: var(--ne-primary);
+  background: var(--ne-primary-soft);
+  box-shadow: var(--ne-shadow-soft);
 }
 
 .side-status {
   display: grid;
   gap: 6px;
   padding: 10px 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--ne-border);
   border-radius: 10px;
+  background: linear-gradient(135deg, rgba(42, 92, 255, 0.06), rgba(0, 194, 255, 0.08));
 }
 
 .status-label {
-  color: #6b7280;
+  color: var(--ne-text-muted);
   font-size: 12px;
 }
 
@@ -711,11 +723,22 @@ onBeforeUnmount(() => {
 
 .panel-card {
   min-height: 320px;
+  position: relative;
+  overflow: hidden;
+}
+
+.panel-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--ne-gradient-accent);
 }
 
 .panel-title {
   margin: 0 0 12px;
   font-size: 20px;
+  color: var(--ne-text-strong);
 }
 
 .avatar-wrap {
@@ -729,7 +752,8 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   overflow: hidden;
   cursor: pointer;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--ne-border);
+  box-shadow: var(--ne-shadow-soft);
 }
 
 .avatar-image {
@@ -737,14 +761,14 @@ onBeforeUnmount(() => {
   height: 92px;
   border-radius: 50%;
   object-fit: cover;
-  background: #ffffff;
+  background: var(--ne-surface);
 }
 
 .avatar-tip {
   margin-top: 8px;
   text-align: center;
   font-size: 12px;
-  color: #409eff;
+  color: var(--ne-primary);
 }
 
 .avatar-input {
@@ -774,7 +798,7 @@ onBeforeUnmount(() => {
 
 .section-title {
   margin-bottom: 8px;
-  color: #6b7280;
+  color: var(--ne-text-muted);
   font-size: 13px;
 }
 
@@ -796,12 +820,12 @@ onBeforeUnmount(() => {
 }
 
 .student-subtitle {
-  color: #111827;
+  color: var(--ne-text-strong);
   font-weight: 600;
 }
 
 .student-count {
-  color: #6b7280;
+  color: var(--ne-text-muted);
   font-size: 12px;
 }
 
@@ -813,24 +837,24 @@ onBeforeUnmount(() => {
 
 .class-card {
   text-align: left;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--ne-border);
   border-radius: 12px;
   padding: 6px 10px;
-  background: #ffffff;
+  background: var(--ne-surface);
   cursor: pointer;
   transition: all 0.2s ease;
   max-width: 180px;
 }
 
 .class-card:hover {
-  border-color: #cbd5f5;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  border-color: rgba(42, 92, 255, 0.35);
+  box-shadow: var(--ne-shadow-soft);
   transform: translateY(-1px);
 }
 
 .class-card.active {
-  border-color: #2563eb;
-  background: #eff5ff;
+  border-color: rgba(42, 92, 255, 0.6);
+  background: var(--ne-primary-soft);
 }
 
 .class-title {
@@ -842,12 +866,12 @@ onBeforeUnmount(() => {
 
 .class-code {
   font-weight: 700;
-  color: #1f2937;
+  color: var(--ne-text-strong);
 }
 
 .class-name {
   margin-top: 0;
-  color: #6b7280;
+  color: var(--ne-text-muted);
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
@@ -856,13 +880,13 @@ onBeforeUnmount(() => {
 
 .pwd-strength {
   margin-top: 10px;
-  color: #6b7280;
+  color: var(--ne-text-muted);
   font-size: 13px;
 }
 
 .pwd-hint {
   margin: 8px 0 0;
-  color: #909399;
+  color: var(--ne-text-subtle);
   font-size: 12px;
 }
 

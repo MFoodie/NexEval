@@ -1,8 +1,15 @@
 <template>
   <section class="login-wrap">
     <div class="card login-card">
+      <div class="login-brand">
+        <img class="login-logo" :src="logoUrl" alt="NexEval Logo" />
+        <div class="login-brand-text">
+          <div class="login-brand-title">NexEval</div>
+          <div class="login-brand-subtitle">智能评估系统</div>
+        </div>
+      </div>
       <h1 class="card-title">考生登录</h1>
-      <p class="card-subtitle">支持卡号、手机号或邮箱 + 密码登录（需与数据库匹配）。</p>
+      <p class="card-subtitle">支持卡号、手机号或邮箱 + 密码登录</p>
 
       <p class="ws-line">
         WebSocket:
@@ -30,6 +37,7 @@ import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { saveLogin } from "../auth";
 import { createExamSocket } from "../ws";
+import logoUrl from "../assets/logo.png";
 
 const router = useRouter();
 const account = ref("");
@@ -109,6 +117,38 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.login-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  object-fit: contain;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(16, 24, 39, 0.12);
+}
+
+.login-brand-text {
+  display: grid;
+}
+
+.login-brand-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: 0.3px;
+}
+
+.login-brand-subtitle {
+  font-size: 12px;
+  color: #64748b;
 }
 
 .login-card {
