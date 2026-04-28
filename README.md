@@ -66,10 +66,20 @@ docker compose up -d
 - 业务 REST 端点已移除。
 - 考试主流程仅使用 WebSocket 请求-响应。
 
+## 角色功能
+
+- 学生端：查看个人信息、查看所属教学班、进入考试。
+- 教师端：查看教学班与学生列表、成绩批改入口（占位）。
+- 管理员端：用户信息注册、课程信息管理、教学班管理、批量导入、成绩复核审理（占位）。
+
 ## WebSocket 通道
 
 - WS 端点：/ws/exam 或 /ws/exam?sessionId={sessionId}
-- 请求动作：LOGIN、START_SESSION、NEXT_QUESTION、SUBMIT_ANSWER、UPDATE_AVATAR、RESET_AVATAR
+- 请求动作：
+  - 登录/资料：LOGIN、UPDATE_PROFILE、UPDATE_AVATAR、RESET_AVATAR
+  - 考试：START_SESSION、NEXT_QUESTION、SUBMIT_ANSWER
+  - 管理端：REGISTER_USER、CREATE_COURSE、CREATE_CLASS、IMPORT_BATCH
+  - 教学班：GET_TEACHER_CLASSES、GET_STUDENT_CLASSES
 - 响应格式：RESPONSE（requestId/action/success/payload）
 - 服务端事件：CONNECTED、PONG、ANSWER_UPDATED、ERROR
 
@@ -85,7 +95,19 @@ docker compose up -d
 - 自定义头像支持 JPG/PNG，裁剪为圆形 PNG 后保存为 server/avatar/{cardNo}.png。
 - 恢复默认头像会删除对应的自定义 {cardNo}.png 文件。
 
-数据库必需表（你已创建）：users
+数据库必需表（你已创建）：users、student、teacher、course、class、SC
+
+若你的旧库中 class.eid 仍关联 teacher.id，可执行修复脚本：infra/sql/20260426_fix_class_fk.sql
+
+## 批量导入模板
+
+模板文件位于项目根目录（students.xlsx / teachers.xlsx / courses.xlsx / classes.xlsx / SClist.xlsx）。
+
+- students.xlsx：卡号、姓名、性别、学号、入学年份、专业、学院
+- teachers.xlsx：卡号、姓名、性别、工号、入职年份、职称、学院
+- courses.xlsx：课程编号、课程名称、学分
+- classes.xlsx：课程编号、教师工号
+- SClist.xlsx：学号、课程编号、教师工号、成绩
 
 使用你的数据库账号启动后端：
 

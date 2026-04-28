@@ -3,6 +3,7 @@ package com.nexeval.ws;
 import com.nexeval.dto.AnswerRequest;
 import com.nexeval.service.AdminManagementService;
 import com.nexeval.service.CatExamService;
+import com.nexeval.service.ClassQueryService;
 import com.nexeval.service.UserAuthService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,19 +32,22 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
   private final CatExamService catExamService;
   private final UserAuthService userAuthService;
   private final AdminManagementService adminManagementService;
+  private final ClassQueryService classQueryService;
 
   public ExamWebSocketHandler(
     ExamWebSocketHub hub,
     ObjectMapper objectMapper,
     CatExamService catExamService,
     UserAuthService userAuthService,
-    AdminManagementService adminManagementService
+    AdminManagementService adminManagementService,
+    ClassQueryService classQueryService
   ) {
     this.hub = hub;
     this.objectMapper = objectMapper;
     this.catExamService = catExamService;
     this.userAuthService = userAuthService;
     this.adminManagementService = adminManagementService;
+    this.classQueryService = classQueryService;
   }
 
   @Override
@@ -179,6 +183,16 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
           responsePayload = adminManagementService.importBatch(
             requireText(payload, "importType"),
             requireText(payload, "fileBase64")
+          );
+          break;
+        case "GET_TEACHER_CLASSES":
+          responsePayload = classQueryService.getTeacherClasses(
+            requireText(payload, "eid")
+          );
+          break;
+        case "GET_STUDENT_CLASSES":
+          responsePayload = classQueryService.getStudentClasses(
+            requireText(payload, "sno")
           );
           break;
         case "START_SESSION":

@@ -1,25 +1,56 @@
 <template>
-  <section>
-    <div class="dashboard-head card">
-      <h1 class="card-title">在线考试系统</h1>
-      <p class="card-subtitle">{{ pageSubtitle }}</p>
-    </div>
+  <section class="home-shell">
+    <aside class="home-sidebar card">
+      <div class="side-profile">
+        <img :src="avatarUrl" alt="默认头像" class="side-avatar" @click="triggerAvatarPicker" />
+        <div class="side-name">{{ userName }}</div>
+        <div class="side-id">卡号 {{ cardNo }}</div>
+      </div>
 
-    <div class="dashboard-grid">
-      <section class="card panel-card">
+      <nav class="side-nav">
+        <button
+          v-for="item in menuItems"
+          :key="item.key"
+          type="button"
+          class="side-item"
+          :class="{ active: activeMenu === item.key }"
+          @click="activeMenu = item.key"
+        >
+          {{ item.label }}
+        </button>
+      </nav>
+
+      <div class="side-status">
+        <div class="status-label">WebSocket</div>
+        <el-tag size="small" :type="wsTagType">{{ wsStatus }}</el-tag>
+      </div>
+
+      <div class="side-actions">
+        <el-button text type="danger" @click="handleLogout">退出登录</el-button>
+      </div>
+
+      <input
+        ref="avatarInputRef"
+        class="avatar-input"
+        type="file"
+        accept="image/png,image/jpeg"
+        @change="handleAvatarFileChange"
+      />
+    </aside>
+
+    <main class="home-main">
+      <div class="dashboard-head card">
+        <h1 class="card-title">在线考试系统</h1>
+        <p class="card-subtitle">{{ pageSubtitle }}</p>
+      </div>
+
+      <section class="card panel-card" v-if="activeMenu === 'profile'">
         <h2 class="panel-title">个人信息</h2>
         <div class="avatar-wrap">
           <div class="avatar-click" @click="triggerAvatarPicker">
             <img :src="avatarUrl" alt="默认头像" class="avatar-image" />
           </div>
           <div class="avatar-tip">点击修改头像</div>
-          <input
-            ref="avatarInputRef"
-            class="avatar-input"
-            type="file"
-            accept="image/png,image/jpeg"
-            @change="handleAvatarFileChange"
-          />
         </div>
         <el-descriptions :column="1" border>
           <el-descriptions-item label="卡号">{{ cardNo }}</el-descriptions-item>
@@ -44,18 +75,88 @@
         <div class="action-row">
           <el-button :loading="avatarSaving" @click="handleResetAvatar">恢复默认头像</el-button>
           <el-button type="primary" plain @click="openEditDialog">修改信息</el-button>
-          <el-button text type="danger" @click="handleLogout">退出登录</el-button>
         </div>
       </section>
 
-      <section class="card panel-card">
+      <section class="card panel-card" v-else>
         <h2 class="panel-title">{{ actionPanelTitle }}</h2>
-        <p class="ws-line">
-          WebSocket:
-          <el-tag size="small" :type="wsTagType">{{ wsStatus }}</el-tag>
-        </p>
 
-        <el-form @submit.prevent>
+        <template v-if="isTeacher">
+          <div class="teacher-layout">
+            <div class="teacher-sidebar">
+              <div class="section-title">教学班</div>
+              <div v-if="teacherLoading" class="placeholder">正在加载教学班...</div>
+              <div v-else-if="teacherClasses.length === 0" class="placeholder">暂无教学班</div>
+              <div v-else class="class-list">
+                <button
+                  v-for="clazz in teacherClasses"
+                  :key="`${clazz.cno}-${clazz.eid}`"
+                  type="button"
+                  class="class-card"
+                  :class="{ active: selectedClass?.cno === clazz.cno && selectedClass?.eid === clazz.eid }"
+                  @click="selectClass(clazz)"
+                >
+                  <div class="class-title">
+                    <span class="class-code">{{ clazz.cno }}</span>
+                    <span class="class-name">{{ clazz.cname }}</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <div class="teacher-main">
+              <div class="student-header">
+                <div>
+                  <div class="section-title">学生列表</div>
+                  <div class="student-subtitle">
+                    {{ selectedClass ? `${selectedClass.cno} ${selectedClass.cname}` : "请先选择教学班" }}
+                  </div>
+                </div>
+                <div v-if="selectedClass" class="student-count">共 {{ selectedClass.students?.length || 0 }} 人</div>
+              </div>
+              <div v-if="!selectedClass" class="placeholder">请选择教学班查看学生</div>
+              <el-table v-else :data="selectedClass.students || []" size="small">
+                <el-table-column prop="userId" label="卡号" width="120" />
+                <el-table-column prop="sno" label="学号" width="120" />
+                <el-table-column prop="name" label="姓名" width="120" />
+                <el-table-column label="性别" width="80">
+                  <template #default="scope">
+                    {{ scope.row.sex ? '男' : '女' }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="grade" label="成绩" width="80">
+                  <template #default="scope">
+                    {{ scope.row.grade ?? '-' }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作">
+                  <template #default="scope">
+                    <el-button size="small" @click="handleGradeStudent(scope.row)">成绩批改</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </div>
+        </template>
+
+        <template v-else-if="isStudent">
+          <div v-if="studentLoading" class="placeholder">正在加载教学班...</div>
+          <el-table v-else-if="studentClasses.length" :data="studentClasses" size="small">
+            <el-table-column prop="cno" label="课程号" width="140" />
+            <el-table-column prop="cname" label="课程名" />
+            <el-table-column prop="teacherName" label="教师姓名" width="120" />
+            <el-table-column label="操作" width="140">
+              <template #default="scope">
+                <el-button type="primary" size="small" :loading="starting" @click="handleStartExamForClass(scope.row)">
+                  进入考试
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div v-else class="placeholder">暂无教学班</div>
+        </template>
+
+        <el-form v-else @submit.prevent>
           <el-form-item label="考试账号">
             <el-input v-model="userId" disabled />
           </el-form-item>
@@ -63,7 +164,7 @@
           <el-button type="primary" :loading="starting" @click="handleStartExam">{{ actionButtonText }}</el-button>
         </el-form>
       </section>
-    </div>
+    </main>
 
     <el-dialog v-model="editVisible" title="修改个人信息" width="520px">
       <el-form label-position="top">
@@ -149,6 +250,16 @@ const displayPhone = computed(() => formatPhoneForDisplay(phone.value));
 const actionPanelTitle = computed(() => (isTeacher.value ? "考试批改" : "进入考试"));
 const actionButtonText = computed(() => (isTeacher.value ? "考试批改" : "进入考试"));
 const pageSubtitle = computed(() => (isTeacher.value ? "请先确认个人信息，再进入批改。" : "请先确认个人信息，再进入考试。"));
+const activeMenu = ref("action");
+const menuItems = computed(() => [
+  { key: "profile", label: "个人信息" },
+  { key: "action", label: actionPanelTitle.value }
+]);
+const teacherClasses = ref([]);
+const studentClasses = ref([]);
+const teacherLoading = ref(false);
+const studentLoading = ref(false);
+const selectedClass = ref(null);
 
 const editVisible = ref(false);
 const saving = ref(false);
@@ -218,6 +329,7 @@ function connectWebSocket() {
   wsClient = createExamSocket(null, {
     onOpen() {
       wsStatus.value = "connected";
+      refreshClassLists();
     },
     onClose() {
       wsStatus.value = "closed";
@@ -231,6 +343,58 @@ function connectWebSocket() {
 function handleLogout() {
   clearLogin();
   router.push("/login");
+}
+
+function refreshClassLists() {
+  if (!wsClient || !wsClient.isOpen()) {
+    return;
+  }
+
+  if (isTeacher.value) {
+    fetchTeacherClasses();
+  }
+
+  if (isStudent.value) {
+    fetchStudentClasses();
+  }
+}
+
+async function fetchTeacherClasses() {
+  const eid = teacherInfo.value?.eid;
+  if (!eid) {
+    teacherClasses.value = [];
+    selectedClass.value = null;
+    return;
+  }
+
+  teacherLoading.value = true;
+  try {
+    const data = await wsClient.request("GET_TEACHER_CLASSES", { eid }, 20000);
+    teacherClasses.value = Array.isArray(data) ? data : [];
+    selectedClass.value = teacherClasses.value[0] || null;
+  } catch (error) {
+    ElMessage.error(error.message || "教学班获取失败");
+  } finally {
+    teacherLoading.value = false;
+  }
+}
+
+async function fetchStudentClasses() {
+  const sno = studentInfo.value?.sno;
+  if (!sno) {
+    studentClasses.value = [];
+    return;
+  }
+
+  studentLoading.value = true;
+  try {
+    const data = await wsClient.request("GET_STUDENT_CLASSES", { sno }, 20000);
+    studentClasses.value = Array.isArray(data) ? data : [];
+  } catch (error) {
+    ElMessage.error(error.message || "教学班获取失败");
+  } finally {
+    studentLoading.value = false;
+  }
 }
 
 function triggerAvatarPicker() {
@@ -349,6 +513,7 @@ function applyProfile(profile) {
   teacherInfo.value = profile.teacherInfo || null;
   avatarUrl.value = withAvatarVersion(profile.avatarUrl || avatarUrl.value);
   saveLogin(profile);
+  refreshClassLists();
 }
 
 function isAllZeroPhone(value) {
@@ -434,6 +599,18 @@ async function handleStartExam() {
   }
 }
 
+function handleStartExamForClass() {
+  handleStartExam();
+}
+
+function selectClass(clazz) {
+  selectedClass.value = clazz;
+}
+
+function handleGradeStudent() {
+  ElMessage.info("成绩批改功能开发中");
+}
+
 onMounted(connectWebSocket);
 
 onBeforeUnmount(() => {
@@ -442,18 +619,98 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.dashboard-head {
-  margin-bottom: 16px;
-}
-
-.dashboard-grid {
+.home-shell {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 240px 1fr;
   gap: 16px;
 }
 
+.home-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 520px;
+}
+
+.side-profile {
+  text-align: center;
+}
+
+.side-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #dcdfe6;
+  cursor: pointer;
+}
+
+.side-name {
+  margin-top: 10px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.side-id {
+  margin-top: 2px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.side-item {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.side-item.active {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #eff5ff;
+}
+
+.side-status {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.status-label {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.side-actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.home-main {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-head {
+  margin-bottom: 0;
+}
+
 .panel-card {
-  min-height: 280px;
+  min-height: 320px;
 }
 
 .panel-title {
@@ -494,6 +751,7 @@ onBeforeUnmount(() => {
   display: none;
 }
 
+
 .action-row {
   margin-top: 14px;
   display: flex;
@@ -505,6 +763,95 @@ onBeforeUnmount(() => {
   margin: 0 0 14px;
   color: #6b7280;
   font-size: 14px;
+}
+
+.teacher-layout {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.section-title {
+  margin-bottom: 8px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.teacher-sidebar {
+  display: grid;
+  gap: 12px;
+}
+
+.teacher-main {
+  display: grid;
+  gap: 12px;
+}
+
+.student-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.student-subtitle {
+  color: #111827;
+  font-weight: 600;
+}
+
+.student-count {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.class-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.class-card {
+  text-align: left;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 6px 10px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  max-width: 180px;
+}
+
+.class-card:hover {
+  border-color: #cbd5f5;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.class-card.active {
+  border-color: #2563eb;
+  background: #eff5ff;
+}
+
+.class-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.class-code {
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.class-name {
+  margin-top: 0;
+  color: #6b7280;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pwd-strength {
@@ -520,7 +867,11 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 900px) {
-  .dashboard-grid {
+  .home-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .teacher-layout {
     grid-template-columns: 1fr;
   }
 }
