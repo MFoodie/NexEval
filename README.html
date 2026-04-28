@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>NexEval B&sol;S &#x5728;&#x7ebf;&#x8003;&#x8bd5;&#x7cfb;&#x7edf;</title>
+            <style>
+/* From extension vscode.github */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.vscode-dark img[src$=\#gh-light-mode-only],
+.vscode-light img[src$=\#gh-dark-mode-only],
+.vscode-high-contrast:not(.vscode-high-contrast-light) img[src$=\#gh-light-mode-only],
+.vscode-high-contrast-light img[src$=\#gh-dark-mode-only] {
+	display: none;
+}
+
+</style>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css">
+<link href="https://cdn.jsdelivr.net/npm/katex-copytex@latest/dist/katex-copytex.min.css" rel="stylesheet" type="text/css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+<style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        <style>
+.task-list-item {
+    list-style-type: none;
+}
+
+.task-list-item-checkbox {
+    margin-left: -20px;
+    vertical-align: middle;
+    pointer-events: none;
+}
+</style>
+<style>
+:root {
+  --color-note: #0969da;
+  --color-tip: #1a7f37;
+  --color-warning: #9a6700;
+  --color-severe: #bc4c00;
+  --color-caution: #d1242f;
+  --color-important: #8250df;
+}
+
+</style>
+<style>
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-note: #2f81f7;
+    --color-tip: #3fb950;
+    --color-warning: #d29922;
+    --color-severe: #db6d28;
+    --color-caution: #f85149;
+    --color-important: #a371f7;
+  }
+}
+
+</style>
+<style>
+.markdown-alert {
+  padding: 0.5rem 1rem;
+  margin-bottom: 16px;
+  color: inherit;
+  border-left: .25em solid #888;
+}
+
+.markdown-alert>:first-child {
+  margin-top: 0
+}
+
+.markdown-alert>:last-child {
+  margin-bottom: 0
+}
+
+.markdown-alert .markdown-alert-title {
+  display: flex;
+  font-weight: 500;
+  align-items: center;
+  line-height: 1
+}
+
+.markdown-alert .markdown-alert-title .octicon {
+  margin-right: 0.5rem;
+  display: inline-block;
+  overflow: visible !important;
+  vertical-align: text-bottom;
+  fill: currentColor;
+}
+
+.markdown-alert.markdown-alert-note {
+  border-left-color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-note .markdown-alert-title {
+  color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-important {
+  border-left-color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-important .markdown-alert-title {
+  color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-warning {
+  border-left-color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-warning .markdown-alert-title {
+  color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-tip {
+  border-left-color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-tip .markdown-alert-title {
+  color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-caution {
+  border-left-color: var(--color-caution);
+}
+
+.markdown-alert.markdown-alert-caution .markdown-alert-title {
+  color: var(--color-caution);
+}
+
+</style>
+        
+        </head>
+        <body class="vscode-body vscode-light">
+            <h1 id="nexeval-bs-在线考试系统">NexEval B/S 在线考试系统</h1>
+<p>这是一个用于构建 CAT 类在线考试系统的浅层目录 B/S（浏览器/服务器）项目。</p>
+<h2 id="技术栈">技术栈</h2>
+<ul>
+<li>前端：Vue 3 + Vite + Element Plus</li>
+<li>后端：Java 21 + Spring Boot 3（Gradle，WebSocket API）</li>
+<li>基础设施（可选）：MySQL + Redis + Nginx</li>
+</ul>
+<h2 id="目录结构">目录结构</h2>
+<pre><code class="language-text">NexEval/
+  client/          # 浏览器端应用（Vue）
+  server/          # 服务端应用（Spring Boot）
+  infra/           # Docker 与 Nginx 示例配置
+  .gitignore
+  README.md
+</code></pre>
+<p>为方便维护，项目顶层目录深度保持较浅。</p>
+<h2 id="快速启动">快速启动</h2>
+<h3 id="1-启动后端">1. 启动后端</h3>
+<p>先生成本地 TLS 证书（仅首次需要）：</p>
+<pre><code class="language-powershell"><span class="hljs-built_in">cd</span> server
+mkdir certs <span class="hljs-literal">-ErrorAction</span> SilentlyContinue
+keytool <span class="hljs-literal">-genkeypair</span> <span class="hljs-literal">-alias</span> nexeval <span class="hljs-literal">-keyalg</span> RSA <span class="hljs-literal">-keysize</span> <span class="hljs-number">2048</span> <span class="hljs-literal">-storetype</span> PKCS12 <span class="hljs-literal">-keystore</span> .\certs\nexeval.p12 <span class="hljs-literal">-validity</span> <span class="hljs-number">3650</span> <span class="hljs-literal">-storepass</span> changeit <span class="hljs-literal">-keypass</span> changeit <span class="hljs-literal">-dname</span> <span class="hljs-string">&quot;CN=localhost, OU=NexEval, O=NexEval, L=Local, ST=Local, C=CN&quot;</span>
+</code></pre>
+<p>启动后端：</p>
+<pre><code class="language-powershell"><span class="hljs-built_in">cd</span> server
+gradle bootRun
+</code></pre>
+<p>后端地址：<a href="https://localhost:8443">https://localhost:8443</a></p>
+<h3 id="2-启动前端">2. 启动前端</h3>
+<pre><code class="language-powershell"><span class="hljs-built_in">cd</span> client
+npm install
+npm run dev
+</code></pre>
+<p>前端地址（HTTP）：<a href="http://localhost:5173">http://localhost:5173</a></p>
+<p>前端地址（HTTPS）：<a href="https://localhost:5173">https://localhost:5173</a></p>
+<h3 id="3-可选启动本地基础设施">3. 可选：启动本地基础设施</h3>
+<pre><code class="language-powershell"><span class="hljs-built_in">cd</span> infra
+docker compose up <span class="hljs-literal">-d</span>
+</code></pre>
+<h2 id="接口现状">接口现状</h2>
+<ul>
+<li>业务 REST 端点已移除。</li>
+<li>考试主流程仅使用 WebSocket 请求-响应。</li>
+</ul>
+<h2 id="websocket-通道">WebSocket 通道</h2>
+<ul>
+<li>WS 端点：/ws/exam 或 /ws/exam?sessionId={sessionId}</li>
+<li>请求动作：LOGIN、START_SESSION、NEXT_QUESTION、SUBMIT_ANSWER、UPDATE_AVATAR、RESET_AVATAR</li>
+<li>响应格式：RESPONSE（requestId/action/success/payload）</li>
+<li>服务端事件：CONNECTED、PONG、ANSWER_UPDATED、ERROR</li>
+</ul>
+<h2 id="数据库登录mysql-sedb">数据库登录（MySQL sedb）</h2>
+<ul>
+<li>后端连接 MySQL 的 sedb schema。</li>
+<li>支持卡号/手机号/邮箱 + 密码登录。</li>
+<li>登录成功后，数据库中的密码会以 bcrypt 密文保存。</li>
+<li>默认头像根据 type + sex 选择，通过 /avatar/** 提供访问：
+<ul>
+<li>student：student_male.png / student_female.png</li>
+<li>teacher：teacher_male.png / teacher_female.png</li>
+<li>admin：admin_male.png / admin_female.png</li>
+</ul>
+</li>
+<li>自定义头像支持 JPG/PNG，裁剪为圆形 PNG 后保存为 server/avatar/{cardNo}.png。</li>
+<li>恢复默认头像会删除对应的自定义 {cardNo}.png 文件。</li>
+</ul>
+<p>数据库必需表（你已创建）：users</p>
+<p>使用你的数据库账号启动后端：</p>
+<pre><code class="language-powershell"><span class="hljs-variable">$env:DB_HOST</span> = <span class="hljs-string">&quot;localhost&quot;</span>
+<span class="hljs-variable">$env:DB_PORT</span> = <span class="hljs-string">&quot;3306&quot;</span>
+<span class="hljs-variable">$env:DB_USERNAME</span> = <span class="hljs-string">&quot;root&quot;</span>
+<span class="hljs-variable">$env:DB_PASSWORD</span> = <span class="hljs-string">&quot;123456&quot;</span>
+<span class="hljs-variable">$env:SSL_ENABLED</span> = <span class="hljs-string">&quot;true&quot;</span>
+<span class="hljs-variable">$env:SSL_KEY_STORE</span> = <span class="hljs-string">&quot;file:./certs/nexeval.p12&quot;</span>
+<span class="hljs-variable">$env:SSL_KEY_STORE_PASSWORD</span> = <span class="hljs-string">&quot;changeit&quot;</span>
+<span class="hljs-variable">$env:SSL_KEY_ALIAS</span> = <span class="hljs-string">&quot;nexeval&quot;</span>
+<span class="hljs-built_in">cd</span> server
+gradle bootRun
+</code></pre>
+<h2 id="默认安全加固">默认安全加固</h2>
+<ul>
+<li>TLS/HTTPS + HTTP/2</li>
+<li>限制 WebSocket 允许来源（ALLOWED_ORIGINS）</li>
+<li>安全响应头：HSTS、CSP、X-Frame-Options、X-Content-Type-Options</li>
+</ul>
+<h2 id="说明">说明</h2>
+<ul>
+<li>当前 CAT 逻辑是内存版实现，用于快速原型验证。</li>
+<li>MySQL 与 Redis 已预留，但部分能力仍可继续扩展。</li>
+<li>后续可继续扩展认证、题库管理、考试编排、AI 阅卷、统计分析等模块。</li>
+</ul>
+
+            <script async src="https://cdn.jsdelivr.net/npm/katex-copytex@latest/dist/katex-copytex.min.js"></script>
+            
+        </body>
+        </html>
