@@ -10,21 +10,29 @@
       </div>
       <nav class="nav">
         <RouterLink
-          v-if="route.name !== 'login'"
+          v-if="route.name !== 'login' && route.name !== 'register'"
           to="/"
           class="nav-link"
           active-class="nav-link--active"
         >
           首页
         </RouterLink>
-        <RouterLink
-          v-else
-          to="/login"
-          class="nav-link"
-          active-class="nav-link--active"
-        >
-          登录
-        </RouterLink>
+        <template v-else>
+          <RouterLink
+            to="/login"
+            class="nav-link"
+            active-class="nav-link--active"
+          >
+            登录
+          </RouterLink>
+          <RouterLink
+            to="/register"
+            class="nav-link"
+            active-class="nav-link--active"
+          >
+            注册
+          </RouterLink>
+        </template>
       </nav>
     </header>
     <main class="content">
