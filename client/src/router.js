@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { getLogin, isLoggedIn } from "./auth";
 import LoginView from "./views/LoginView.vue";
+import RegisterView from "./views/RegisterView.vue";
 import HomeView from "./views/HomeView.vue";
 import ExamRoomView from "./views/ExamRoomView.vue";
 import AdminView from "./views/AdminView.vue";
@@ -10,6 +11,14 @@ const routes = [
     path: "/login",
     name: "login",
     component: LoginView,
+    meta: {
+      guestOnly: true
+    }
+  },
+  {
+    path: "/register",
+    name: "register",
+    component: RegisterView,
     meta: {
       guestOnly: true
     }
