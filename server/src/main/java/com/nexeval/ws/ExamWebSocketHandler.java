@@ -198,6 +198,16 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
         case "START_SESSION":
           responsePayload = handleStartSession(payload);
           break;
+        case "GET_EXAM_QUESTIONS":
+          responsePayload = catExamService.getExamQuestions(
+            requireText(payload, "sessionId")
+          );
+          break;
+        case "GET_SESSION_STATE":
+          responsePayload = catExamService.getSessionState(
+            requireText(payload, "sessionId")
+          );
+          break;
         case "NEXT_QUESTION":
           responsePayload = catExamService.getNextQuestion(requireText(payload, "sessionId"));
           break;
@@ -219,7 +229,10 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
   }
 
   private Object handleStartSession(JsonNode payload) {
-    return catExamService.startSession(requireText(payload, "userId"));
+    return catExamService.startSession(
+      requireText(payload, "userId"),
+      optionalText(payload, "examId")
+    );
   }
 
   private String requireText(JsonNode payload, String fieldName) {

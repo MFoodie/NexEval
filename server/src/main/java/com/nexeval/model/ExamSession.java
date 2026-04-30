@@ -8,6 +8,7 @@ public class ExamSession {
 
   private final String sessionId;
   private final String userId;
+  private final String examId;
   private final int maxQuestions;
   private final Set<String> answeredQuestionIds = new HashSet<>();
 
@@ -16,9 +17,10 @@ public class ExamSession {
   private double theta;
   private boolean finished;
 
-  public ExamSession(String sessionId, String userId, int maxQuestions) {
+  public ExamSession(String sessionId, String userId, String examId, int maxQuestions) {
     this.sessionId = sessionId;
     this.userId = userId;
+    this.examId = examId;
     this.maxQuestions = maxQuestions;
     this.theta = 0.0;
     this.finished = false;
@@ -71,6 +73,10 @@ public class ExamSession {
 
   public String getUserId() {
     return userId;
+  }
+
+  public String getExamId() {
+    return examId;
   }
 
   public synchronized int getAnsweredCount() {

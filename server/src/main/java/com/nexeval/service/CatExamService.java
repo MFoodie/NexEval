@@ -5,8 +5,14 @@ import com.nexeval.dto.AnswerResponse;
 import com.nexeval.dto.NextQuestionResponse;
 import com.nexeval.dto.QuestionView;
 import com.nexeval.dto.StartExamResponse;
+import com.nexeval.model.ExamDefinition;
+import com.nexeval.model.ExamPaperQuestion;
 import com.nexeval.model.ExamSession;
+import com.nexeval.model.QuestionBank;
 import com.nexeval.model.QuestionItem;
+import com.nexeval.model.QuestionOption;
+import com.nexeval.repository.ExamDefinitionRepository;
+import com.nexeval.repository.ExamPaperQuestionRepository;
 import com.nexeval.ws.ExamWebSocketHub;
 import java.util.Comparator;
 import java.util.List;
@@ -20,38 +26,59 @@ import org.springframework.stereotype.Service;
 @Service
 public class CatExamService {
 
-  private static final int MAX_QUESTIONS = 10;
+  private static final int DEFAULT_MAX_QUESTIONS = 10;
   private final ExamWebSocketHub webSocketHub;
+  private final ExamDefinitionRepository examDefinitionRepository;
+  private final ExamPaperQuestionRepository examPaperQuestionRepository;
 
   private final Map<String, ExamSession> sessions = new ConcurrentHashMap<>();
 
-  private final List<QuestionItem> questionBank = List.of(
-    new QuestionItem("Q001", "What is 6 + 7?", List.of("11", "12", "13", "14"), "13", -2.2),
-    new QuestionItem("Q002", "What is 9 * 8?", List.of("62", "72", "81", "64"), "72", -1.7),
-    new QuestionItem("Q003", "Solve x in 2x + 5 = 19.", List.of("6", "7", "8", "9"), "7", -1.1),
-    new QuestionItem("Q004", "Derivative of x^2 is:", List.of("x", "2x", "x^2", "2"), "2x", -0.6),
-    new QuestionItem("Q005", "Which data structure is FIFO?", List.of("Stack", "Queue", "Tree", "Heap"), "Queue", -0.2),
-    new QuestionItem("Q006", "SQL keyword used to filter rows:", List.of("ORDER", "WHERE", "GROUP", "INDEX"), "WHERE", 0.1),
-    new QuestionItem("Q007", "Binary search average time complexity:", List.of("O(n)", "O(log n)", "O(n log n)", "O(1)"), "O(log n)", 0.3),
-    new QuestionItem("Q008", "If p -> q and p is true, then q is:", List.of("True", "False", "Unknown", "Both"), "True", 0.7),
-    new QuestionItem("Q009", "First normal form (1NF) mainly requires:", List.of("No null values", "Atomic column values", "No duplicate rows", "Foreign keys"), "Atomic column values", 1.0),
-    new QuestionItem("Q010", "JVM stands for:", List.of("Java Verified Model", "Java Virtual Machine", "Joint Vector Memory", "Java Vendor Module"), "Java Virtual Machine", 1.3),
-    new QuestionItem("Q011", "For REST update with idempotence, common method is:", List.of("POST", "PATCH", "PUT", "CONNECT"), "PUT", 1.4),
-    new QuestionItem("Q012", "Integral of 2x dx is:", List.of("x^2 + C", "2x + C", "x + C", "x^3 + C"), "x^2 + C", 1.6),
-    new QuestionItem("Q013", "Gradient descent is used to:", List.of("Maximize variance", "Minimize loss", "Encode labels", "Sort arrays"), "Minimize loss", 1.9),
-    new QuestionItem("Q014", "Under network partition in CAP theorem, systems usually trade off:", List.of("Consistency or Availability", "Latency or Throughput", "Memory or CPU", "Storage or Network"), "Consistency or Availability", 2.2),
-    new QuestionItem("Q015", "In IRT/CAT, theta usually denotes:", List.of("Question count", "Latent ability level", "Exam duration", "Difficulty variance"), "Latent ability level", 2.5)
-  );
+  private final Map<String, List<QuestionItem>> examQuestionCache = new ConcurrentHashMap<>();
 
-  public CatExamService(ExamWebSocketHub webSocketHub) {
+  public CatExamService(
+    ExamWebSocketHub webSocketHub,
+    ExamDefinitionRepository examDefinitionRepository,
+    ExamPaperQuestionRepository examPaperQuestionRepository
+  ) {
     this.webSocketHub = webSocketHub;
+    this.examDefinitionRepository = examDefinitionRepository;
+    this.examPaperQuestionRepository = examPaperQuestionRepository;
   }
 
-  public StartExamResponse startSession(String userId) {
+  public StartExamResponse startSession(String userId, String examId) {
+    ExamDefinition examDefinition = resolveExamDefinition(examId);
+    List<QuestionItem> questionBank = getQuestionBank(examDefinition.getId());
+    int maxQuestions = resolveMaxQuestions(examDefinition, questionBank.size());
     String sessionId = UUID.randomUUID().toString().replace("-", "");
-    ExamSession session = new ExamSession(sessionId, userId, MAX_QUESTIONS);
+    ExamSession session = new ExamSession(sessionId, userId, examDefinition.getId(), maxQuestions);
     sessions.put(sessionId, session);
-    return new StartExamResponse(sessionId, session.getUserId(), session.getTheta(), MAX_QUESTIONS);
+    return new StartExamResponse(
+      sessionId,
+      session.getUserId(),
+      session.getExamId(),
+      session.getTheta(),
+      session.getMaxQuestions()
+    );
+  }
+
+  public List<QuestionView> getExamQuestions(String sessionId) {
+    ExamSession session = requireSession(sessionId);
+    return getQuestionBank(session.getExamId()).stream()
+      .map(this::toQuestionView)
+      .toList();
+  }
+
+  public Map<String, Object> getSessionState(String sessionId) {
+    ExamSession session = requireSession(sessionId);
+    return Map.of(
+      "sessionId", session.getSessionId(),
+      "examId", session.getExamId(),
+      "theta", session.getTheta(),
+      "answeredCount", session.getAnsweredCount(),
+      "maxQuestions", session.getMaxQuestions(),
+      "finished", session.isFinished(),
+      "answeredQuestionIds", session.getAnsweredQuestionIds().stream().toList()
+    );
   }
 
   public NextQuestionResponse getNextQuestion(String sessionId) {
@@ -83,7 +110,7 @@ public class CatExamService {
     String questionId = request.questionId().trim();
     String selectedOption = request.selectedOption().trim();
 
-    QuestionItem question = requireQuestion(questionId);
+    QuestionItem question = requireQuestion(session.getExamId(), questionId);
     boolean correct = question.answerKey().equalsIgnoreCase(selectedOption);
 
     session.markAnswered(question.id(), correct, question.difficulty());
@@ -105,6 +132,7 @@ public class CatExamService {
   }
 
   private QuestionItem pickNextQuestion(ExamSession session) {
+    List<QuestionItem> questionBank = getQuestionBank(session.getExamId());
     Set<String> answered = session.getAnsweredQuestionIds();
 
     return questionBank.stream()
@@ -121,11 +149,73 @@ public class CatExamService {
     return session;
   }
 
-  private QuestionItem requireQuestion(String questionId) {
+  private QuestionItem requireQuestion(String examId, String questionId) {
+    List<QuestionItem> questionBank = getQuestionBank(examId);
     return questionBank.stream()
       .filter(item -> item.id().equals(questionId))
       .findFirst()
       .orElseThrow(() -> new NoSuchElementException("Question not found: " + questionId));
+  }
+
+  private List<QuestionItem> getQuestionBank(String examId) {
+    ExamDefinition examDefinition = resolveExamDefinition(examId);
+    String resolvedExamId = examDefinition.getId();
+    List<QuestionItem> cached = examQuestionCache.get(resolvedExamId);
+    if (cached != null && !cached.isEmpty()) {
+      return cached;
+    }
+
+    List<QuestionItem> loaded = loadExamQuestionBank(examDefinition);
+    examQuestionCache.put(resolvedExamId, loaded);
+    return loaded;
+  }
+
+  private List<QuestionItem> loadExamQuestionBank(ExamDefinition examDefinition) {
+    List<ExamPaperQuestion> paperQuestions = examPaperQuestionRepository
+      .findAllByPaper_IdOrderByDisplayOrderAsc(examDefinition.getPaper().getId());
+
+    if (paperQuestions.isEmpty()) {
+      throw new NoSuchElementException("Exam paper has no questions: " + examDefinition.getId());
+    }
+
+    return paperQuestions.stream()
+      .map(ExamPaperQuestion::getQuestion)
+      .map(this::toQuestionItem)
+      .toList();
+  }
+
+  private ExamDefinition resolveExamDefinition(String examId) {
+    if (examId == null || examId.isBlank()) {
+      return examDefinitionRepository.findFirstByIsDefaultTrueAndActiveTrue()
+        .orElseThrow(() -> new NoSuchElementException("Default exam is not configured"));
+    }
+
+    return examDefinitionRepository.findByIdAndActiveTrue(examId)
+      .orElseThrow(() -> new NoSuchElementException("Exam not found: " + examId));
+  }
+
+  private int resolveMaxQuestions(ExamDefinition examDefinition, int questionCount) {
+    int configured = examDefinition.getMaxQuestions();
+    int fallback = Math.min(DEFAULT_MAX_QUESTIONS, questionCount);
+    if (configured <= 0) {
+      return fallback;
+    }
+    return Math.min(configured, questionCount);
+  }
+
+  private QuestionItem toQuestionItem(QuestionBank question) {
+    List<String> options = question.getOptions().stream()
+      .sorted(Comparator.comparingInt(QuestionOption::getOptionOrder))
+      .map(QuestionOption::getOptionText)
+      .toList();
+
+    return new QuestionItem(
+      question.getId(),
+      question.getStem(),
+      options,
+      question.getAnswerKey(),
+      question.getDifficulty()
+    );
   }
 
   private NextQuestionResponse buildFinishedResponse(ExamSession session) {
