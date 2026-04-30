@@ -61,6 +61,26 @@ public class CatExamService {
     );
   }
 
+  public List<QuestionView> getExamQuestions(String sessionId) {
+    ExamSession session = requireSession(sessionId);
+    return getQuestionBank(session.getExamId()).stream()
+      .map(this::toQuestionView)
+      .toList();
+  }
+
+  public Map<String, Object> getSessionState(String sessionId) {
+    ExamSession session = requireSession(sessionId);
+    return Map.of(
+      "sessionId", session.getSessionId(),
+      "examId", session.getExamId(),
+      "theta", session.getTheta(),
+      "answeredCount", session.getAnsweredCount(),
+      "maxQuestions", session.getMaxQuestions(),
+      "finished", session.isFinished(),
+      "answeredQuestionIds", session.getAnsweredQuestionIds().stream().toList()
+    );
+  }
+
   public NextQuestionResponse getNextQuestion(String sessionId) {
     ExamSession session = requireSession(sessionId);
 
