@@ -219,7 +219,10 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
   }
 
   private Object handleStartSession(JsonNode payload) {
-    return catExamService.startSession(requireText(payload, "userId"));
+    return catExamService.startSession(
+      requireText(payload, "userId"),
+      optionalText(payload, "examId")
+    );
   }
 
   private String requireText(JsonNode payload, String fieldName) {
