@@ -41,7 +41,6 @@
     <main class="home-main">
       <div class="dashboard-head card">
         <h1 class="card-title">在线考试系统</h1>
-        <p class="card-subtitle">{{ pageSubtitle }}</p>
       </div>
 
       <section class="card panel-card" v-if="activeMenu === 'profile'">
@@ -78,7 +77,7 @@
         </div>
       </section>
 
-      <section class="card panel-card" v-else>
+      <section class="card panel-card exam-panel-card" v-else>
         <h2 class="panel-title">{{ actionPanelTitle }}</h2>
 
         <template v-if="isTeacher">
@@ -249,7 +248,6 @@ const isTeacher = computed(() => userType.value === "teacher");
 const displayPhone = computed(() => formatPhoneForDisplay(phone.value));
 const actionPanelTitle = computed(() => (isTeacher.value ? "考试批改" : "进入考试"));
 const actionButtonText = computed(() => (isTeacher.value ? "考试批改" : "进入考试"));
-const pageSubtitle = computed(() => (isTeacher.value ? "请先确认个人信息，再进入批改。" : "请先确认个人信息，再进入考试。"));
 const activeMenu = ref("action");
 const menuItems = computed(() => [
   { key: "profile", label: "个人信息" },
@@ -713,18 +711,35 @@ onBeforeUnmount(() => {
 
 .home-main {
   min-width: 0;
-  display: grid;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-content: start;
+  align-self: stretch;
 }
 
 .dashboard-head {
   margin-bottom: 0;
+  height: 56px;
+  padding: 0 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.dashboard-head .card-title {
+  margin-bottom: 0;
 }
 
 .panel-card {
-  min-height: 320px;
+  min-height: 0;
   position: relative;
   overflow: hidden;
+}
+
+.exam-panel-card {
+  flex: 1;
 }
 
 .panel-card::before {
