@@ -247,7 +247,7 @@
               v-if="canReviewAnswer(scope.row)"
               v-model="scope.row.score"
               :min="0"
-              :max="100"
+              :max="scope.row.maxScore ?? 100"
               size="small"
             />
             <span v-else>{{ scope.row.score ?? '-' }}</span>

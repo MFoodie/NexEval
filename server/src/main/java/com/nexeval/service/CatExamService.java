@@ -149,7 +149,7 @@ public class CatExamService {
     ExamDefinition definition = resolveExamDefinition(null);
     List<QuestionItem> questionBank = loadCourseQuestionBank(normalizedCourseNo);
     String paperId = null;
-    int maxQuestions = resolveMaxQuestions(definition, questionBank.size());
+    int maxQuestions = questionBank.size();
 
     int durationMinutes = definition.getDurationMinutes() > 0
       ? definition.getDurationMinutes()
@@ -260,8 +260,8 @@ public class CatExamService {
   public ExamAnswerDetailView reviewAnswer(Long answerId, Integer score, String reviewNote, String reviewerId) {
     ExamAnswer answer = examAnswerRepository.findById(answerId)
       .orElseThrow(() -> new NoSuchElementException("Answer not found: " + answerId));
-
-    answer.setScore(score);
+    Integer cappedScore = capReviewScore(score, answer);
+    answer.setScore(cappedScore);
     answer.setReviewNote(reviewNote == null || reviewNote.isBlank() ? null : reviewNote.trim());
     answer.setReviewerId(reviewerId == null || reviewerId.isBlank() ? null : reviewerId.trim());
     answer.setReviewed(true);
@@ -269,6 +269,18 @@ public class CatExamService {
 
     ExamAnswer saved = examAnswerRepository.save(answer);
     return toAnswerDetailView(saved);
+  }
+
+  private Integer capReviewScore(Integer score, ExamAnswer answer) {
+    if (score == null) {
+      return null;
+    }
+    int normalizedScore = Math.max(0, score);
+    Integer maxScore = resolveQuestionMaxScore(answer.getQuestionType(), answer.getQuestionId());
+    if (maxScore == null || maxScore <= 0) {
+      return normalizedScore;
+    }
+    return Math.min(normalizedScore, maxScore);
   }
 
   public NextQuestionResponse getNextQuestion(String sessionId) {
@@ -366,12 +378,13 @@ public class CatExamService {
       answer.setQuestionType(question.type());
       answer.setAnswerText(answerText);
       answer.setCorrect(scoreEnabled ? correct : null);
+      int maxScore = Math.max(0, question.points());
       if (scoreEnabled) {
-        answer.setScore(correct ? 1 : 0);
+        answer.setScore(correct ? maxScore : 0);
         answer.setReviewed(true);
         answer.setReviewNote(null);
         answer.setReviewerId(null);
-        answer.setReviewedAt(null);
+        answer.setReviewedAt(Instant.now());
       } else {
         answer.setScore(null);
         answer.setReviewed(false);
@@ -570,6 +583,7 @@ public class CatExamService {
       question.getAnswerKey(),
       question.getDifficulty(),
       QuestionType.CHOICE,
+      1,
       true
     );
   }
@@ -582,6 +596,7 @@ public class CatExamService {
       question.isAnswerKey() ? "true" : "false",
       question.getDifficulty(),
       QuestionType.JUDGE,
+      question.getPoints(),
       true
     );
   }
@@ -594,6 +609,7 @@ public class CatExamService {
       question.getAnswerKey(),
       question.getDifficulty(),
       QuestionType.BLANK,
+      question.getPoints(),
       true
     );
   }
@@ -606,6 +622,7 @@ public class CatExamService {
       "",
       question.getDifficulty(),
       QuestionType.ESSAY,
+      question.getPoints(),
       false
     );
   }
@@ -747,8 +764,28 @@ public class CatExamService {
       answer.getCorrect(),
       answer.getScore(),
       answer.isReviewed(),
-      answer.getReviewNote()
+      answer.getReviewNote(),
+      resolveQuestionMaxScore(answer.getQuestionType(), answer.getQuestionId())
     );
+  }
+
+  private Integer resolveQuestionMaxScore(QuestionType type, String questionId) {
+    if (type == null || questionId == null || questionId.isBlank()) {
+      return null;
+    }
+
+    return switch (type) {
+      case CHOICE -> 1;
+      case JUDGE -> judgeQuestionBankRepository.findById(questionId)
+        .map(JudgeQuestionBank::getPoints)
+        .orElse(null);
+      case BLANK -> blankQuestionBankRepository.findById(questionId)
+        .map(BlankQuestionBank::getPoints)
+        .orElse(null);
+      case ESSAY -> essayQuestionBankRepository.findById(questionId)
+        .map(EssayQuestionBank::getPoints)
+        .orElse(null);
+    };
   }
 
   private String resolveQuestionStem(ExamAnswer answer) {

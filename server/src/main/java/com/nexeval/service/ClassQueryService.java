@@ -3,6 +3,11 @@ package com.nexeval.service;
 import com.nexeval.dto.ClassStudentSummary;
 import com.nexeval.dto.StudentClassSummary;
 import com.nexeval.dto.TeacherClassSummary;
+import com.nexeval.model.ExamAttempt;
+import com.nexeval.model.ExamAttemptStatus;
+import com.nexeval.model.SessionMode;
+import com.nexeval.repository.ExamAnswerRepository;
+import com.nexeval.repository.ExamAttemptRepository;
 import com.nexeval.repository.ScRecordRepository;
 import com.nexeval.repository.StudentProfileRepository;
 import com.nexeval.repository.TeacherProfileRepository;
@@ -16,17 +21,23 @@ public class ClassQueryService {
 
   private final TeachingClassRepository teachingClassRepository;
   private final ScRecordRepository scRecordRepository;
+  private final ExamAttemptRepository examAttemptRepository;
+  private final ExamAnswerRepository examAnswerRepository;
   private final TeacherProfileRepository teacherProfileRepository;
   private final StudentProfileRepository studentProfileRepository;
 
   public ClassQueryService(
     TeachingClassRepository teachingClassRepository,
     ScRecordRepository scRecordRepository,
+    ExamAttemptRepository examAttemptRepository,
+    ExamAnswerRepository examAnswerRepository,
     TeacherProfileRepository teacherProfileRepository,
     StudentProfileRepository studentProfileRepository
   ) {
     this.teachingClassRepository = teachingClassRepository;
     this.scRecordRepository = scRecordRepository;
+    this.examAttemptRepository = examAttemptRepository;
+    this.examAnswerRepository = examAnswerRepository;
     this.teacherProfileRepository = teacherProfileRepository;
     this.studentProfileRepository = studentProfileRepository;
   }
@@ -45,13 +56,16 @@ public class ClassQueryService {
       List<ClassStudentSummary> students = scRecordRepository
         .findClassStudents(row.getCno(), row.getEid())
         .stream()
-        .map(student -> new ClassStudentSummary(
-          student.getUserId(),
-          student.getSno(),
-          student.getName(),
-          student.isSex(),
-          student.getGrade()
-        ))
+        .map(student -> {
+          Integer examScore = resolveLatestExamScore(student.getUserId(), row.getCno());
+          return new ClassStudentSummary(
+            student.getUserId(),
+            student.getSno(),
+            student.getName(),
+            student.isSex(),
+            examScore != null ? examScore : student.getGrade()
+          );
+        })
         .toList();
 
       result.add(new TeacherClassSummary(
@@ -88,5 +102,34 @@ public class ClassQueryService {
       throw new IllegalArgumentException(fieldName + " 不能为空");
     }
     return text;
+  }
+
+  private Integer resolveLatestExamScore(String userId, String courseNo) {
+    String normalizedUserId = normalize(userId);
+    String normalizedCourseNo = normalize(courseNo);
+    if (normalizedUserId.isBlank() || normalizedCourseNo.isBlank()) {
+      return null;
+    }
+
+    List<ExamAttempt> attempts = examAttemptRepository
+      .findAllByUserIdAndCourseNoAndModeOrderByStartedAtDesc(
+        normalizedUserId,
+        normalizedCourseNo,
+        SessionMode.EXAM
+      );
+
+    for (ExamAttempt attempt : attempts) {
+      if (attempt.getStatus() == ExamAttemptStatus.IN_PROGRESS) {
+        continue;
+      }
+      Long total = examAnswerRepository.sumScoreBySessionId(attempt.getSessionId());
+      return total == null ? 0 : total.intValue();
+    }
+
+    return null;
+  }
+
+  private String normalize(String value) {
+    return value == null ? "" : value.trim();
   }
 }

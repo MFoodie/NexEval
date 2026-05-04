@@ -9,6 +9,7 @@ public record ExamAnswerDetailView(
   Boolean correct,
   Integer score,
   Boolean reviewed,
-  String reviewNote
+  String reviewNote,
+  Integer maxScore
 ) {
 }

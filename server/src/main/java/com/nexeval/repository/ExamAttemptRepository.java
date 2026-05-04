@@ -16,4 +16,10 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, Long> 
   );
 
   List<ExamAttempt> findAllByUserIdAndModeOrderByStartedAtDesc(String userId, SessionMode mode);
+
+  List<ExamAttempt> findAllByUserIdAndCourseNoAndModeOrderByStartedAtDesc(
+    String userId,
+    String courseNo,
+    SessionMode mode
+  );
 }

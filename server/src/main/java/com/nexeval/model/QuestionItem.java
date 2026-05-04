@@ -9,6 +9,7 @@ public record QuestionItem(
 	String answerKey,
 	double difficulty,
 	QuestionType type,
+	int points,
 	boolean scorable
 ) {
 }
