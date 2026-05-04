@@ -198,6 +198,18 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
         case "START_SESSION":
           responsePayload = handleStartSession(payload);
           break;
+        case "START_PRACTICE":
+          responsePayload = catExamService.startPracticeSession(
+            requireText(payload, "userId"),
+            optionalText(payload, "courseNo")
+          );
+          break;
+        case "START_EXAM":
+          responsePayload = catExamService.startExamSession(
+            requireText(payload, "userId"),
+            optionalText(payload, "courseNo")
+          );
+          break;
         case "GET_EXAM_QUESTIONS":
           responsePayload = catExamService.getExamQuestions(
             requireText(payload, "sessionId")
@@ -211,6 +223,30 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
         case "GET_SESSION_ANSWERS":
           responsePayload = catExamService.getSessionAnswers(
             requireText(payload, "sessionId")
+          );
+          break;
+        case "FINISH_SESSION":
+          responsePayload = catExamService.finishSession(
+            requireText(payload, "sessionId")
+          );
+          break;
+        case "GET_EXAM_ATTEMPTS":
+          responsePayload = catExamService.getExamAttempts(
+            optionalText(payload, "courseNo"),
+            requireText(payload, "userId")
+          );
+          break;
+        case "GET_ATTEMPT_ANSWERS":
+          responsePayload = catExamService.getAttemptAnswers(
+            requireText(payload, "sessionId")
+          );
+          break;
+        case "REVIEW_ANSWER":
+          responsePayload = catExamService.reviewAnswer(
+            Long.parseLong(requireText(payload, "answerId")),
+            optionalInt(payload, "score"),
+            optionalText(payload, "reviewNote"),
+            optionalText(payload, "reviewerId")
           );
           break;
         case "NEXT_QUESTION":
@@ -255,6 +291,25 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
 
   private String optionalText(JsonNode payload, String fieldName) {
     return payload.path(fieldName).asText("").trim();
+  }
+
+  private Integer optionalInt(JsonNode payload, String fieldName) {
+    JsonNode node = payload.get(fieldName);
+    if (node == null || node.isNull()) {
+      return null;
+    }
+    if (node.isInt() || node.isLong()) {
+      return node.asInt();
+    }
+    String text = node.asText("").trim();
+    if (text.isBlank()) {
+      return null;
+    }
+    try {
+      return Integer.parseInt(text);
+    } catch (NumberFormatException ex) {
+      return null;
+    }
   }
 
   private Map<String, Object> buildResponse(

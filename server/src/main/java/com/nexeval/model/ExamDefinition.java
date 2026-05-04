@@ -25,6 +25,9 @@ public class ExamDefinition {
   @Column(name = "max_questions", nullable = false)
   private int maxQuestions;
 
+  @Column(name = "duration_minutes", nullable = false)
+  private int durationMinutes = 60;
+
   @Column(name = "active", nullable = false)
   private boolean active = true;
 
@@ -65,6 +68,14 @@ public class ExamDefinition {
 
   public void setMaxQuestions(int maxQuestions) {
     this.maxQuestions = maxQuestions;
+  }
+
+  public int getDurationMinutes() {
+    return durationMinutes;
+  }
+
+  public void setDurationMinutes(int durationMinutes) {
+    this.durationMinutes = durationMinutes;
   }
 
   public boolean isActive() {

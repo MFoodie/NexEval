@@ -22,6 +22,10 @@
             <span class="progress-text">{{ answeredCount }}/{{ maxQuestions }}</span>
           </div>
         </div>
+        <div v-if="isExamMode" class="status-item">
+          <span class="status-label">剩余时间</span>
+          <span class="status-value">{{ remainingLabel }}</span>
+        </div>
       </div>
     </header>
 
@@ -30,7 +34,7 @@
         <el-skeleton :rows="6" animated v-if="loading" />
 
         <template v-else>
-          <el-result v-if="finished" icon="success" title="练习完成">
+          <el-result v-if="finished" icon="success" :title="finishedTitle">
             <template #extra>
               <el-button type="primary" @click="router.push('/')">返回首页</el-button>
             </template>
@@ -98,6 +102,9 @@
               <el-button type="primary" :loading="submitting" @click="handleSubmit">
                 提交答案
               </el-button>
+              <el-button v-if="isExamMode" type="danger" :loading="finishing" @click="handleFinishExam">
+                交卷
+              </el-button>
             </div>
           </template>
         </template>
@@ -107,8 +114,10 @@
         <div class="card aside-card">
           <div class="aside-title">提示</div>
           <ul class="aside-tips">
-            <li>每题可多次提交，以最后一次为准。</li>
-            <li>当前为固定题库练习模式。</li>
+            <li v-if="isExamMode">考试限时，支持提前交卷。</li>
+            <li v-else>每题可多次提交，以最后一次为准。</li>
+            <li v-if="isExamMode">系统自动判分客观题，主观题可人工批改。</li>
+            <li v-else>当前为固定题库练习模式。</li>
             <li>如遇网络异常，请刷新页面重试。</li>
           </ul>
         </div>
@@ -132,6 +141,11 @@ const courseNameText = computed(() => String(route.query.courseName || "").trim(
 const courseTitle = computed(() => courseNameText.value || `课程 ${courseNoText.value}`);
 const loading = ref(false);
 const submitting = ref(false);
+const finishing = ref(false);
+const sessionMode = ref("practice");
+const timeLimitSeconds = ref(-1);
+const remainingSeconds = ref(-1);
+let timerId = null;
 
 const questions = ref([]);
 const currentIndex = ref(0);
@@ -162,6 +176,12 @@ const isOptionQuestion = computed(() => {
   return type === "choice" || type === "judge";
 });
 
+const isExamMode = computed(() => sessionMode.value === "exam");
+
+const finishedTitle = computed(() => (isExamMode.value ? "考试完成" : "练习完成"));
+
+const remainingLabel = computed(() => formatSeconds(remainingSeconds.value));
+
 const progressPercent = computed(() => {
   if (!maxQuestions.value) {
     return 0;
@@ -170,6 +190,40 @@ const progressPercent = computed(() => {
   const ratio = answeredCount.value / maxQuestions.value;
   return Math.min(100, Math.max(0, Math.round(ratio * 100)));
 });
+
+function formatSeconds(value) {
+  if (value == null || value < 0) {
+    return "-";
+  }
+  const minutes = Math.floor(value / 60);
+  const seconds = value % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function stopTimer() {
+  if (timerId) {
+    clearInterval(timerId);
+    timerId = null;
+  }
+}
+
+function startTimer() {
+  stopTimer();
+  if (!isExamMode.value || remainingSeconds.value < 0) {
+    return;
+  }
+  timerId = setInterval(() => {
+    if (finished.value || !isExamMode.value) {
+      stopTimer();
+      return;
+    }
+    remainingSeconds.value = Math.max(0, remainingSeconds.value - 1);
+    if (remainingSeconds.value <= 0) {
+      handleFinishExam("timeout");
+      stopTimer();
+    }
+  }, 1000);
+}
 
 async function loadQuestions() {
   if (!wsClient || !wsClient.isOpen()) {
@@ -206,7 +260,15 @@ async function loadSessionState() {
     answeredCount.value = payload.answeredCount ?? answeredCount.value;
     maxQuestions.value = payload.maxQuestions ?? maxQuestions.value;
     finished.value = payload.finished ?? finished.value;
+    sessionMode.value = payload.mode ?? sessionMode.value;
+    timeLimitSeconds.value = payload.timeLimitSeconds ?? timeLimitSeconds.value;
+    remainingSeconds.value = payload.remainingSeconds ?? remainingSeconds.value;
     answeredSet.value = new Set(payload.answeredQuestionIds || []);
+    if (finished.value) {
+      stopTimer();
+    } else {
+      startTimer();
+    }
   } catch (error) {
     ElMessage.error(error.message || "会话状态获取失败。");
   }
@@ -271,11 +333,38 @@ async function handleSubmit() {
     }
     if (!payload.finished) {
       goToNextQuestion();
+    } else {
+      stopTimer();
     }
   } catch (error) {
     ElMessage.error(error.message || "提交失败。");
   } finally {
     submitting.value = false;
+  }
+}
+
+async function handleFinishExam(reason = "manual") {
+  if (finishing.value || finished.value) {
+    return;
+  }
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket 未连接，请稍后重试。");
+    return;
+  }
+
+  finishing.value = true;
+  try {
+    const payload = await wsClient.request("FINISH_SESSION", {
+      sessionId: sessionId.value,
+      reason
+    });
+    finished.value = payload.finished ?? true;
+    stopTimer();
+    ElMessage.success("已交卷。");
+  } catch (error) {
+    ElMessage.error(error.message || "交卷失败。");
+  } finally {
+    finishing.value = false;
   }
 }
 
@@ -369,6 +458,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  stopTimer();
   wsClient?.close();
 });
 </script>
@@ -436,6 +526,11 @@ onBeforeUnmount(() => {
 
 .status-label {
   color: var(--ne-text-subtle);
+}
+
+.status-value {
+  color: var(--ne-text-strong);
+  font-weight: 600;
 }
 
 

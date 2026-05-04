@@ -146,9 +146,19 @@
             <el-table-column prop="teacherName" label="教师姓名" width="120" />
             <el-table-column label="操作" width="140">
               <template #default="scope">
-                <el-button type="primary" size="small" :loading="starting" @click="handleStartExamForClass(scope.row)">
-                  进入考试
-                </el-button>
+                <div class="action-buttons">
+                  <el-button
+                    type="primary"
+                    size="small"
+                    :loading="startingPractice"
+                    @click="handleStartPracticeForClass(scope.row)"
+                  >
+                    题目练习
+                  </el-button>
+                  <el-button size="small" :loading="startingExam" @click="handleStartExamForClass(scope.row)">
+                    进入考试
+                  </el-button>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -160,7 +170,10 @@
             <el-input v-model="userId" disabled />
           </el-form-item>
 
-          <el-button type="primary" :loading="starting" @click="handleStartExam">{{ actionButtonText }}</el-button>
+          <div class="action-row">
+            <el-button type="primary" :loading="startingPractice" @click="handleStartPractice">题目练习</el-button>
+            <el-button :loading="startingExam" @click="handleStartExam">进入考试</el-button>
+          </div>
         </el-form>
       </section>
     </main>
@@ -194,6 +207,78 @@
         <el-button type="primary" :loading="saving" @click="handleSaveProfile">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="gradingVisible" title="考试批改" width="860px">
+      <div class="grading-head">
+        <div class="grading-meta">
+          <div>学生：{{ gradingStudent?.name || '-' }}（{{ gradingStudent?.sno || '-' }}）</div>
+          <div>课程：{{ selectedClass?.cno || '-' }} {{ selectedClass?.cname || '' }}</div>
+        </div>
+        <el-select
+          v-model="selectedAttemptId"
+          placeholder="选择考试记录"
+          size="small"
+          @change="handleAttemptChange"
+        >
+          <el-option
+            v-for="attempt in gradingAttempts"
+            :key="attempt.sessionId"
+            :label="formatAttemptLabel(attempt)"
+            :value="attempt.sessionId"
+          />
+        </el-select>
+      </div>
+
+      <div v-if="gradingLoading" class="placeholder">正在加载答卷...</div>
+      <div v-else-if="gradingAttempts.length === 0" class="placeholder">暂无考试记录</div>
+      <el-table v-else :data="gradingAnswers" size="small">
+        <el-table-column prop="stem" label="题目" min-width="240" />
+        <el-table-column prop="answerText" label="作答" min-width="160" />
+        <el-table-column label="判定" width="90">
+          <template #default="scope">
+            <span v-if="scope.row.correct === true">正确</span>
+            <span v-else-if="scope.row.correct === false">错误</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="得分" width="120">
+          <template #default="scope">
+            <el-input-number
+              v-if="canReviewAnswer(scope.row)"
+              v-model="scope.row.score"
+              :min="0"
+              :max="100"
+              size="small"
+            />
+            <span v-else>{{ scope.row.score ?? '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="评语" min-width="180">
+          <template #default="scope">
+            <el-input
+              v-if="canReviewAnswer(scope.row)"
+              v-model="scope.row.reviewNote"
+              size="small"
+              placeholder="填写评语"
+            />
+            <span v-else>{{ scope.row.reviewNote || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120">
+          <template #default="scope">
+            <el-button
+              v-if="canReviewAnswer(scope.row)"
+              size="small"
+              :loading="gradingSaving"
+              @click="handleReviewAnswer(scope.row)"
+            >
+              保存
+            </el-button>
+            <span v-else>自动批改</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </section>
 </template>
 
@@ -217,7 +302,8 @@ const studentInfo = ref(loginInfo?.studentInfo || null);
 const teacherInfo = ref(loginInfo?.teacherInfo || null);
 const avatarUrl = ref(withAvatarVersion(loginInfo?.avatarUrl || "/avatar/student_male.png"));
 const userId = ref(loginInfo?.cardNo || "");
-const starting = ref(false);
+const startingPractice = ref(false);
+const startingExam = ref(false);
 const avatarSaving = ref(false);
 const wsStatus = ref("connecting");
 const avatarInputRef = ref(null);
@@ -246,8 +332,7 @@ const wsTagType = computed(() => {
 const isStudent = computed(() => userType.value === "student");
 const isTeacher = computed(() => userType.value === "teacher");
 const displayPhone = computed(() => formatPhoneForDisplay(phone.value));
-const actionPanelTitle = computed(() => (isTeacher.value ? "考试批改" : "进入考试"));
-const actionButtonText = computed(() => (isTeacher.value ? "考试批改" : "进入考试"));
+const actionPanelTitle = computed(() => (isTeacher.value ? "考试批改" : "题目练习与考试"));
 const activeMenu = ref("action");
 const menuItems = computed(() => [
   { key: "profile", label: "个人信息" },
@@ -258,6 +343,13 @@ const studentClasses = ref([]);
 const teacherLoading = ref(false);
 const studentLoading = ref(false);
 const selectedClass = ref(null);
+const gradingVisible = ref(false);
+const gradingLoading = ref(false);
+const gradingStudent = ref(null);
+const gradingAttempts = ref([]);
+const gradingAnswers = ref([]);
+const selectedAttemptId = ref("");
+const gradingSaving = ref(false);
 
 const editVisible = ref(false);
 const saving = ref(false);
@@ -573,6 +665,41 @@ async function handleSaveProfile() {
   }
 }
 
+async function handleStartPractice(courseNo = "", courseName = "") {
+  if (!userId.value.trim()) {
+    ElMessage.warning("Please input user id.");
+    return;
+  }
+
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket is not connected. Please wait for reconnect.");
+    return;
+  }
+
+  startingPractice.value = true;
+  try {
+    const payload = await wsClient.request("START_PRACTICE", {
+      userId: userId.value.trim(),
+      courseNo: String(courseNo || "").trim()
+    });
+    router.push({
+      name: "exam",
+      params: {
+        sessionId: payload.sessionId
+      },
+      query: {
+        courseNo: String(courseNo || "").trim(),
+        courseName: String(courseName || "").trim(),
+        mode: "practice"
+      }
+    });
+  } catch (error) {
+    ElMessage.error(error.message || "Failed to start practice session.");
+  } finally {
+    startingPractice.value = false;
+  }
+}
+
 async function handleStartExam(courseNo = "", courseName = "") {
   if (!userId.value.trim()) {
     ElMessage.warning("Please input user id.");
@@ -584,9 +711,9 @@ async function handleStartExam(courseNo = "", courseName = "") {
     return;
   }
 
-  starting.value = true;
+  startingExam.value = true;
   try {
-    const payload = await wsClient.request("START_SESSION", {
+    const payload = await wsClient.request("START_EXAM", {
       userId: userId.value.trim(),
       courseNo: String(courseNo || "").trim()
     });
@@ -597,14 +724,19 @@ async function handleStartExam(courseNo = "", courseName = "") {
       },
       query: {
         courseNo: String(courseNo || "").trim(),
-        courseName: String(courseName || "").trim()
+        courseName: String(courseName || "").trim(),
+        mode: "exam"
       }
     });
   } catch (error) {
     ElMessage.error(error.message || "Failed to start exam session.");
   } finally {
-    starting.value = false;
+    startingExam.value = false;
   }
+}
+
+function handleStartPracticeForClass(clazz) {
+  handleStartPractice(clazz?.cno || "", clazz?.cname || "");
 }
 
 function handleStartExamForClass(clazz) {
@@ -615,8 +747,105 @@ function selectClass(clazz) {
   selectedClass.value = clazz;
 }
 
-function handleGradeStudent() {
-  ElMessage.info("成绩批改功能开发中");
+async function handleGradeStudent(row) {
+  if (!selectedClass.value) {
+    return;
+  }
+  gradingStudent.value = row || null;
+  gradingVisible.value = true;
+  await loadExamAttempts();
+}
+
+async function loadExamAttempts() {
+  if (!wsClient || !wsClient.isOpen() || !gradingStudent.value) {
+    return;
+  }
+
+  gradingLoading.value = true;
+  try {
+    const data = await wsClient.request("GET_EXAM_ATTEMPTS", {
+      userId: gradingStudent.value.userId,
+      courseNo: selectedClass.value?.cno || ""
+    });
+    gradingAttempts.value = Array.isArray(data) ? data : [];
+    selectedAttemptId.value = gradingAttempts.value[0]?.sessionId || "";
+    if (selectedAttemptId.value) {
+      await loadAttemptAnswers(selectedAttemptId.value);
+    } else {
+      gradingAnswers.value = [];
+    }
+  } catch (error) {
+    ElMessage.error(error.message || "考试记录获取失败");
+  } finally {
+    gradingLoading.value = false;
+  }
+}
+
+async function loadAttemptAnswers(sessionId) {
+  if (!wsClient || !wsClient.isOpen() || !sessionId) {
+    return;
+  }
+
+  gradingLoading.value = true;
+  try {
+    const data = await wsClient.request("GET_ATTEMPT_ANSWERS", {
+      sessionId
+    });
+    gradingAnswers.value = Array.isArray(data) ? data : [];
+  } catch (error) {
+    ElMessage.error(error.message || "答卷获取失败");
+  } finally {
+    gradingLoading.value = false;
+  }
+}
+
+function handleAttemptChange(value) {
+  selectedAttemptId.value = value || "";
+  if (selectedAttemptId.value) {
+    loadAttemptAnswers(selectedAttemptId.value);
+  }
+}
+
+function formatAttemptLabel(attempt) {
+  if (!attempt) {
+    return "";
+  }
+  const started = attempt.startedAt ? new Date(attempt.startedAt).toLocaleString() : "-";
+  const status = attempt.status ? attempt.status.toUpperCase() : "";
+  return `${started} ${status}`.trim();
+}
+
+function canReviewAnswer(answer) {
+  return answer?.type === "essay";
+}
+
+async function handleReviewAnswer(answer) {
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket is not connected. Please wait for reconnect.");
+    return;
+  }
+  if (!answer?.answerId) {
+    return;
+  }
+
+  gradingSaving.value = true;
+  try {
+    const payload = await wsClient.request("REVIEW_ANSWER", {
+      answerId: String(answer.answerId),
+      score: answer.score,
+      reviewNote: answer.reviewNote || "",
+      reviewerId: cardNo.value
+    });
+    const index = gradingAnswers.value.findIndex((item) => item.answerId === payload.answerId);
+    if (index !== -1) {
+      gradingAnswers.value.splice(index, 1, payload);
+    }
+    ElMessage.success("批改已保存");
+  } catch (error) {
+    ElMessage.error(error.message || "批改保存失败");
+  } finally {
+    gradingSaving.value = false;
+  }
 }
 
 onMounted(connectWebSocket);
@@ -808,6 +1037,12 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .ws-line {
   margin: 0 0 14px;
   color: #6b7280;
@@ -842,6 +1077,21 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: flex-end;
   gap: 12px;
+}
+
+.grading-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.grading-meta {
+  display: grid;
+  gap: 6px;
+  color: var(--ne-text-muted);
+  font-size: 13px;
 }
 
 .student-subtitle {

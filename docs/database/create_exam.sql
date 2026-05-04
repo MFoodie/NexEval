@@ -971,11 +971,45 @@
         name varchar(64) NOT NULL,
         description varchar(255),
         max_questions int NOT NULL,
+        duration_minutes int NOT NULL DEFAULT 60,
         active boolean NOT NULL DEFAULT true,
         is_default boolean NOT NULL DEFAULT false,
         paper_id varchar(32) NOT NULL,
         PRIMARY KEY (id),
         FOREIGN KEY (paper_id) REFERENCES exam_paper(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS practice_paper (
+        id varchar(32) NOT NULL,
+        name varchar(64) NOT NULL,
+        course_no char(8),
+        active boolean NOT NULL DEFAULT true,
+        PRIMARY KEY (id),
+        FOREIGN KEY (course_no) REFERENCES course(cno)
+    );
+
+    CREATE TABLE IF NOT EXISTS practice_paper_question (
+        paper_id varchar(32) NOT NULL,
+        question_id varchar(32) NOT NULL,
+        display_order int NOT NULL,
+        PRIMARY KEY (paper_id, question_id),
+        FOREIGN KEY (paper_id) REFERENCES practice_paper(id),
+        FOREIGN KEY (question_id) REFERENCES question_bank(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS exam_attempt (
+        id bigint NOT NULL AUTO_INCREMENT,
+        session_id varchar(32) NOT NULL,
+        user_id varchar(32) NOT NULL,
+        course_no char(8),
+        mode varchar(16) NOT NULL,
+        paper_id varchar(32),
+        status varchar(16) NOT NULL,
+        time_limit_seconds int,
+        started_at datetime NOT NULL,
+        submitted_at datetime,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_exam_attempt_session (session_id)
     );
 
     CREATE TABLE IF NOT EXISTS exam_paper_question (
@@ -991,9 +1025,34 @@
     ('PAPER_DEFAULT', '标准题库', true),
     ('PAPER_BASIC', '基础题库', true);
 
-    INSERT IGNORE INTO exam_definition (id, name, description, max_questions, active, is_default, paper_id) VALUES
-    ('EXAM_DEFAULT', '标准考试', '覆盖全部题目', 42, true, true, 'PAPER_DEFAULT'),
-    ('EXAM_BASIC', '基础考试', '基础题目集合', 15, true, false, 'PAPER_BASIC');
+    INSERT IGNORE INTO exam_definition (id, name, description, max_questions, duration_minutes, active, is_default, paper_id) VALUES
+    ('EXAM_DEFAULT', '标准考试', '覆盖全部题目', 42, 60, true, true, 'PAPER_DEFAULT'),
+    ('EXAM_BASIC', '基础考试', '基础题目集合', 15, 45, true, false, 'PAPER_BASIC');
+
+    INSERT IGNORE INTO practice_paper (id, name, course_no, active) VALUES
+    ('PRACTICE_DEFAULT', '练习题库', NULL, true);
+
+    INSERT IGNORE INTO practice_paper_question (paper_id, question_id, display_order) VALUES
+    ('PRACTICE_DEFAULT', 'Q043', 1),
+    ('PRACTICE_DEFAULT', 'Q044', 2),
+    ('PRACTICE_DEFAULT', 'Q045', 3),
+    ('PRACTICE_DEFAULT', 'Q046', 4),
+    ('PRACTICE_DEFAULT', 'Q047', 5),
+    ('PRACTICE_DEFAULT', 'Q048', 6),
+    ('PRACTICE_DEFAULT', 'Q049', 7),
+    ('PRACTICE_DEFAULT', 'Q050', 8),
+    ('PRACTICE_DEFAULT', 'Q051', 9),
+    ('PRACTICE_DEFAULT', 'Q052', 10),
+    ('PRACTICE_DEFAULT', 'Q053', 11),
+    ('PRACTICE_DEFAULT', 'Q054', 12),
+    ('PRACTICE_DEFAULT', 'Q055', 13),
+    ('PRACTICE_DEFAULT', 'Q056', 14),
+    ('PRACTICE_DEFAULT', 'Q057', 15),
+    ('PRACTICE_DEFAULT', 'Q058', 16),
+    ('PRACTICE_DEFAULT', 'Q059', 17),
+    ('PRACTICE_DEFAULT', 'Q060', 18),
+    ('PRACTICE_DEFAULT', 'Q061', 19),
+    ('PRACTICE_DEFAULT', 'Q062', 20);
 
     INSERT IGNORE INTO exam_paper_question (paper_id, question_id, display_order) VALUES
     ('PAPER_DEFAULT', 'Q001', 1),
