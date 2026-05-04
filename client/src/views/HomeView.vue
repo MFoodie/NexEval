@@ -573,7 +573,7 @@ async function handleSaveProfile() {
   }
 }
 
-async function handleStartExam() {
+async function handleStartExam(courseNo = "", courseName = "") {
   if (!userId.value.trim()) {
     ElMessage.warning("Please input user id.");
     return;
@@ -587,9 +587,19 @@ async function handleStartExam() {
   starting.value = true;
   try {
     const payload = await wsClient.request("START_SESSION", {
-      userId: userId.value.trim()
+      userId: userId.value.trim(),
+      courseNo: String(courseNo || "").trim()
     });
-    router.push(`/exam/${payload.sessionId}`);
+    router.push({
+      name: "exam",
+      params: {
+        sessionId: payload.sessionId
+      },
+      query: {
+        courseNo: String(courseNo || "").trim(),
+        courseName: String(courseName || "").trim()
+      }
+    });
   } catch (error) {
     ElMessage.error(error.message || "Failed to start exam session.");
   } finally {
@@ -597,8 +607,8 @@ async function handleStartExam() {
   }
 }
 
-function handleStartExamForClass() {
-  handleStartExam();
+function handleStartExamForClass(clazz) {
+  handleStartExam(clazz?.cno || "", clazz?.cname || "");
 }
 
 function selectClass(clazz) {

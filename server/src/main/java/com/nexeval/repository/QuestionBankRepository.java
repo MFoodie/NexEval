@@ -6,4 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface QuestionBankRepository extends JpaRepository<QuestionBank, String> {
   List<QuestionBank> findAllByActiveTrue();
+
+  List<QuestionBank> findAllByActiveTrueAndCno(String cno);
+
+  boolean existsByActiveTrueAndCno(String cno);
 }

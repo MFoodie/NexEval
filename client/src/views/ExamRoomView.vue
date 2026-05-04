@@ -3,9 +3,12 @@
     <header class="exam-hero card">
       <div class="hero-main">
         <div>
-          <div class="hero-eyebrow">固定题库</div>
-          <h1 class="hero-title">题库练习</h1>
-          <p class="hero-subtitle">当前阶段先完成固定题库练习，提交后进入下一题。</p>
+          <div class="hero-eyebrow">当前课程</div>
+          <h1 class="hero-title">{{ courseTitle }}</h1>
+          <p class="hero-subtitle">
+            课程编号：{{ courseNoText }}
+            <span v-if="courseNameText">｜课程名称：{{ courseNameText }}</span>
+          </p>
         </div>
       </div>
 
@@ -36,21 +39,58 @@
           <template v-else-if="currentQuestion">
             <div class="question-head">
               <div class="question-index">第 {{ currentIndex + 1 }} 题</div>
-              <div class="question-difficulty">难度系数：{{ currentQuestion.difficulty.toFixed(1) }}</div>
+              <div class="question-meta">
+                <span class="question-type">{{ currentTypeLabel }}</span>
+              </div>
             </div>
             <h2 class="question-title">{{ currentQuestion.stem }}</h2>
 
-            <el-radio-group v-model="selectedOption" class="option-group">
-              <el-radio
-                v-for="(option, index) in currentQuestion.options"
-                :key="option"
-                :label="option"
-                class="option-item"
+            <template v-if="isOptionQuestion">
+              <el-radio-group v-model="answerValue" class="option-group">
+                <el-radio
+                  v-for="(option, index) in currentQuestion.options"
+                  :key="option"
+                  :label="option"
+                  class="option-item"
+                >
+                  <span class="option-tag">{{ String.fromCharCode(65 + index) }}</span>
+                  <span class="option-text">{{ formatOptionText(option) }}</span>
+                </el-radio>
+              </el-radio-group>
+            </template>
+
+            <template v-else-if="currentQuestion.type === 'blank'">
+              <el-input v-model="answerValue" class="answer-input" placeholder="请输入答案" clearable />
+            </template>
+
+            <template v-else-if="currentQuestion.type === 'essay'">
+              <el-input
+                v-model="answerValue"
+                class="answer-input"
+                type="textarea"
+                :rows="6"
+                placeholder="请输入作答内容"
+              />
+            </template>
+
+            <div class="status-legend">
+              <span class="legend-chip legend-answered">已答</span>
+              <span class="legend-chip legend-current">当前题目</span>
+              <span class="legend-chip legend-unanswered">未答</span>
+            </div>
+
+            <div class="question-grid">
+              <button
+                v-for="(item, index) in questions"
+                :key="item.id"
+                type="button"
+                class="question-node"
+                :class="questionNodeClass(index, item.id)"
+                @click="goToQuestion(index)"
               >
-                <span class="option-tag">{{ String.fromCharCode(65 + index) }}</span>
-                <span class="option-text">{{ option }}</span>
-              </el-radio>
-            </el-radio-group>
+                {{ index + 1 }}
+              </button>
+            </div>
 
             <div class="question-actions">
               <el-button @click="goToPrevQuestion">上一题</el-button>
@@ -67,7 +107,7 @@
         <div class="card aside-card">
           <div class="aside-title">提示</div>
           <ul class="aside-tips">
-            <li>每题仅可提交一次，请确认后再提交。</li>
+            <li>每题可多次提交，以最后一次为准。</li>
             <li>当前为固定题库练习模式。</li>
             <li>如遇网络异常，请刷新页面重试。</li>
           </ul>
@@ -78,7 +118,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { createExamSocket } from "../ws";
@@ -87,19 +127,40 @@ const route = useRoute();
 const router = useRouter();
 
 const sessionId = computed(() => route.params.sessionId);
+const courseNoText = computed(() => String(route.query.courseNo || "").trim() || "-");
+const courseNameText = computed(() => String(route.query.courseName || "").trim());
+const courseTitle = computed(() => courseNameText.value || `课程 ${courseNoText.value}`);
 const loading = ref(false);
 const submitting = ref(false);
 
 const questions = ref([]);
 const currentIndex = ref(0);
 const currentQuestion = computed(() => questions.value[currentIndex.value] || null);
-const selectedOption = ref("");
+const answerValue = ref("");
+const answerMap = ref({});
 const theta = ref(0);
 const answeredCount = ref(0);
 const maxQuestions = ref(10);
 const finished = ref(false);
 const answeredSet = ref(new Set());
 let wsClient = null;
+
+const typeLabels = {
+  choice: "选择题",
+  judge: "判断题",
+  blank: "填空题",
+  essay: "大题"
+};
+
+const currentTypeLabel = computed(() => {
+  const type = currentQuestion.value?.type || "choice";
+  return typeLabels[type] || "题目";
+});
+
+const isOptionQuestion = computed(() => {
+  const type = currentQuestion.value?.type || "choice";
+  return type === "choice" || type === "judge";
+});
 
 const progressPercent = computed(() => {
   if (!maxQuestions.value) {
@@ -124,7 +185,7 @@ async function loadQuestions() {
     questions.value = Array.isArray(payload) ? payload : [];
     maxQuestions.value = questions.value.length || maxQuestions.value;
     currentIndex.value = 0;
-    selectedOption.value = "";
+    syncAnswerForCurrentQuestion();
   } catch (error) {
     ElMessage.error(error.message || "题目加载失败。");
   } finally {
@@ -151,13 +212,41 @@ async function loadSessionState() {
   }
 }
 
+async function loadSessionAnswers() {
+  if (!wsClient || !wsClient.isOpen()) {
+    return;
+  }
+
+  try {
+    const payload = await wsClient.request("GET_SESSION_ANSWERS", {
+      sessionId: sessionId.value
+    });
+    const nextMap = {};
+    const nextAnswered = new Set();
+
+    (Array.isArray(payload) ? payload : []).forEach((item) => {
+      if (!item?.questionId) {
+        return;
+      }
+      nextMap[item.questionId] = item.answerText ?? "";
+      nextAnswered.add(item.questionId);
+    });
+
+    answerMap.value = nextMap;
+    answeredSet.value = nextAnswered;
+    syncAnswerForCurrentQuestion();
+  } catch (error) {
+    ElMessage.error(error.message || "答题记录获取失败。");
+  }
+}
+
 async function handleSubmit() {
   if (!currentQuestion.value) {
     return;
   }
 
-  if (!selectedOption.value) {
-    ElMessage.warning("请选择一个选项。");
+  if (!String(answerValue.value || "").trim()) {
+    ElMessage.warning(isOptionQuestion.value ? "请选择一个选项。" : "请输入答案。");
     return;
   }
 
@@ -166,13 +255,14 @@ async function handleSubmit() {
     const payload = await wsClient.request("SUBMIT_ANSWER", {
       sessionId: sessionId.value,
       questionId: currentQuestion.value.id,
-      selectedOption: selectedOption.value
+      selectedOption: answerValue.value
     });
 
     theta.value = payload.theta;
     answeredCount.value = payload.answeredCount;
     finished.value = payload.finished;
-    answeredSet.value.add(currentQuestion.value.id);
+    answeredSet.value = new Set([...answeredSet.value, currentQuestion.value.id]);
+    saveAnswerForQuestion(currentQuestion.value.id, answerValue.value);
 
     if (payload.correct) {
       ElMessage.success("提交成功。");
@@ -194,7 +284,7 @@ function goToPrevQuestion() {
     return;
   }
   currentIndex.value = currentIndex.value > 0 ? currentIndex.value - 1 : questions.value.length - 1;
-  selectedOption.value = "";
+  syncAnswerForCurrentQuestion();
 }
 
 function goToNextQuestion() {
@@ -202,13 +292,62 @@ function goToNextQuestion() {
     return;
   }
   currentIndex.value = currentIndex.value < questions.value.length - 1 ? currentIndex.value + 1 : 0;
-  selectedOption.value = "";
+  syncAnswerForCurrentQuestion();
 }
+
+function goToQuestion(index) {
+  if (!questions.value.length) {
+    return;
+  }
+  currentIndex.value = index;
+  syncAnswerForCurrentQuestion();
+}
+
+function formatOptionText(option) {
+  if (currentQuestion.value?.type === "judge") {
+    return option === "true" ? "正确" : "错误";
+  }
+  return option;
+}
+
+function saveAnswerForQuestion(questionId, value) {
+  if (!questionId) {
+    return;
+  }
+  answerMap.value = {
+    ...answerMap.value,
+    [questionId]: value
+  };
+}
+
+function questionNodeClass(index, questionId) {
+  if (index === currentIndex.value) {
+    return "is-current";
+  }
+  if (answeredSet.value.has(questionId)) {
+    return "is-answered";
+  }
+  return "is-unanswered";
+}
+
+function syncAnswerForCurrentQuestion() {
+  const questionId = currentQuestion.value?.id;
+  if (!questionId) {
+    answerValue.value = "";
+    return;
+  }
+  answerValue.value = answerMap.value[questionId] ?? "";
+}
+
+watch(currentQuestion, () => {
+  syncAnswerForCurrentQuestion();
+});
 
 function connectWebSocket() {
   wsClient = createExamSocket(sessionId.value, {
     onOpen() {
       loadSessionState();
+      loadSessionAnswers();
       loadQuestions();
     },
     onClose() {
@@ -346,6 +485,21 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 
+.question-meta {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.question-type {
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--ne-border);
+  background: var(--ne-primary-soft);
+  color: var(--ne-primary);
+  font-size: 12px;
+}
+
 .question-title {
   margin: 0 0 18px;
   font-size: 20px;
@@ -356,6 +510,85 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 12px;
   margin-bottom: 24px;
+}
+
+.answer-input {
+  margin-bottom: 24px;
+}
+
+.status-legend {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--ne-text-muted);
+}
+
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--ne-border);
+  background: var(--ne-surface);
+}
+
+.legend-chip::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.legend-answered::before {
+  background: rgba(42, 92, 255, 0.35);
+}
+
+.legend-current::before {
+  background: var(--ne-primary);
+}
+
+.legend-unanswered::before {
+  background: #d5dbe5;
+}
+
+.question-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.question-node {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--ne-border);
+  background: #f2f4f8;
+  color: var(--ne-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.question-node.is-answered {
+  background: rgba(42, 92, 255, 0.18);
+  border-color: rgba(42, 92, 255, 0.4);
+  color: var(--ne-primary);
+}
+
+.question-node.is-current {
+  background: var(--ne-primary);
+  border-color: var(--ne-primary);
+  color: #fff;
+  box-shadow: var(--ne-shadow-soft);
+}
+
+.question-node:hover {
+  transform: translateY(-1px);
 }
 
 .option-item {

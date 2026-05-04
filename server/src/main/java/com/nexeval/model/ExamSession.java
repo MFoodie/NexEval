@@ -26,13 +26,19 @@ public class ExamSession {
     this.finished = false;
   }
 
-  public synchronized void markAnswered(String questionId, boolean correct, double questionDifficulty) {
+  public synchronized void markAnswered(
+    String questionId,
+    boolean correct,
+    double questionDifficulty,
+    boolean scoreEnabled
+  ) {
     if (finished) {
       throw new IllegalStateException("Exam session already finished.");
     }
 
     if (answeredQuestionIds.contains(questionId)) {
-      throw new IllegalArgumentException("Question already answered.");
+      // Allow re-submit without changing session statistics.
+      return;
     }
 
     answeredQuestionIds.add(questionId);
@@ -42,7 +48,9 @@ public class ExamSession {
       correctCount++;
     }
 
-    updateTheta(correct, questionDifficulty);
+    if (scoreEnabled) {
+      updateTheta(correct, questionDifficulty);
+    }
 
     if (answeredCount >= maxQuestions) {
       finished = true;

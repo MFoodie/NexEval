@@ -1,19 +1,13 @@
 package com.nexeval.model;
 
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
-@Table(name = "question_bank")
-public class QuestionBank {
+@Table(name = "essay_question_bank")
+public class EssayQuestionBank {
 
   @Id
   @Column(name = "id", nullable = false, length = 32)
@@ -22,8 +16,8 @@ public class QuestionBank {
   @Column(name = "stem", nullable = false, length = 512)
   private String stem;
 
-  @Column(name = "answer_key", nullable = false, length = 64)
-  private String answerKey;
+  @Column(name = "points", nullable = false)
+  private int points;
 
   @Column(name = "difficulty", nullable = false)
   private double difficulty;
@@ -33,10 +27,6 @@ public class QuestionBank {
 
   @Column(name = "active", nullable = false)
   private boolean active = true;
-
-  @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
-  @OrderBy("optionOrder ASC")
-  private List<QuestionOption> options = new ArrayList<>();
 
   public String getId() {
     return id;
@@ -54,12 +44,12 @@ public class QuestionBank {
     this.stem = stem;
   }
 
-  public String getAnswerKey() {
-    return answerKey;
+  public int getPoints() {
+    return points;
   }
 
-  public void setAnswerKey(String answerKey) {
-    this.answerKey = answerKey;
+  public void setPoints(int points) {
+    this.points = points;
   }
 
   public double getDifficulty() {
@@ -84,13 +74,5 @@ public class QuestionBank {
 
   public void setActive(boolean active) {
     this.active = active;
-  }
-
-  public List<QuestionOption> getOptions() {
-    return options;
-  }
-
-  public void setOptions(List<QuestionOption> options) {
-    this.options = options == null ? new ArrayList<>() : options;
   }
 }

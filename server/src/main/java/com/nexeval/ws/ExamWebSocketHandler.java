@@ -208,6 +208,11 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
             requireText(payload, "sessionId")
           );
           break;
+        case "GET_SESSION_ANSWERS":
+          responsePayload = catExamService.getSessionAnswers(
+            requireText(payload, "sessionId")
+          );
+          break;
         case "NEXT_QUESTION":
           responsePayload = catExamService.getNextQuestion(requireText(payload, "sessionId"));
           break;
@@ -229,9 +234,14 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
   }
 
   private Object handleStartSession(JsonNode payload) {
+    String courseNo = optionalText(payload, "courseNo");
+    if (courseNo.isBlank()) {
+      courseNo = optionalText(payload, "examId");
+    }
+
     return catExamService.startSession(
       requireText(payload, "userId"),
-      optionalText(payload, "examId")
+      courseNo
     );
   }
 
