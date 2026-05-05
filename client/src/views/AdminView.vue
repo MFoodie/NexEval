@@ -180,7 +180,49 @@
 
       <section class="card panel-card" v-if="activeMenu === 'review'">
         <h2 class="panel-title">成绩复核审理</h2>
-        <div class="placeholder">该功能暂未开放。</div>
+        <div v-if="appealLoading" class="placeholder">正在加载复核申请...</div>
+        <div v-else-if="scoreAppeals.length === 0" class="placeholder">暂无成绩复核申请</div>
+        <el-table v-else :data="scoreAppeals" size="small">
+          <el-table-column prop="userId" label="卡号" width="120" />
+          <el-table-column prop="courseNo" label="课程号" width="120" />
+          <el-table-column prop="reason" label="申请说明" min-width="240" />
+          <el-table-column prop="status" label="状态" width="100" />
+          <el-table-column prop="createdAt" label="提交时间" width="180" />
+          <el-table-column label="处理结果" min-width="160">
+            <template #default="scope">
+              <div>
+                <div>{{ scope.row.handledBy || '-' }}</div>
+                <div class="muted-text">{{ scope.row.handledNote || '-' }}</div>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="180">
+            <template #default="scope">
+              <div class="action-buttons">
+                <el-button
+                  v-if="scope.row.status === 'pending'"
+                  size="small"
+                  type="primary"
+                  :loading="appealActionLoading === scope.row.id"
+                  @click="handleReviewAppeal(scope.row, true)"
+                >
+                  同意
+                </el-button>
+                <el-button
+                  v-if="scope.row.status === 'pending'"
+                  size="small"
+                  type="danger"
+                  plain
+                  :loading="appealActionLoading === scope.row.id"
+                  @click="handleReviewAppeal(scope.row, false)"
+                >
+                  拒绝
+                </el-button>
+                <span v-else>已处理</span>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
       </section>
 
       <input
@@ -195,7 +237,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { clearLogin, getLogin, saveLogin } from "../auth";
@@ -203,7 +245,13 @@ import { createExamSocket } from "../ws";
 
 const router = useRouter();
 const loginInfo = getLogin();
-const wsClient = createExamSocket(null);
+const wsClient = createExamSocket(null, {
+  onOpen() {
+    if (activeMenu.value === "review") {
+      loadScoreAppeals();
+    }
+  }
+});
 const avatarSaving = ref(false);
 const avatarInputRef = ref(null);
 const importInputRef = ref(null);
@@ -212,6 +260,9 @@ const activeMenu = ref("profile");
 const importingType = ref("");
 const pendingImportType = ref("");
 const importResult = ref(null);
+const scoreAppeals = ref([]);
+const appealLoading = ref(false);
+const appealActionLoading = ref(null);
 
 const menuItems = [
   { key: "profile", label: "个人信息" },
@@ -221,6 +272,12 @@ const menuItems = [
   { key: "batch", label: "批量导入" },
   { key: "review", label: "成绩复核审理" }
 ];
+
+watch(activeMenu, (value) => {
+  if (value === "review") {
+    loadScoreAppeals();
+  }
+});
 
 const sexText = computed(() => {
   if (loginInfo?.sex === true) {
@@ -558,6 +615,51 @@ function handleLogout() {
   router.push("/login");
 }
 
+async function loadScoreAppeals() {
+  if (!wsClient.isOpen()) {
+    return;
+  }
+
+  appealLoading.value = true;
+  try {
+    const data = await wsClient.request("GET_SCORE_APPEALS", {});
+    scoreAppeals.value = Array.isArray(data) ? data : [];
+  } catch (error) {
+    ElMessage.error(error.message || "复核申请获取失败");
+  } finally {
+    appealLoading.value = false;
+  }
+}
+
+async function handleReviewAppeal(appeal, approved) {
+  if (!wsClient.isOpen()) {
+    ElMessage.error("WebSocket 未连接，请稍后再试");
+    return;
+  }
+
+  appealActionLoading.value = appeal?.id ?? null;
+  try {
+    await wsClient.request("REVIEW_SCORE_APPEAL", {
+      appealId: String(appeal.id),
+      approved,
+      reviewerId: loginInfo?.cardNo || "",
+      handledNote: approved ? "同意复核，已将该考试大题清零" : "已拒绝复核申请"
+    });
+    ElMessage.success(approved ? "已同意复核申请" : "已拒绝复核申请");
+    await loadScoreAppeals();
+  } catch (error) {
+    ElMessage.error(error.message || "处理失败");
+  } finally {
+    appealActionLoading.value = null;
+  }
+}
+
+onMounted(() => {
+  if (activeMenu.value === "review") {
+    loadScoreAppeals();
+  }
+});
+
 onBeforeUnmount(() => {
   wsClient.close();
 });
@@ -717,6 +819,17 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.muted-text {
+  color: #909399;
+  font-size: 12px;
 }
 
 .import-summary {

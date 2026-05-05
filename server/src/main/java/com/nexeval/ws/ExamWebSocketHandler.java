@@ -1,12 +1,5 @@
 package com.nexeval.ws;
 
-import com.nexeval.dto.AnswerRequest;
-import com.nexeval.service.AdminManagementService;
-import com.nexeval.service.CatExamService;
-import com.nexeval.service.ClassQueryService;
-import com.nexeval.service.UserAuthService;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -16,11 +9,21 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexeval.dto.AnswerRequest;
+import com.nexeval.dto.ScoreAppealRequest;
+import com.nexeval.service.AdminManagementService;
+import com.nexeval.service.CatExamService;
+import com.nexeval.service.ClassQueryService;
+import com.nexeval.service.UserAuthService;
 
 @Component
 public class ExamWebSocketHandler extends TextWebSocketHandler {
@@ -249,6 +252,26 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
             optionalText(payload, "reviewerId")
           );
           break;
+        case "CREATE_SCORE_APPEAL":
+          responsePayload = catExamService.createScoreAppeal(
+            new ScoreAppealRequest(
+              requireText(payload, "userId"),
+              requireText(payload, "courseNo"),
+              optionalText(payload, "reason")
+            )
+          );
+          break;
+        case "GET_SCORE_APPEALS":
+          responsePayload = catExamService.getScoreAppeals();
+          break;
+        case "REVIEW_SCORE_APPEAL":
+          responsePayload = catExamService.reviewScoreAppeal(
+            Long.parseLong(requireText(payload, "appealId")),
+            optionalBoolean(payload, "approved"),
+            optionalText(payload, "reviewerId"),
+            optionalText(payload, "handledNote")
+          );
+          break;
         case "NEXT_QUESTION":
           responsePayload = catExamService.getNextQuestion(requireText(payload, "sessionId"));
           break;
@@ -310,6 +333,17 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
     } catch (NumberFormatException ex) {
       return null;
     }
+  }
+
+  private boolean optionalBoolean(JsonNode payload, String fieldName) {
+    JsonNode node = payload.get(fieldName);
+    if (node == null || node.isNull()) {
+      return false;
+    }
+    if (node.isBoolean()) {
+      return node.asBoolean();
+    }
+    return Boolean.parseBoolean(node.asText("false").trim());
   }
 
   private Map<String, Object> buildResponse(

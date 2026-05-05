@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface TeacherProfileRepository extends JpaRepository<TeacherProfile, String> {
 
   Optional<TeacherProfile> findFirstById(String id);
+
+  Optional<TeacherProfile> findFirstByEid(String eid);
 }

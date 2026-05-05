@@ -8,6 +8,7 @@ public record ExamAttemptView(
   String status,
   String startedAt,
   String submittedAt,
-  Integer timeLimitSeconds
+  Integer timeLimitSeconds,
+  Integer totalScore
 ) {
 }

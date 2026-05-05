@@ -6,6 +6,8 @@ import com.nexeval.dto.ExamAnswerDetailView;
 import com.nexeval.dto.ExamAttemptView;
 import com.nexeval.dto.ExamAnswerView;
 import com.nexeval.dto.NextQuestionResponse;
+import com.nexeval.dto.ScoreAppealRequest;
+import com.nexeval.dto.ScoreAppealView;
 import com.nexeval.dto.QuestionView;
 import com.nexeval.dto.StartExamResponse;
 import com.nexeval.model.BlankQuestionBank;
@@ -19,6 +21,8 @@ import com.nexeval.model.ExamSession;
 import com.nexeval.model.JudgeQuestionBank;
 import com.nexeval.model.PracticePaper;
 import com.nexeval.model.PracticePaperQuestion;
+import com.nexeval.model.ScoreAppeal;
+import com.nexeval.model.ScoreAppealStatus;
 import com.nexeval.model.QuestionBank;
 import com.nexeval.model.QuestionItem;
 import com.nexeval.model.QuestionOption;
@@ -33,6 +37,7 @@ import com.nexeval.repository.ExamPaperQuestionRepository;
 import com.nexeval.repository.JudgeQuestionBankRepository;
 import com.nexeval.repository.PracticePaperQuestionRepository;
 import com.nexeval.repository.PracticePaperRepository;
+import com.nexeval.repository.ScoreAppealRepository;
 import com.nexeval.repository.QuestionBankRepository;
 import com.nexeval.ws.ExamWebSocketHub;
 import java.time.Instant;
@@ -57,7 +62,6 @@ public class CatExamService {
 
   private static final Logger log = LoggerFactory.getLogger(CatExamService.class);
 
-  private static final int DEFAULT_MAX_QUESTIONS = 10;
   private static final int DEFAULT_EXAM_DURATION_MINUTES = 60;
   private static final List<String> JUDGE_OPTIONS = List.of("true", "false");
   private final ExamWebSocketHub webSocketHub;
@@ -71,6 +75,7 @@ public class CatExamService {
   private final EssayQuestionBankRepository essayQuestionBankRepository;
   private final ExamAnswerRepository examAnswerRepository;
   private final ExamAttemptRepository examAttemptRepository;
+  private final ScoreAppealRepository scoreAppealRepository;
 
   private final Map<String, ExamSession> sessions = new ConcurrentHashMap<>();
 
@@ -87,7 +92,8 @@ public class CatExamService {
     BlankQuestionBankRepository blankQuestionBankRepository,
     EssayQuestionBankRepository essayQuestionBankRepository,
     ExamAnswerRepository examAnswerRepository,
-    ExamAttemptRepository examAttemptRepository
+    ExamAttemptRepository examAttemptRepository,
+    ScoreAppealRepository scoreAppealRepository
   ) {
     this.webSocketHub = webSocketHub;
     this.examDefinitionRepository = examDefinitionRepository;
@@ -100,6 +106,7 @@ public class CatExamService {
     this.essayQuestionBankRepository = essayQuestionBankRepository;
     this.examAnswerRepository = examAnswerRepository;
     this.examAttemptRepository = examAttemptRepository;
+    this.scoreAppealRepository = scoreAppealRepository;
   }
 
   public StartExamResponse startSession(String userId, String sourceId) {
@@ -243,6 +250,101 @@ public class CatExamService {
     } catch (DataAccessException ex) {
       log.warn("Failed to load exam attempts for userId={}, courseNo={}: {}", userId, courseNo, ex.getMessage());
       return List.of();
+    }
+  }
+
+  public List<ScoreAppealView> getScoreAppeals() {
+    try {
+      return scoreAppealRepository.findAllByOrderByCreatedAtDesc().stream()
+        .map(this::toScoreAppealView)
+        .toList();
+    } catch (DataAccessException ex) {
+      log.warn("Failed to load score appeals: {}", ex.getMessage());
+      return List.of();
+    }
+  }
+
+  public ScoreAppealView createScoreAppeal(ScoreAppealRequest request) {
+    String userId = normalizeSourceId(request.userId());
+    String courseNo = normalizeSourceId(request.courseNo());
+    String reason = request.reason() == null ? "" : request.reason().trim();
+    if (userId.isBlank()) {
+      throw new IllegalArgumentException("userId is required");
+    }
+    if (courseNo.isBlank()) {
+      throw new IllegalArgumentException("courseNo is required");
+    }
+
+    ExamAttempt attempt = resolveLatestSubmittedExamAttempt(userId, courseNo);
+    if (attempt == null) {
+      throw new NoSuchElementException("No submitted exam found for this course");
+    }
+
+    scoreAppealRepository.findFirstBySessionIdAndStatus(attempt.getSessionId(), ScoreAppealStatus.PENDING)
+      .ifPresent(existing -> {
+        throw new IllegalStateException("该考试已存在待处理的复核申请");
+      });
+
+    ScoreAppeal appeal = new ScoreAppeal();
+    appeal.setSessionId(attempt.getSessionId());
+    appeal.setUserId(userId);
+    appeal.setCourseNo(courseNo);
+    appeal.setReason(reason.isBlank() ? null : reason);
+    appeal.setStatus(ScoreAppealStatus.PENDING);
+    appeal.setCreatedAt(Instant.now());
+    scoreAppealRepository.save(appeal);
+    return toScoreAppealView(appeal);
+  }
+
+  public ScoreAppealView reviewScoreAppeal(Long appealId, boolean approved, String reviewerId, String handledNote) {
+    ScoreAppeal appeal = scoreAppealRepository.findById(appealId)
+      .orElseThrow(() -> new NoSuchElementException("Appeal not found: " + appealId));
+    if (appeal.getStatus() != ScoreAppealStatus.PENDING) {
+      throw new IllegalStateException("该复核申请已处理");
+    }
+
+    String normalizedReviewerId = normalizeSourceId(reviewerId);
+    String note = handledNote == null ? "" : handledNote.trim();
+
+    if (approved) {
+      zeroEssayScores(appeal.getSessionId());
+      appeal.setStatus(ScoreAppealStatus.APPROVED);
+    } else {
+      appeal.setStatus(ScoreAppealStatus.REJECTED);
+    }
+
+    appeal.setHandledAt(Instant.now());
+    appeal.setHandledBy(normalizedReviewerId.isBlank() ? null : normalizedReviewerId);
+    appeal.setHandledNote(note.isBlank() ? null : note);
+    ScoreAppeal saved = scoreAppealRepository.save(appeal);
+    return toScoreAppealView(saved);
+  }
+
+  private ExamAttempt resolveLatestSubmittedExamAttempt(String userId, String courseNo) {
+    List<ExamAttempt> attempts = examAttemptRepository
+      .findAllByUserIdAndCourseNoAndModeOrderByStartedAtDesc(userId, courseNo, SessionMode.EXAM);
+
+    for (ExamAttempt attempt : attempts) {
+      if (attempt.getStatus() == ExamAttemptStatus.IN_PROGRESS) {
+        continue;
+      }
+      return attempt;
+    }
+
+    return null;
+  }
+
+  private void zeroEssayScores(String sessionId) {
+    try {
+      List<ExamAnswer> essayAnswers = examAnswerRepository.findAllBySessionIdAndQuestionType(sessionId, QuestionType.ESSAY);
+      for (ExamAnswer answer : essayAnswers) {
+        answer.setScore(0);
+        answer.setReviewed(true);
+        answer.setReviewedAt(Instant.now());
+      }
+      examAnswerRepository.saveAll(essayAnswers);
+    } catch (DataAccessException ex) {
+      log.warn("Failed to zero essay scores for sessionId={}: {}", sessionId, ex.getMessage());
     }
   }
 
@@ -561,15 +663,6 @@ public class CatExamService {
       .orElseThrow(() -> new NoSuchElementException("Exam not found: " + examId));
   }
 
-  private int resolveMaxQuestions(ExamDefinition examDefinition, int questionCount) {
-    int configured = examDefinition.getMaxQuestions();
-    int fallback = Math.min(DEFAULT_MAX_QUESTIONS, questionCount);
-    if (configured <= 0) {
-      return fallback;
-    }
-    return Math.min(configured, questionCount);
-  }
-
   private QuestionItem toQuestionItem(QuestionBank question) {
     List<String> options = question.getOptions().stream()
       .sorted(Comparator.comparingInt(QuestionOption::getOptionOrder))
@@ -750,8 +843,19 @@ public class CatExamService {
       attempt.getStatus().name().toLowerCase(),
       attempt.getStartedAt() == null ? null : attempt.getStartedAt().toString(),
       attempt.getSubmittedAt() == null ? null : attempt.getSubmittedAt().toString(),
-      attempt.getTimeLimitSeconds()
+      attempt.getTimeLimitSeconds(),
+      resolveAttemptTotalScore(attempt.getSessionId())
     );
+  }
+
+  private Integer resolveAttemptTotalScore(String sessionId) {
+    try {
+      Long total = examAnswerRepository.sumScoreBySessionId(sessionId);
+      return total == null ? 0 : total.intValue();
+    } catch (DataAccessException ex) {
+      log.warn("Failed to load total score for sessionId={}: {}", sessionId, ex.getMessage());
+      return 0;
+    }
   }
 
   private ExamAnswerDetailView toAnswerDetailView(ExamAnswer answer) {
@@ -766,6 +870,21 @@ public class CatExamService {
       answer.isReviewed(),
       answer.getReviewNote(),
       resolveQuestionMaxScore(answer.getQuestionType(), answer.getQuestionId())
+    );
+  }
+
+  private ScoreAppealView toScoreAppealView(ScoreAppeal appeal) {
+    return new ScoreAppealView(
+      appeal.getId(),
+      appeal.getSessionId(),
+      appeal.getUserId(),
+      appeal.getCourseNo(),
+      appeal.getReason(),
+      appeal.getStatus() == null ? null : appeal.getStatus().name().toLowerCase(),
+      appeal.getCreatedAt() == null ? null : appeal.getCreatedAt().toString(),
+      appeal.getHandledAt() == null ? null : appeal.getHandledAt().toString(),
+      appeal.getHandledBy(),
+      appeal.getHandledNote()
     );
   }
 

@@ -44,7 +44,7 @@ public class ClassQueryService {
 
   public List<TeacherClassSummary> getTeacherClasses(String eid) {
     String normalizedEid = required(eid, "eid");
-    if (!teacherProfileRepository.existsById(normalizedEid)) {
+    if (teacherProfileRepository.findFirstByEid(normalizedEid).isEmpty()) {
       throw new IllegalArgumentException("教师工号不存在");
     }
 
@@ -81,7 +81,7 @@ public class ClassQueryService {
 
   public List<StudentClassSummary> getStudentClasses(String sno) {
     String normalizedSno = required(sno, "sno");
-    if (!studentProfileRepository.existsById(normalizedSno)) {
+    if (studentProfileRepository.findFirstBySno(normalizedSno).isEmpty()) {
       throw new IllegalArgumentException("学号不存在");
     }
 

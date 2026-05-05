@@ -140,13 +140,45 @@
 
         <template v-else-if="isStudent">
           <div v-if="studentLoading" class="placeholder">正在加载教学班...</div>
-          <el-table v-else-if="studentClasses.length" :data="studentClasses" size="small">
-            <el-table-column prop="cno" label="课程号" width="140" />
-            <el-table-column prop="cname" label="课程名" />
-            <el-table-column prop="teacherName" label="教师姓名" width="120" />
-            <el-table-column label="操作" width="140">
+          <el-table v-else-if="studentClasses.length" :data="studentClasses" size="small" class="student-classes-table">
+            <el-table-column
+              prop="cno"
+              label="课程号"
+              width="140"
+              align="left"
+              header-align="left"
+              class-name="col-large"
+              header-class-name="col-large-header"
+            />
+            <el-table-column
+              prop="cname"
+              label="课程名"
+              align="left"
+              header-align="left"
+              class-name="col-large"
+              header-class-name="col-large-header"
+            />
+            <el-table-column
+              prop="teacherName"
+              label="教师姓名"
+              width="100"
+              align="center"
+              header-align="center"
+              class-name="col-large col-teacher-cell"
+              header-class-name="col-large col-teacher-header"
+            />
+            <el-table-column
+              prop="grade"
+              label="成绩"
+              width="100"
+              align="center"
+              header-align="center"
+              class-name="col-large col-score-cell"
+              header-class-name="col-large col-score-header"
+            />
+            <el-table-column label="操作" width="110" align="center" header-align="center">
               <template #default="scope">
-                <div class="action-buttons">
+                <div class="student-action-buttons">
                   <el-button
                     type="primary"
                     size="small"
@@ -157,6 +189,9 @@
                   </el-button>
                   <el-button size="small" :loading="startingExam" @click="handleStartExamForClass(scope.row)">
                     进入考试
+                  </el-button>
+                  <el-button type="warning" plain size="small" @click="openAppealHistory(scope.row)">
+                    成绩复核
                   </el-button>
                 </div>
               </template>
@@ -205,6 +240,53 @@
       <template #footer>
         <el-button @click="editVisible = false">取消</el-button>
         <el-button type="primary" :loading="saving" @click="handleSaveProfile">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="appealHistoryVisible" title="成绩复核记录" width="640px">
+      <div v-if="appealLoading" class="placeholder">正在加载复核记录...</div>
+      <div v-else>
+        <div v-if="appealHistoryList.length === 0" class="placeholder">暂无复核记录</div>
+        <el-table v-else :data="appealHistoryList" size="small">
+          <el-table-column prop="createdAt" label="申请时间" width="180">
+            <template #default="{ row }">{{ row.createdAt ? new Date(row.createdAt).toLocaleString() : '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="reason" label="说明" />
+          <el-table-column prop="status" label="状态" width="120">
+            <template #default="{ row }">
+              <el-tag v-if="row.status === 'pending'" type="info">待处理</el-tag>
+              <el-tag v-else-if="row.status === 'approved'" type="success">同意</el-tag>
+              <el-tag v-else-if="row.status === 'rejected'" type="danger">不同意</el-tag>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <template #footer>
+        <el-button @click="appealHistoryVisible = false">关闭</el-button>
+        <el-button type="primary" @click="appealHistoryVisible = false; appealVisible = true">申请复核</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="appealVisible" title="成绩复核申请" width="520px">
+      <el-form label-position="top">
+        <el-form-item label="课程">
+          <el-input :model-value="appealCourseLabel" disabled />
+        </el-form-item>
+        <el-form-item label="申请说明">
+          <el-input
+            v-model="appealReason"
+            type="textarea"
+            :rows="5"
+            maxlength="1024"
+            show-word-limit
+            placeholder="请输入复核原因"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="appealVisible = false">取消</el-button>
+        <el-button type="primary" :loading="appealSubmitting" @click="handleSubmitScoreAppeal">提交申请</el-button>
       </template>
     </el-dialog>
 
@@ -350,6 +432,13 @@ const gradingAttempts = ref([]);
 const gradingAnswers = ref([]);
 const selectedAttemptId = ref("");
 const gradingSaving = ref(false);
+const appealVisible = ref(false);
+const appealSubmitting = ref(false);
+const appealCourse = ref(null);
+const appealReason = ref("");
+const appealHistoryVisible = ref(false);
+const appealHistoryList = ref([]);
+const appealLoading = ref(false);
 
 const editVisible = ref(false);
 const saving = ref(false);
@@ -402,6 +491,14 @@ const passwordStrengthTagType = computed(() => {
   }
 
   return "success";
+});
+
+const appealCourseLabel = computed(() => {
+  if (!appealCourse.value) {
+    return "-";
+  }
+
+  return `${appealCourse.value.cno || "-"} ${appealCourse.value.cname || ""}`.trim();
 });
 
 let wsClient = null;
@@ -480,6 +577,28 @@ async function fetchStudentClasses() {
   try {
     const data = await wsClient.request("GET_STUDENT_CLASSES", { sno }, 20000);
     studentClasses.value = Array.isArray(data) ? data : [];
+
+    // 为每门课程尝试获取该学生的最新考试得分（使用已有的 GET_EXAM_ATTEMPTS action）
+    if (wsClient && wsClient.isOpen() && Array.isArray(studentClasses.value) && studentClasses.value.length) {
+      await Promise.all(studentClasses.value.map(async (c) => {
+        try {
+          const attempts = await wsClient.request("GET_EXAM_ATTEMPTS", {
+            userId: cardNo.value,
+            courseNo: c.cno || ""
+          }, 10000);
+
+          if (Array.isArray(attempts) && attempts.length) {
+            const latest = attempts[0];
+            // 兼容不同返回字段名
+            c.grade = latest.score ?? latest.totalScore ?? latest.sumScore ?? latest.mark ?? latest.grade ?? '-';
+          } else {
+            c.grade = '-';
+          }
+        } catch (err) {
+          c.grade = '-';
+        }
+      }));
+    }
   } catch (error) {
     ElMessage.error(error.message || "教学班获取失败");
   } finally {
@@ -745,6 +864,73 @@ function handleStartExamForClass(clazz) {
 
 function selectClass(clazz) {
   selectedClass.value = clazz;
+}
+
+function openScoreAppealDialog(clazz) {
+  appealCourse.value = clazz || null;
+  appealReason.value = "";
+  appealVisible.value = true;
+}
+
+async function openAppealHistory(clazz) {
+  appealCourse.value = clazz || null;
+  appealHistoryList.value = [];
+  appealHistoryVisible.value = true;
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket 未连接，无法获取复核记录");
+    return;
+  }
+  appealLoading.value = true;
+  try {
+    const data = await wsClient.request("GET_SCORE_APPEALS", {
+      userId: cardNo.value,
+      courseNo: clazz?.cno || ""
+    }, 20000);
+    const raw = Array.isArray(data) ? data : [];
+    const cno = String(clazz?.cno || "").trim();
+    // 额外在客户端按课程号过滤，兼容后端返回字段名不同（courseNo / course_no）
+    appealHistoryList.value = raw.filter((r) => {
+      if (!r) return false;
+      const a = r.courseNo || r.course_no || r.course || r.course_no?.toString?.();
+      return String(a || "").trim() === cno;
+    });
+  } catch (err) {
+    ElMessage.error(err.message || "获取复核记录失败");
+  } finally {
+    appealLoading.value = false;
+  }
+}
+
+async function handleSubmitScoreAppeal() {
+  if (!appealCourse.value) {
+    ElMessage.warning("请先选择课程");
+    return;
+  }
+
+  if (!appealReason.value.trim()) {
+    ElMessage.warning("请填写复核说明");
+    return;
+  }
+
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket is not connected. Please wait for reconnect.");
+    return;
+  }
+
+  appealSubmitting.value = true;
+  try {
+    await wsClient.request("CREATE_SCORE_APPEAL", {
+      userId: cardNo.value,
+      courseNo: appealCourse.value.cno,
+      reason: appealReason.value.trim()
+    });
+    ElMessage.success("成绩复核申请已提交");
+    appealVisible.value = false;
+  } catch (error) {
+    ElMessage.error(error.message || "申请提交失败");
+  } finally {
+    appealSubmitting.value = false;
+  }
 }
 
 async function handleGradeStudent(row) {
@@ -1043,6 +1229,31 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
+.student-action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end; 
+  width: auto;
+}
+
+.student-action-buttons .el-button {
+  width: 90px; 
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* 放大表格中某些列的字号 */
+::v-deep(.col-large .cell),
+.col-large-header {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+::v-deep(.col-score-cell .cell) {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+}
+
 .ws-line {
   margin: 0 0 14px;
   color: #6b7280;
@@ -1173,5 +1384,18 @@ onBeforeUnmount(() => {
   .teacher-layout {
     grid-template-columns: 1fr;
   }
+}
+
+::v-deep(.student-classes-table) .el-table__header-wrapper th:nth-child(3) .cell,
+::v-deep(.student-classes-table) .el-table__header-wrapper th:nth-child(3) .cell,
+::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(3) .cell {
+  padding-left: 4px !important;
+  transform: translateX(-150px) !important;
+}
+
+::v-deep(.student-classes-table) .el-table__header-wrapper th:nth-child(4) .cell,
+::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(4) .cell {
+  padding-left: 4px !important;
+  transform: translateX(-90px) !important;
 }
 </style>
