@@ -49,7 +49,7 @@ a {
 }
 
 .topbar {
-  height: 72px;
+  min-height: 64px;
   padding: 0 28px;
   display: flex;
   align-items: center;
@@ -75,19 +75,22 @@ a {
 }
 
 .brand-text {
-  display: grid;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  white-space: nowrap;
 }
 
 .brand-title {
   font-family: "Space Grotesk", "Manrope", sans-serif;
-  font-size: 18px;
+  font-size: 24px;
   font-weight: 700;
   color: var(--ne-text-strong);
-  letter-spacing: 0.2px;
+  letter-spacing: 0.1px;
 }
 
 .brand-subtitle {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--ne-text-muted);
 }
 
@@ -147,7 +150,16 @@ a {
 
 @media (max-width: 768px) {
   .topbar {
+    min-height: 60px;
     padding: 0 16px;
+  }
+
+  .brand-title {
+    font-size: 20px;
+  }
+
+  .brand-subtitle {
+    font-size: 12px;
   }
 
   .content {

@@ -8,6 +8,7 @@
           <div class="login-brand-subtitle">智能评估系统</div>
         </div>
       </div>
+
       <h1 class="card-title">用户注册</h1>
       <p class="card-subtitle">注册新用户账号</p>
 
@@ -16,62 +17,72 @@
         <el-tag size="small" :type="wsTagType">{{ wsStatus }}</el-tag>
       </p>
 
-      <el-form @submit.prevent>
-        <el-form-item label="卡号">
-          <el-input v-model="form.id" placeholder="9位卡号" maxlength="9" />
-        </el-form-item>
+      <el-form class="register-form" @submit.prevent>
+        <div class="form-grid form-grid--two">
+          <el-form-item label="卡号">
+            <el-input v-model="form.id" placeholder="9位卡号" maxlength="9" />
+          </el-form-item>
 
-        <el-form-item label="姓名">
-          <el-input v-model="form.name" placeholder="请输入姓名" />
-        </el-form-item>
+          <el-form-item label="姓名">
+            <el-input v-model="form.name" placeholder="请输入姓名" />
+          </el-form-item>
+        </div>
 
-        <el-form-item label="性别">
-          <el-radio-group v-model="form.sex">
-            <el-radio value="男">男</el-radio>
-            <el-radio value="女">女</el-radio>
-          </el-radio-group>
-        </el-form-item>
+        <div class="form-grid form-grid--two">
+          <el-form-item label="性别">
+            <el-radio-group v-model="form.sex" class="sex-radio-group">
+              <el-radio value="男" class="sex-radio sex-radio--male">男</el-radio>
+              <el-radio value="女" class="sex-radio sex-radio--female">女</el-radio>
+            </el-radio-group>
+          </el-form-item>
 
-        <el-form-item label="用户类型">
-          <el-select v-model="form.type" placeholder="请选择用户类型" style="width:100%">
-            <el-option label="学生" value="student" />
-            <el-option label="教师" value="teacher" />
-          </el-select>
-        </el-form-item>
+          <el-form-item label="用户类型">
+            <el-select v-model="form.type" placeholder="请选择用户类型" style="width:100%">
+              <el-option label="学生" value="student" />
+              <el-option label="教师" value="teacher" />
+            </el-select>
+          </el-form-item>
+        </div>
 
         <template v-if="form.type === 'student'">
-          <el-form-item label="学号">
-            <el-input v-model="form.sno" placeholder="请输入学号" />
-          </el-form-item>
-          <el-form-item label="入学年份">
-            <el-input v-model="form.studentEnterYear" placeholder="如 2024" />
-          </el-form-item>
-          <el-form-item label="专业">
-            <el-input v-model="form.major" placeholder="请输入专业" />
-          </el-form-item>
-          <el-form-item label="院系">
-            <el-input v-model="form.studentDepartment" placeholder="请输入院系" />
-          </el-form-item>
+          <div class="form-grid form-grid--two">
+            <el-form-item label="学号">
+              <el-input v-model="form.sno" placeholder="请输入学号" />
+            </el-form-item>
+            <el-form-item label="入学年份">
+              <el-input v-model="form.studentEnterYear" placeholder="如 2024" />
+            </el-form-item>
+          </div>
+          <div class="form-grid form-grid--two">
+            <el-form-item label="专业">
+              <el-input v-model="form.major" placeholder="请输入专业" />
+            </el-form-item>
+            <el-form-item label="院系">
+              <el-input v-model="form.studentDepartment" placeholder="请输入院系" />
+            </el-form-item>
+          </div>
         </template>
 
-        <template v-if="form.type === 'teacher'">
-          <el-form-item label="工号">
-            <el-input v-model="form.eid" placeholder="请输入工号" />
-          </el-form-item>
-          <el-form-item label="入职年份">
-            <el-input v-model="form.teacherEnterYear" placeholder="如 2020" />
-          </el-form-item>
-          <el-form-item label="职称">
-            <el-input v-model="form.title" placeholder="如 教授、副教授、讲师" />
-          </el-form-item>
-          <el-form-item label="院系">
-            <el-input v-model="form.teacherDepartment" placeholder="请输入院系" />
-          </el-form-item>
+        <template v-else-if="form.type === 'teacher'">
+          <div class="form-grid form-grid--two">
+            <el-form-item label="工号">
+              <el-input v-model="form.eid" placeholder="请输入工号" />
+            </el-form-item>
+            <el-form-item label="入职年份">
+              <el-input v-model="form.teacherEnterYear" placeholder="如 2020" />
+            </el-form-item>
+          </div>
+          <div class="form-grid form-grid--two">
+            <el-form-item label="职称">
+              <el-input v-model="form.title" placeholder="如 教授、副教授、讲师" />
+            </el-form-item>
+            <el-form-item label="院系">
+              <el-input v-model="form.teacherDepartment" placeholder="请输入院系" />
+            </el-form-item>
+          </div>
         </template>
 
-        <el-button type="primary" :loading="submitting" @click="handleRegister" style="width:100%">
-          注册
-        </el-button>
+        <el-button class="login-submit" type="primary" :loading="submitting" @click="handleRegister">注册</el-button>
 
         <p class="switch-line">
           已有账号？<RouterLink to="/login">去登录</RouterLink>
@@ -173,6 +184,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px 0 28px;
 }
 
 .login-brand {
@@ -192,23 +204,28 @@ onBeforeUnmount(() => {
 }
 
 .login-brand-text {
-  display: grid;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  white-space: nowrap;
 }
 
 .login-brand-title {
-  font-size: 18px;
+  font-size: 24px;
   font-weight: 700;
   color: #0f172a;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
 }
 
 .login-brand-subtitle {
-  font-size: 12px;
+  font-size: 14px;
   color: #64748b;
 }
 
 .login-card {
-  width: min(520px, 100%);
+  width: min(640px, calc(100% - 32px));
+  border: 1px solid rgba(42, 92, 255, 0.12);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.14), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
 }
 
 .ws-line {
@@ -222,5 +239,107 @@ onBeforeUnmount(() => {
   text-align: center;
   font-size: 13px;
   color: #6b7280;
+}
+
+.register-form {
+  display: grid;
+  gap: 6px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.form-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sex-radio-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 40px;
+}
+
+.sex-radio {
+  margin-right: 0;
+}
+
+.sex-radio--male :deep(.el-radio__inner) {
+  border-color: #0059f5;
+}
+
+.sex-radio--male :deep(.el-radio__input.is-checked .el-radio__inner) {
+  border-color: #0059f5;
+  background: #0059f5;
+}
+
+.sex-radio--male :deep(.el-radio__input.is-checked + .el-radio__label) {
+  color: #0059f5;
+}
+
+.sex-radio--female :deep(.el-radio__inner) {
+  border-color: #ff00ff;
+}
+
+.sex-radio--female :deep(.el-radio__input.is-checked .el-radio__inner) {
+  border-color: #ff00ff;
+  background: #ff00ff;
+}
+
+.sex-radio--female :deep(.el-radio__input.is-checked + .el-radio__label) {
+  color: #ff00ff;
+}
+
+.login-submit {
+  width: 96px;
+  box-shadow: 0 10px 24px rgba(42, 92, 255, 0.2);
+  margin: 12px auto 0;
+}
+
+/* Ensure form controls inside the two-column grid align vertically with their labels */
+.form-grid .el-form-item__content {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+}
+
+/* Make the first row (卡号 / 姓名) have a slightly narrower left column so 卡号 input is shorter */
+.register-form > .form-grid.form-grid--two:first-child {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+/* Nudge the labels in the second row (性别 / 用户类型) slightly down */
+.register-form > .form-grid.form-grid--two:nth-child(2) .el-form-item__label {
+  padding-top: 6px;
+}
+
+/* Tighten label spacing so the two text boxes sit closer together */
+.register-form .el-form-item__label {
+  padding-right: 4px;
+  min-width: 48px;
+}
+
+/* Only shorten the 卡号 input itself so 姓名 stays in place */
+.register-form > .form-grid.form-grid--two:first-child .el-form-item:first-child :deep(.el-input) {
+  max-width: 220px;
+}
+
+.register-form > .form-grid.form-grid--two:first-child .el-form-item:first-child :deep(.el-input__wrapper) {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .login-card {
+    width: 100%;
+    min-height: auto;
+    padding: 20px;
+  }
+
+  .form-grid--two {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -40,7 +40,13 @@
 
     <main class="home-main">
       <div class="dashboard-head card">
-        <h1 class="card-title">在线考试系统</h1>
+        <div class="dashboard-head-main">
+          <h1 class="card-title">在线考试系统</h1>
+          <p class="dashboard-subtitle">考试、练习、批改与复核统一在同一工作台中完成。</p>
+        </div>
+        <div class="dashboard-head-badges">
+          <span class="dashboard-badge">{{ isTeacher ? '教师端' : '学生端' }}</span>
+        </div>
       </div>
 
       <section class="card panel-card" v-if="activeMenu === 'profile'">
@@ -79,6 +85,16 @@
 
       <section class="card panel-card exam-panel-card" v-else>
         <h2 class="panel-title">{{ actionPanelTitle }}</h2>
+        <div class="exam-intro">
+          <div class="exam-intro-item">
+            <div class="exam-intro-title">当前视图</div>
+            <div class="exam-intro-value">{{ actionPanelTitle }}</div>
+          </div>
+          <div class="exam-intro-item">
+            <div class="exam-intro-title">教学班/课程</div>
+            <div class="exam-intro-value">{{ isTeacher ? teacherClasses.length : studentClasses.length }}</div>
+          </div>
+        </div>
 
         <template v-if="isTeacher">
           <div class="teacher-layout">
@@ -1144,16 +1160,47 @@ onBeforeUnmount(() => {
 
 .dashboard-head {
   margin-bottom: 0;
-  height: 56px;
-  padding: 0 28px;
+  min-height: 72px;
+  padding: 16px 28px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   justify-content: center;
+  justify-content: space-between;
+  gap: 16px;
   overflow: hidden;
+  align-items: center;
 }
 
 .dashboard-head .card-title {
   margin-bottom: 0;
+}
+
+.dashboard-head-main {
+  display: grid;
+  gap: 4px;
+}
+
+.dashboard-subtitle {
+  margin: 0;
+  color: var(--ne-text-muted);
+  font-size: 13px;
+}
+
+.dashboard-head-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.dashboard-badge {
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--ne-gradient-primary);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 8px 18px rgba(42, 92, 255, 0.14);
 }
 
 .panel-card {
@@ -1180,8 +1227,35 @@ onBeforeUnmount(() => {
   color: var(--ne-text-strong);
 }
 
+.exam-intro {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.exam-intro-item {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--ne-border);
+  background: linear-gradient(135deg, rgba(42, 92, 255, 0.04), rgba(0, 194, 255, 0.06));
+}
+.exam-intro-title {
+  color: var(--ne-text-muted);
+  font-size: 12px;
+}
+.exam-intro-value {
+  margin-top: 4px;
+  color: var(--ne-text-strong);
+  font-weight: 700;
+}
+
+
 .avatar-wrap {
-  width: 92px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 16px;
 }
 
 .avatar-click {
@@ -1389,6 +1463,20 @@ onBeforeUnmount(() => {
   }
 
   .teacher-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dashboard-head-badges {
+    justify-content: flex-start;
+  }
+
+  .profile-summary,
+  .exam-intro {
     grid-template-columns: 1fr;
   }
 }
