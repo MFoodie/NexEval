@@ -44,6 +44,11 @@ services:
       ALLOWED_ORIGINS: http://localhost,http://127.0.0.1
     ports:
       - "8080:8080"
+    volumes:
+      - ../server/avatar:/app/avatar
+      - ../server/fig:/app/fig
+      - ../server/question-images:/app/question-images
+      - ../server/answer-images:/app/answer-images
 
   frontend:
     build:
