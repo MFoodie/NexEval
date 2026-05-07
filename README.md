@@ -159,3 +159,28 @@ gradle bootRun
   - 答题记录、考试尝试、复核申请与审理结果持久化到 MySQL。
 - MySQL 与 Redis 已预留，后续可继续扩展缓存、并发与审计能力。
 - 后续可继续扩展认证、题库管理、考试编排、AI 阅卷、统计分析等模块。
+
+## Docker 启停（常用）
+
+如需停止并删除容器且同时删除数据库数据卷（强烈建议用于重置数据库时使用）：
+
+```powershell
+docker compose -f infra/docker-compose.yml down -v
+```
+
+如需根据最新镜像/配置重新创建并在后台启动：
+
+```powershell
+docker compose -f infra/docker-compose.yml up -d
+```
+
+（也可以在首次构建或需要强制重建镜像时加上 `--build`）
+
+## 新功能说明（图片题与大题图片上传）
+
+- 题目支持带图片：题库表已扩展 `image_path` 与 `image_mode`（数据库：DECIMAL(3,2)），图片文件存放于服务端并通过静态路径暴露，例如 `/fig/**` 或 `/question-images/**`。
+- 客观题 / 主观题在题目视图中会包含 `imagePath` 与 `imageMode` 字段，前端按 `imageMode`（0.01 - 1.00）作为页面宽度比例展示并居中。
+- 大题（主观题）答案支持上传图片：后端持久化字段 `answerImagePath` 用于保存服务器上的图片路径，前端已支持在答题页预览并将图片路径随答题一起提交（若需启用文件上传接口，请确保后端上传端点已部署并在 `server/fig` 或 `server/question-images` 下有写权限）。
+- 如使用容器部署，请在首次启动前检查 `docs/database/` 中的 SQL 脚本（包括为题目新增 `image_mode` 的脚本），并在需要重建数据库时使用 `down -v` 清理卷以触发初始化脚本执行。
+
+如需我把 `docs/database/create_question_with_image.sql` 中的示例行直接应用到数据库（生成可执行 SQL），或实现后端的文件上传接口并完成前端上传控件，请告诉我，我可以继续实现并提交改动。

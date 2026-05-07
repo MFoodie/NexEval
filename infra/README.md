@@ -65,4 +65,22 @@ docker compose -f infra/docker-compose.yml logs -f mysql
 
 ```powershell
 docker compose -f infra/docker-compose.yml down
+docker compose -f infra/docker-compose.yml down -v    # 停止并删除容器，同时删除数据库数据卷（重置 DB 用）
 ```
+
+后台启动（不重建镜像）：
+
+```powershell
+docker compose -f infra/docker-compose.yml up -d
+```
+
+若需要强制重建镜像并启动：
+
+```powershell
+docker compose -f infra/docker-compose.yml up -d --build
+```
+
+## 新功能提示
+
+- 支持题目带图片（题库表新增 `image_path` 与 `image_mode`，`image_mode` 为 DECIMAL(3,2)），容器映射会把 `docs/database` 挂载到 MySQL 初始化目录以执行建表脚本。
+- 大题（主观题）答案可包含图片，后端保存答案图片路径（`answerImagePath`），前端可在答题页上传并预览图片（需启用后端上传端点且容器内目录有写权限）。
