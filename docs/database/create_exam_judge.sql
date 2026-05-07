@@ -1,4 +1,6 @@
 -- Requires course table from create.sql
+SET NAMES utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
 CREATE TABLE IF NOT EXISTS judge_question_bank (
     id varchar(32) NOT NULL,
     stem varchar(512) NOT NULL,
@@ -9,14 +11,14 @@ CREATE TABLE IF NOT EXISTS judge_question_bank (
     active boolean NOT NULL DEFAULT true,
     PRIMARY KEY (id),
     FOREIGN KEY (cno) REFERENCES course(cno)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS judge_exam_paper (
     id varchar(32) NOT NULL,
     name varchar(64) NOT NULL,
     active boolean NOT NULL DEFAULT true,
     PRIMARY KEY (id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS judge_exam_definition (
     id varchar(32) NOT NULL,
@@ -28,7 +30,7 @@ CREATE TABLE IF NOT EXISTS judge_exam_definition (
     paper_id varchar(32) NOT NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (paper_id) REFERENCES judge_exam_paper(id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS judge_exam_paper_question (
     paper_id varchar(32) NOT NULL,
@@ -37,7 +39,7 @@ CREATE TABLE IF NOT EXISTS judge_exam_paper_question (
     PRIMARY KEY (paper_id, question_id),
     FOREIGN KEY (paper_id) REFERENCES judge_exam_paper(id),
     FOREIGN KEY (question_id) REFERENCES judge_question_bank(id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 INSERT IGNORE INTO judge_question_bank (id, stem, answer_key, points, difficulty, cno, active) VALUES
 ('J001', '【知识点：存储层次】寄存器位于 CPU 内部，速度最快。', true, 2, 1.5, 'BJSL0001', true),

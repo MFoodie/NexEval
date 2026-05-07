@@ -1,3 +1,6 @@
+    SET NAMES utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+    
     CREATE TABLE IF NOT EXISTS question_bank (
         id varchar(32) NOT NULL,
         stem varchar(512) NOT NULL,

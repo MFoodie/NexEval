@@ -1,4 +1,5 @@
--- Requires exam_answer and exam_attempt tables from docs/database/create_exam_answer.sql and docs/database/create_exam.sql
+SET NAMES utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
 CREATE TABLE IF NOT EXISTS score_appeal (
     id bigint NOT NULL AUTO_INCREMENT,
     session_id varchar(32) NOT NULL,

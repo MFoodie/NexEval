@@ -1,4 +1,5 @@
--- Requires course table from create.sql
+SET NAMES utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
 CREATE TABLE IF NOT EXISTS exam_answer (
     id bigint NOT NULL AUTO_INCREMENT,
     session_id varchar(32) NOT NULL,

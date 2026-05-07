@@ -202,7 +202,8 @@
                 <el-button
                   v-if="scope.row.status === 'pending'"
                   size="small"
-                  type="primary"
+                  class="approve-button"
+                  plain
                   :loading="appealActionLoading === scope.row.id"
                   @click="handleReviewAppeal(scope.row, true)"
                 >
@@ -825,6 +826,26 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.approve-button.el-button.is-plain {
+  background-color: rgba(16, 185, 22, 0.12) !important;
+  border-color: #1bb91073 !important;
+  color: #51AD13 !important;
+  box-shadow: none !important;
+}
+
+.approve-button.el-button.is-plain:hover,
+.approve-button.el-button.is-plain:focus {
+  background-color: #11D635 !important;
+  border-color: #11D635 !important;
+  color: #ffffff !important;
+}
+
+.approve-button.el-button.is-plain:active {
+  background-color: #51AD13 !important;
+  border-color: #51AD13 !important;
+  color: #ffffff !important;
 }
 
 .muted-text {

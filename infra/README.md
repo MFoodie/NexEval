@@ -25,10 +25,12 @@ docker compose -f infra/docker-compose.yml up -d --build
 
 ## 访问地址
 
-- 前端：http://localhost
-- 后端（容器内 HTTP）：http://localhost:8080
+- 前端开发模式：[https://localhost:5173](https://localhost:5173)
+- 后端（容器内 HTTP）：[http://localhost:8080](http://localhost:8080)
 - MySQL：localhost:3306
 - Redis：localhost:6379
+
+前端容器运行的是 Vite dev server，不是 Nginx 静态站点；因此保存 `client/` 源码后会触发浏览器热更新。
 
 ## 数据库初始化说明
 
@@ -36,6 +38,7 @@ docker compose -f infra/docker-compose.yml up -d --build
 
 - 第一次创建数据卷时会自动执行 SQL 脚本
 - 如果你之前已经启动过 MySQL 容器并保留了旧数据卷，脚本不会再次自动执行
+- `docs/database/99_batch_import.sql` 会自动串联执行 `docs/database/batch_import/` 下由 Excel 生成的 5 个导入脚本
 
 如需重置并重新初始化：
 

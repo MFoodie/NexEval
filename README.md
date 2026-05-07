@@ -61,6 +61,8 @@ cd infra
 docker compose up -d
 ```
 
+这里的前端容器默认是 Vite 开发服务器，打开 [https://localhost:5173](https://localhost:5173) 后，保存 `client/` 下的源码会自动热更新。
+
 ## 接口现状
 
 - 业务 REST 端点已移除。
@@ -118,6 +120,18 @@ docker compose up -d
 - `create_exam.sql`、`create_exam_answer.sql`（考试记录）
 - `create_exam_judge.sql`、`create_exam_blank.sql`、`create_exam_essay.sql`（题型题库）
 - `create_score_appeal.sql`（成绩复核）
+
+批量导入脚本位于：`docs/database/batch_import/`
+
+- `courses.sql`
+- `teachers.sql`
+- `students.sql`
+- `classes.sql`
+- `SClist.sql`
+
+这些脚本由根目录的 5 个 Excel 直接生成，适合在 Docker 重建数据卷后重新导入。
+
+另外，`docs/database/99_batch_import.sql` 会在 MySQL 首次初始化时自动按顺序执行这 5 个脚本；所以只要你执行了 `docker compose -f infra/docker-compose.yml down -v`，再 `up -d`，数据库会自动重新导入，不需要手工点导入。
 
 若你的旧库中 class.eid 仍关联 teacher.id，可执行修复脚本：infra/sql/20260426_fix_class_fk.sql
 

@@ -7,7 +7,8 @@ npm install
 npm run dev
 ```
 
-- Local dev URL: https://localhost:5173
+- Local dev URL: [https://localhost:5173](https://localhost:5173)
+- If you run Vite inside Docker, use `npm run dev -- --host 0.0.0.0` so the browser can reach the dev server and HMR websocket.
 
 ## Routes
 

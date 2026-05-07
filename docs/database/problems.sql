@@ -1,3 +1,5 @@
+SET NAMES utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
 INSERT IGNORE INTO question_bank (id, stem, answer_key, points, difficulty, cno, active) VALUES
 ('Q_NEW_001', '【知识点：总线控制】在集中式总线仲裁中，对电路故障最敏感的方式是？', '链式查询', 2, 2.5, 'BJSL0001', true),
 ('Q_NEW_002', '【知识点：网络安全】防止重放攻击（Replay Attack）最常用的技术手段是？', '时间戳和随机数', 3, 3.5, 'BJSL0004', true),
