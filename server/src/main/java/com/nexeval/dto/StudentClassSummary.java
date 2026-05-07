@@ -4,6 +4,7 @@ public record StudentClassSummary(
   String cno,
   String cname,
   String eid,
-  String teacherName
+  String teacherName,
+  Integer grade
 ) {
 }

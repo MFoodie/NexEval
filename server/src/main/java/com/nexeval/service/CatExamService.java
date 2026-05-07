@@ -42,6 +42,7 @@ import com.nexeval.repository.QuestionBankRepository;
 import com.nexeval.ws.ExamWebSocketHub;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,6 +53,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -124,7 +127,7 @@ public class CatExamService {
     if (practicePaper != null) {
       paperId = practicePaper.getId();
       sourceId = paperId;
-      questionBank = loadPracticeQuestionBank(paperId);
+      questionBank = loadPracticeQuestionBank(paperId, normalizedCourseNo);
     } else if (!normalizedCourseNo.isBlank() && isCourseSource(normalizedCourseNo)) {
       questionBank = loadCourseQuestionBank(normalizedCourseNo);
     } else {
@@ -420,14 +423,16 @@ public class CatExamService {
     }
 
     String questionId = request.questionId().trim();
-    String answerText = request.selectedOption().trim();
+    String answerText = normalizeAnswerText(request.selectedOption());
+    String answerImagePath = normalizeAnswerImagePath(request.answerImagePath());
 
     QuestionItem question = requireQuestion(session, questionId);
+    validateAnswerPayload(question, answerText, answerImagePath);
     boolean scoreEnabled = question.scorable();
     boolean correct = scoreEnabled && matchesAnswer(question.answerKey(), answerText);
 
     session.markAnswered(question.id(), correct, question.difficulty(), scoreEnabled);
-    saveAnswer(session, question, answerText, scoreEnabled, correct);
+    saveAnswer(session, question, answerText, answerImagePath, scoreEnabled, correct);
 
     if (session.isFinished()) {
       session.submit(Instant.now());
@@ -464,6 +469,7 @@ public class CatExamService {
     ExamSession session,
     QuestionItem question,
     String answerText,
+    String answerImagePath,
     boolean scoreEnabled,
     boolean correct
   ) {
@@ -479,6 +485,7 @@ public class CatExamService {
       answer.setQuestionId(question.id());
       answer.setQuestionType(question.type());
       answer.setAnswerText(answerText);
+      answer.setAnswerImagePath(answerImagePath);
       answer.setCorrect(scoreEnabled ? correct : null);
       int maxScore = Math.max(0, question.points());
       if (scoreEnabled) {
@@ -552,7 +559,7 @@ public class CatExamService {
     }
 
     if (session.getPaperId() != null && !session.getPaperId().isBlank()) {
-      return loadPracticeQuestionBank(session.getPaperId());
+      return loadPracticeQuestionBank(session.getPaperId(), session.getCourseNo());
     }
 
     String courseNo = normalizeSourceId(session.getCourseNo());
@@ -562,7 +569,7 @@ public class CatExamService {
 
     PracticePaper fallbackPaper = resolvePracticePaper(courseNo);
     if (fallbackPaper != null) {
-      return loadPracticeQuestionBank(fallbackPaper.getId());
+      return loadPracticeQuestionBank(fallbackPaper.getId(), courseNo);
     }
 
     return loadExamQuestionBank(resolveExamDefinition(null));
@@ -605,14 +612,16 @@ public class CatExamService {
       .map(this::toQuestionItem)
       .toList());
 
-    return items.stream()
+    List<QuestionItem> ordered = items.stream()
       .sorted(Comparator.comparingInt((QuestionItem item) -> typeOrder(item.type()))
         .thenComparingDouble(QuestionItem::difficulty)
         .thenComparing(QuestionItem::id))
-      .toList();
+      .collect(Collectors.toCollection(ArrayList::new));
+
+    return prioritizeImageQuestion(ordered);
   }
 
-  private List<QuestionItem> loadPracticeQuestionBank(String paperId) {
+  private List<QuestionItem> loadPracticeQuestionBank(String paperId, String courseNo) {
     List<PracticePaperQuestion> paperQuestions = practicePaperQuestionRepository
       .findAllByPaper_IdOrderByDisplayOrderAsc(paperId);
 
@@ -620,10 +629,12 @@ public class CatExamService {
       throw new NoSuchElementException("Practice paper has no questions: " + paperId);
     }
 
-    return paperQuestions.stream()
+    List<QuestionItem> items = paperQuestions.stream()
       .map(PracticePaperQuestion::getQuestion)
       .map(this::toQuestionItem)
-      .toList();
+      .collect(Collectors.toCollection(ArrayList::new));
+
+    return ensurePracticeQuestionBankHasImage(items, courseNo);
   }
 
   private List<QuestionItem> loadExamQuestionBank(ExamDefinition examDefinition) {
@@ -672,6 +683,8 @@ public class CatExamService {
     return new QuestionItem(
       question.getId(),
       question.getStem(),
+      question.getImagePath(),
+      question.getImageMode(),
       options,
       question.getAnswerKey(),
       question.getDifficulty(),
@@ -685,6 +698,8 @@ public class CatExamService {
     return new QuestionItem(
       question.getId(),
       question.getStem(),
+      null,
+      null,
       JUDGE_OPTIONS,
       question.isAnswerKey() ? "true" : "false",
       question.getDifficulty(),
@@ -698,6 +713,8 @@ public class CatExamService {
     return new QuestionItem(
       question.getId(),
       question.getStem(),
+      question.getImagePath(),
+      question.getImageMode(),
       List.of(),
       question.getAnswerKey(),
       question.getDifficulty(),
@@ -711,6 +728,8 @@ public class CatExamService {
     return new QuestionItem(
       question.getId(),
       question.getStem(),
+      question.getImagePath(),
+      question.getImageMode(),
       List.of(),
       "",
       question.getDifficulty(),
@@ -819,16 +838,86 @@ public class CatExamService {
     return new QuestionView(
       item.id(),
       item.stem(),
+      item.imagePath(),
+      item.imageMode(),
       item.options(),
       item.difficulty(),
       item.type().name().toLowerCase()
     );
   }
 
+  private List<QuestionItem> prioritizeImageQuestion(List<QuestionItem> items) {
+    List<QuestionItem> shuffled = new ArrayList<>(items);
+    Collections.shuffle(shuffled, ThreadLocalRandom.current());
+    // Keep image questions in random positions; do not force image question to be first.
+    return shuffled;
+  }
+
+  private List<QuestionItem> ensurePracticeQuestionBankHasImage(List<QuestionItem> items, String courseNo) {
+    List<QuestionItem> working = new ArrayList<>(items);
+    if (working.stream().anyMatch(this::hasImagePath)) {
+      return prioritizeImageQuestion(working);
+    }
+
+    String normalizedCourseNo = normalizeSourceId(courseNo);
+    if (normalizedCourseNo.isBlank() || working.isEmpty()) {
+      return prioritizeImageQuestion(working);
+    }
+
+    Set<String> excludedIds = working.stream()
+      .map(QuestionItem::id)
+      .collect(Collectors.toSet());
+    QuestionItem imageQuestion = pickRandomCourseImageQuestion(normalizedCourseNo, excludedIds);
+    if (imageQuestion == null) {
+      return prioritizeImageQuestion(working);
+    }
+
+    int replaceIndex = ThreadLocalRandom.current().nextInt(working.size());
+    working.set(replaceIndex, imageQuestion);
+    return prioritizeImageQuestion(working);
+  }
+
+  private QuestionItem pickRandomCourseImageQuestion(String courseNo, Set<String> excludedIds) {
+    List<QuestionItem> candidates = new ArrayList<>();
+
+    candidates.addAll(questionBankRepository.findAllByActiveTrueAndCno(courseNo).stream()
+      .filter(question -> hasText(question.getImagePath()))
+      .map(this::toQuestionItem)
+      .filter(item -> !excludedIds.contains(item.id()))
+      .collect(Collectors.toList()));
+
+    candidates.addAll(blankQuestionBankRepository.findAllByActiveTrueAndCno(courseNo).stream()
+      .filter(question -> hasText(question.getImagePath()))
+      .map(this::toQuestionItem)
+      .filter(item -> !excludedIds.contains(item.id()))
+      .collect(Collectors.toList()));
+
+    candidates.addAll(essayQuestionBankRepository.findAllByActiveTrueAndCno(courseNo).stream()
+      .filter(question -> hasText(question.getImagePath()))
+      .map(this::toQuestionItem)
+      .filter(item -> !excludedIds.contains(item.id()))
+      .collect(Collectors.toList()));
+
+    if (candidates.isEmpty()) {
+      return null;
+    }
+
+    return candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
+  }
+
+  private boolean hasImagePath(QuestionItem item) {
+    return item != null && hasText(item.imagePath());
+  }
+
+  private boolean hasText(String value) {
+    return value != null && !value.isBlank();
+  }
+
   private ExamAnswerView toAnswerView(ExamAnswer answer) {
     return new ExamAnswerView(
       answer.getQuestionId(),
       answer.getAnswerText(),
+      answer.getAnswerImagePath(),
       answer.getQuestionType().name().toLowerCase(),
       answer.getCorrect()
     );
@@ -865,12 +954,40 @@ public class CatExamService {
       resolveQuestionStem(answer),
       answer.getQuestionType().name().toLowerCase(),
       answer.getAnswerText(),
+      answer.getAnswerImagePath(),
       answer.getCorrect(),
       answer.getScore(),
       answer.isReviewed(),
       answer.getReviewNote(),
       resolveQuestionMaxScore(answer.getQuestionType(), answer.getQuestionId())
     );
+  }
+
+  private String normalizeAnswerText(String value) {
+    if (value == null) {
+      return "";
+    }
+    return value.trim();
+  }
+
+  private String normalizeAnswerImagePath(String value) {
+    if (value == null) {
+      return "";
+    }
+    return value.trim();
+  }
+
+  private void validateAnswerPayload(QuestionItem question, String answerText, String answerImagePath) {
+    if (question.type() == QuestionType.ESSAY) {
+      if (answerText.isBlank() && answerImagePath.isBlank()) {
+        throw new IllegalArgumentException("请至少填写文字答案或上传一张图片");
+      }
+      return;
+    }
+
+    if (answerText.isBlank()) {
+      throw new IllegalArgumentException("答案不能为空");
+    }
   }
 
   private ScoreAppealView toScoreAppealView(ScoreAppeal appeal) {

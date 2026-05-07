@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "essay_question_bank")
@@ -15,6 +16,12 @@ public class EssayQuestionBank {
 
   @Column(name = "stem", nullable = false, length = 512)
   private String stem;
+
+  @Column(name = "image_path", length = 255)
+  private String imagePath;
+
+  @Column(name = "image_mode", precision = 3, scale = 2)
+  private BigDecimal imageMode;
 
   @Column(name = "points", nullable = false)
   private int points;
@@ -42,6 +49,22 @@ public class EssayQuestionBank {
 
   public void setStem(String stem) {
     this.stem = stem;
+  }
+
+  public String getImagePath() {
+    return imagePath;
+  }
+
+  public void setImagePath(String imagePath) {
+    this.imagePath = imagePath;
+  }
+
+  public BigDecimal getImageMode() {
+    return imageMode;
+  }
+
+  public void setImageMode(BigDecimal imageMode) {
+    this.imageMode = imageMode;
   }
 
   public int getPoints() {

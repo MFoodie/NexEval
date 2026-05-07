@@ -278,7 +278,11 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
         case "SUBMIT_ANSWER":
           responsePayload = catExamService.submitAnswer(
             requireText(payload, "sessionId"),
-            new AnswerRequest(requireText(payload, "questionId"), requireText(payload, "selectedOption"))
+            new AnswerRequest(
+              requireText(payload, "questionId"),
+              optionalText(payload, "selectedOption"),
+              optionalText(payload, "answerImagePath")
+            )
           );
           break;
         default:

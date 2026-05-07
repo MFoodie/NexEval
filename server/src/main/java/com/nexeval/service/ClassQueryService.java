@@ -81,18 +81,26 @@ public class ClassQueryService {
 
   public List<StudentClassSummary> getStudentClasses(String sno) {
     String normalizedSno = required(sno, "sno");
-    if (studentProfileRepository.findFirstBySno(normalizedSno).isEmpty()) {
+    var studentProfile = studentProfileRepository.findFirstBySno(normalizedSno)
+      .orElseThrow(() -> new IllegalArgumentException("学号不存在"));
+
+    String userId = studentProfile.getId();
+    if (userId == null || userId.isBlank()) {
       throw new IllegalArgumentException("学号不存在");
     }
 
     return scRecordRepository.findStudentClasses(normalizedSno)
       .stream()
-      .map(row -> new StudentClassSummary(
-        row.getCno(),
-        row.getCname(),
-        row.getEid(),
-        row.getTeacherName()
-      ))
+      .map(row -> {
+        Integer examScore = resolveLatestExamScore(userId, row.getCno());
+        return new StudentClassSummary(
+          row.getCno(),
+          row.getCname(),
+          row.getEid(),
+          row.getTeacherName(),
+          examScore != null ? examScore : row.getGrade()
+        );
+      })
       .toList();
   }
 

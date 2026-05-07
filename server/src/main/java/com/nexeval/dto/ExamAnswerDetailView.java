@@ -6,6 +6,7 @@ public record ExamAnswerDetailView(
   String stem,
   String type,
   String answerText,
+  String answerImagePath,
   Boolean correct,
   Integer score,
   Boolean reviewed,

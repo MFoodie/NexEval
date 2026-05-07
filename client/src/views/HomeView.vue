@@ -315,7 +315,17 @@
       <div v-else-if="gradingAttempts.length === 0" class="placeholder">暂无考试记录</div>
       <el-table v-else :data="gradingAnswers" size="small">
         <el-table-column prop="stem" label="题目" min-width="240" />
-        <el-table-column prop="answerText" label="作答" min-width="160" />
+        <el-table-column label="作答" min-width="220">
+          <template #default="scope">
+            <div>{{ scope.row.answerText || '-' }}</div>
+            <img
+              v-if="scope.row.answerImagePath"
+              :src="normalizeAnswerImageSrc(scope.row.answerImagePath)"
+              alt="作答图片"
+              class="grading-answer-image"
+            />
+          </template>
+        </el-table-column>
         <el-table-column label="判定" width="90">
           <template #default="scope">
             <span v-if="scope.row.correct === true">正确</span>
@@ -577,28 +587,6 @@ async function fetchStudentClasses() {
   try {
     const data = await wsClient.request("GET_STUDENT_CLASSES", { sno }, 20000);
     studentClasses.value = Array.isArray(data) ? data : [];
-
-    // 为每门课程尝试获取该学生的最新考试得分（使用已有的 GET_EXAM_ATTEMPTS action）
-    if (wsClient && wsClient.isOpen() && Array.isArray(studentClasses.value) && studentClasses.value.length) {
-      await Promise.all(studentClasses.value.map(async (c) => {
-        try {
-          const attempts = await wsClient.request("GET_EXAM_ATTEMPTS", {
-            userId: cardNo.value,
-            courseNo: c.cno || ""
-          }, 10000);
-
-          if (Array.isArray(attempts) && attempts.length) {
-            const latest = attempts[0];
-            // 兼容不同返回字段名
-            c.grade = latest.score ?? latest.totalScore ?? latest.sumScore ?? latest.mark ?? latest.grade ?? '-';
-          } else {
-            c.grade = '-';
-          }
-        } catch (err) {
-          c.grade = '-';
-        }
-      }));
-    }
   } catch (error) {
     ElMessage.error(error.message || "教学班获取失败");
   } finally {
@@ -1005,6 +993,17 @@ function canReviewAnswer(answer) {
   return answer?.type === "essay";
 }
 
+function normalizeAnswerImageSrc(path) {
+  const text = String(path || "").trim();
+  if (!text) {
+    return "";
+  }
+  if (text.startsWith("http://") || text.startsWith("https://") || text.startsWith("/")) {
+    return text;
+  }
+  return `/${text}`;
+}
+
 async function handleReviewAnswer(answer) {
   if (!wsClient || !wsClient.isOpen()) {
     ElMessage.error("WebSocket is not connected. Please wait for reconnect.");
@@ -1303,6 +1302,14 @@ onBeforeUnmount(() => {
   gap: 6px;
   color: var(--ne-text-muted);
   font-size: 13px;
+}
+
+.grading-answer-image {
+  margin-top: 8px;
+  width: min(220px, 100%);
+  border-radius: 8px;
+  border: 1px solid var(--ne-border);
+  display: block;
 }
 
 .student-subtitle {

@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS exam_answer (
     question_id varchar(32) NOT NULL,
     question_type varchar(16) NOT NULL,
     answer_text varchar(1024),
+    answer_image_path varchar(255),
     correct boolean,
     score int,
     review_note varchar(255),
@@ -20,3 +21,19 @@ CREATE TABLE IF NOT EXISTS exam_answer (
 
 CREATE INDEX idx_exam_answer_session ON exam_answer(session_id);
 CREATE INDEX idx_exam_answer_course ON exam_answer(course_no);
+
+SET @col_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+        AND table_name = 'exam_answer'
+        AND column_name = 'answer_image_path'
+);
+SET @sql := IF(
+    @col_exists = 0,
+    'ALTER TABLE exam_answer ADD COLUMN answer_image_path varchar(255) DEFAULT NULL AFTER answer_text',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
