@@ -16,6 +16,8 @@ export function createExamSocket(sessionId, handlers = {}) {
   const socket = new WebSocket(wsUrl);
   const pending = new Map();
   let sequence = 0;
+  const heartbeatIntervalMs = 30000;
+  let heartbeatTimer = null;
 
   function rejectAllPending(reason) {
     for (const entry of pending.values()) {
@@ -28,9 +30,18 @@ export function createExamSocket(sessionId, handlers = {}) {
   socket.onopen = () => {
     handlers.onOpen?.();
     socket.send(JSON.stringify({ type: "PING" }));
+    heartbeatTimer = setInterval(() => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "PING" }));
+      }
+    }, heartbeatIntervalMs);
   };
 
   socket.onclose = (event) => {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
     rejectAllPending("WebSocket closed");
     handlers.onClose?.(event);
   };
@@ -100,6 +111,10 @@ export function createExamSocket(sessionId, handlers = {}) {
     close() {
       if (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN) {
         socket.close();
+      }
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
       }
       rejectAllPending("WebSocket client closed");
     }

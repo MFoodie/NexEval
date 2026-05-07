@@ -16,6 +16,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ../docs/database:/docker-entrypoint-initdb.d:ro
+      - ./mysql.cnf:/etc/mysql/conf.d/charset.cnf:ro
 
   redis:
     image: redis:7.2

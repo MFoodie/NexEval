@@ -1,3 +1,6 @@
+SET NAMES utf8mb4;
+ALTER DATABASE sedb CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
 CREATE TABLE users (
     id CHAR(9) NOT NULL,
     name VARCHAR(20) NOT NULL,
