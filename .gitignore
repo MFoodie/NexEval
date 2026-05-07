@@ -8,6 +8,7 @@ server/target/
 server/build/
 server/.gradle/
 *.log
+*.class
 
 # IDE
 .vscode/
