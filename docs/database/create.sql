@@ -21,7 +21,7 @@ CREATE TABLE student (
     id char(9) NOT NULL,
     sno char(8) NOT NULL,
     enteryear int NOT NULL,
-    major varchar(20) NOT NULL,
+    major varchar(50) NOT NULL,
     department varchar(30) NOT NULL,
     PRIMARY KEY (sno),
     FOREIGN KEY (id) REFERENCES users(id)
@@ -49,7 +49,7 @@ VALUES
 
 CREATE TABLE course(
     cno char(8),
-    cname varchar(20),
+    cname varchar(50),
     credit decimal(2,1),
     PRIMARY KEY (cno)
 );
@@ -78,7 +78,7 @@ CREATE TABLE class(
     FOREIGN KEY (eid) REFERENCES teacher(eid)
 );
 
-CREATE TABLE SC(
+CREATE TABLE sc(
     sno char(8),
     cno char(8),
     eid char(8),
