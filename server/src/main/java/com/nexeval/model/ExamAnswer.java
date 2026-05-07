@@ -38,6 +38,9 @@ public class ExamAnswer {
   @Column(name = "answer_text", length = 1024)
   private String answerText;
 
+  @Column(name = "answer_image_path", length = 255)
+  private String answerImagePath;
+
   @Column(name = "correct")
   private Boolean correct;
 
@@ -113,6 +116,14 @@ public class ExamAnswer {
 
   public void setAnswerText(String answerText) {
     this.answerText = answerText;
+  }
+
+  public String getAnswerImagePath() {
+    return answerImagePath;
+  }
+
+  public void setAnswerImagePath(String answerImagePath) {
+    this.answerImagePath = answerImagePath;
   }
 
   public Boolean getCorrect() {

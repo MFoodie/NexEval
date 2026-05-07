@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,6 +22,12 @@ public class QuestionBank {
 
   @Column(name = "stem", nullable = false, length = 512)
   private String stem;
+
+  @Column(name = "image_path", length = 255)
+  private String imagePath;
+
+  @Column(name = "image_mode", precision = 3, scale = 2)
+  private BigDecimal imageMode;
 
   @Column(name = "answer_key", nullable = false, length = 64)
   private String answerKey;
@@ -52,6 +59,22 @@ public class QuestionBank {
 
   public void setStem(String stem) {
     this.stem = stem;
+  }
+
+  public String getImagePath() {
+    return imagePath;
+  }
+
+  public void setImagePath(String imagePath) {
+    this.imagePath = imagePath;
+  }
+
+  public BigDecimal getImageMode() {
+    return imageMode;
+  }
+
+  public void setImageMode(BigDecimal imageMode) {
+    this.imageMode = imageMode;
   }
 
   public String getAnswerKey() {

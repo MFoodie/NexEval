@@ -20,7 +20,7 @@ public interface ScRecordRepository extends JpaRepository<ScRecord, ScRecordId> 
 	List<ClassStudentRow> findClassStudents(@Param("cno") String cno, @Param("eid") String eid);
 
 	@Query("""
-		select sc.id.cno as cno, c.cname as cname, sc.id.eid as eid, u.name as teacherName
+		select sc.id.cno as cno, c.cname as cname, sc.id.eid as eid, u.name as teacherName, sc.grade as grade
 		from ScRecord sc
 		join Course c on c.cno = sc.id.cno
 		join TeacherProfile t on t.eid = sc.id.eid
@@ -50,5 +50,7 @@ public interface ScRecordRepository extends JpaRepository<ScRecord, ScRecordId> 
 		String getEid();
 
 		String getTeacherName();
+
+		Integer getGrade();
 	}
 }

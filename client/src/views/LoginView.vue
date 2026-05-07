@@ -16,7 +16,7 @@
         <el-tag size="small" :type="wsTagType">{{ wsStatus }}</el-tag>
       </p>
 
-      <el-form @submit.prevent>
+      <el-form @submit.prevent="handleLogin">
         <el-form-item label="账号">
           <el-input v-model="account" placeholder="请输入卡号/手机号/邮箱" />
         </el-form-item>
@@ -25,7 +25,7 @@
           <el-input v-model="password" type="password" show-password placeholder="请输入密码" />
         </el-form-item>
 
-        <el-button type="primary" :loading="submitting" @click="handleLogin">登录</el-button>
+        <el-button type="primary" native-type="submit" :loading="submitting">登录</el-button>
       </el-form>
     </div>
   </section>

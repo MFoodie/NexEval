@@ -49,6 +49,10 @@
             </div>
             <h2 class="question-title">{{ currentQuestion.stem }}</h2>
 
+            <div v-if="questionImageSrc" class="question-image-wrap" :style="questionImageWrapStyle">
+              <img :src="questionImageSrc" alt="题目图片" class="question-image" :style="questionImageStyle" />
+            </div>
+
             <template v-if="isOptionQuestion">
               <el-radio-group v-model="answerValue" class="option-group">
                 <el-radio
@@ -75,6 +79,26 @@
                 :rows="6"
                 placeholder="请输入作答内容"
               />
+
+              <div class="essay-image-actions">
+                <input
+                  ref="essayImageInputRef"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  class="essay-image-input"
+                  @change="handleEssayImageSelected"
+                />
+                <el-button size="small" :loading="uploadingEssayImage" @click="triggerEssayImagePicker">
+                  上传作答图片
+                </el-button>
+                <el-button v-if="essayImagePath" size="small" type="danger" plain @click="clearEssayImage">
+                  移除图片
+                </el-button>
+              </div>
+
+              <div v-if="essayImagePreviewSrc" class="essay-image-preview-wrap">
+                <img :src="essayImagePreviewSrc" alt="作答图片" class="essay-image-preview" />
+              </div>
             </template>
 
             <div class="status-legend">
@@ -142,6 +166,7 @@ const courseTitle = computed(() => courseNameText.value || `课程 ${courseNoTex
 const loading = ref(false);
 const submitting = ref(false);
 const finishing = ref(false);
+const uploadingEssayImage = ref(false);
 const sessionMode = ref("practice");
 const timeLimitSeconds = ref(-1);
 const remainingSeconds = ref(-1);
@@ -152,6 +177,9 @@ const currentIndex = ref(0);
 const currentQuestion = computed(() => questions.value[currentIndex.value] || null);
 const answerValue = ref("");
 const answerMap = ref({});
+const answerImageMap = ref({});
+const essayImagePath = ref("");
+const essayImageInputRef = ref(null);
 const theta = ref(0);
 const answeredCount = ref(0);
 const maxQuestions = ref(10);
@@ -169,6 +197,57 @@ const typeLabels = {
 const currentTypeLabel = computed(() => {
   const type = currentQuestion.value?.type || "choice";
   return typeLabels[type] || "题目";
+});
+
+const questionImageSrc = computed(() => {
+  const path = String(currentQuestion.value?.imagePath || "").trim();
+  if (!path) {
+    return "";
+  }
+
+  if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("/")) {
+    return path;
+  }
+
+  return `/${path}`;
+});
+
+const questionImageScale = computed(() => {
+  const raw = Number(currentQuestion.value?.imageMode);
+
+  if (!Number.isFinite(raw)) {
+    return 1;
+  }
+
+  return Math.min(1, Math.max(0.01, Number(raw.toFixed(2))));
+});
+
+const questionImageWrapStyle = computed(() => {
+  const widthPercent = `${(questionImageScale.value * 100).toFixed(2)}%`;
+  return {
+    width: widthPercent,
+    margin: "0 auto",
+  };
+});
+
+const questionImageStyle = computed(() => {
+  return {
+    width: "100%",
+    maxWidth: "100%",
+    height: "auto",
+    display: "block",
+  };
+});
+
+const essayImagePreviewSrc = computed(() => {
+  const path = String(essayImagePath.value || "").trim();
+  if (!path) {
+    return "";
+  }
+  if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("/")) {
+    return path;
+  }
+  return `/${path}`;
 });
 
 const isOptionQuestion = computed(() => {
@@ -284,6 +363,7 @@ async function loadSessionAnswers() {
       sessionId: sessionId.value
     });
     const nextMap = {};
+    const nextImageMap = {};
     const nextAnswered = new Set();
 
     (Array.isArray(payload) ? payload : []).forEach((item) => {
@@ -291,10 +371,14 @@ async function loadSessionAnswers() {
         return;
       }
       nextMap[item.questionId] = item.answerText ?? "";
+      if (item.answerImagePath) {
+        nextImageMap[item.questionId] = item.answerImagePath;
+      }
       nextAnswered.add(item.questionId);
     });
 
     answerMap.value = nextMap;
+    answerImageMap.value = nextImageMap;
     answeredSet.value = nextAnswered;
     syncAnswerForCurrentQuestion();
   } catch (error) {
@@ -307,8 +391,17 @@ async function handleSubmit() {
     return;
   }
 
-  if (!String(answerValue.value || "").trim()) {
+  const isEssay = currentQuestion.value.type === "essay";
+  const textValue = String(answerValue.value || "").trim();
+  const imageValue = String(essayImagePath.value || "").trim();
+
+  if (!isEssay && !textValue) {
     ElMessage.warning(isOptionQuestion.value ? "请选择一个选项。" : "请输入答案。");
+    return;
+  }
+
+  if (isEssay && !textValue && !imageValue) {
+    ElMessage.warning("请至少填写文字答案或上传一张图片。");
     return;
   }
 
@@ -317,14 +410,16 @@ async function handleSubmit() {
     const payload = await wsClient.request("SUBMIT_ANSWER", {
       sessionId: sessionId.value,
       questionId: currentQuestion.value.id,
-      selectedOption: answerValue.value
+      selectedOption: textValue,
+      answerImagePath: isEssay ? imageValue : ""
     });
 
     theta.value = payload.theta;
     answeredCount.value = payload.answeredCount;
     finished.value = payload.finished;
     answeredSet.value = new Set([...answeredSet.value, currentQuestion.value.id]);
-    saveAnswerForQuestion(currentQuestion.value.id, answerValue.value);
+    saveAnswerForQuestion(currentQuestion.value.id, textValue);
+    saveAnswerImageForQuestion(currentQuestion.value.id, isEssay ? imageValue : "");
 
     if (payload.correct) {
       ElMessage.success("提交成功。");
@@ -409,6 +504,24 @@ function saveAnswerForQuestion(questionId, value) {
   };
 }
 
+function saveAnswerImageForQuestion(questionId, imagePath) {
+  if (!questionId) {
+    return;
+  }
+
+  const next = {
+    ...answerImageMap.value,
+  };
+
+  if (imagePath) {
+    next[questionId] = imagePath;
+  } else {
+    delete next[questionId];
+  }
+
+  answerImageMap.value = next;
+}
+
 function questionNodeClass(index, questionId) {
   if (index === currentIndex.value) {
     return "is-current";
@@ -423,9 +536,82 @@ function syncAnswerForCurrentQuestion() {
   const questionId = currentQuestion.value?.id;
   if (!questionId) {
     answerValue.value = "";
+    essayImagePath.value = "";
     return;
   }
   answerValue.value = answerMap.value[questionId] ?? "";
+  essayImagePath.value = answerImageMap.value[questionId] ?? "";
+}
+
+function triggerEssayImagePicker() {
+  essayImageInputRef.value?.click();
+}
+
+async function handleEssayImageSelected(event) {
+  const file = event?.target?.files?.[0];
+  event.target.value = "";
+
+  if (!file) {
+    return;
+  }
+
+  if (!sessionId.value) {
+    ElMessage.error("会话不存在，无法上传图片");
+    return;
+  }
+
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket 未连接，请稍后重试。");
+    return;
+  }
+
+  if (!currentQuestion.value || currentQuestion.value.type !== "essay") {
+    ElMessage.warning("仅大题支持上传作答图片");
+    return;
+  }
+
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+    ElMessage.warning("仅支持 JPG/PNG/WEBP 图片");
+    return;
+  }
+
+  if (file.size > 8 * 1024 * 1024) {
+    ElMessage.warning("图片不能超过 8MB");
+    return;
+  }
+
+  uploadingEssayImage.value = true;
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("sessionId", String(sessionId.value));
+
+    const response = await fetch("/api/answer-image/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.message || "上传失败");
+    }
+
+    essayImagePath.value = String(payload?.imagePath || "").trim();
+    saveAnswerImageForQuestion(currentQuestion.value.id, essayImagePath.value);
+    ElMessage.success("图片上传成功");
+  } catch (error) {
+    ElMessage.error(error.message || "上传失败");
+  } finally {
+    uploadingEssayImage.value = false;
+  }
+}
+
+function clearEssayImage() {
+  essayImagePath.value = "";
+  const questionId = currentQuestion.value?.id;
+  if (questionId) {
+    saveAnswerImageForQuestion(questionId, "");
+  }
 }
 
 watch(currentQuestion, () => {
@@ -601,6 +787,19 @@ onBeforeUnmount(() => {
   color: var(--ne-text-strong);
 }
 
+.question-image-wrap {
+  margin: 0 0 18px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  overflow: auto;
+}
+
+.question-image {
+  border-radius: 10px;
+}
+
 .option-group {
   display: grid;
   gap: 12px;
@@ -609,6 +808,32 @@ onBeforeUnmount(() => {
 
 .answer-input {
   margin-bottom: 24px;
+}
+
+.essay-image-input {
+  display: none;
+}
+
+.essay-image-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.essay-image-preview-wrap {
+  margin-bottom: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  max-width: 72%;
+}
+
+.essay-image-preview {
+  width: 100%;
+  display: block;
+  border-radius: 8px;
 }
 
 .status-legend {

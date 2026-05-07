@@ -18,6 +18,26 @@ export default defineConfig({
         target: "https://localhost:8443",
         changeOrigin: true,
         secure: false
+      },
+      "/question-images": {
+        target: "https://localhost:8443",
+        changeOrigin: true,
+        secure: false
+      },
+      "/fig": {
+        target: "https://localhost:8443",
+        changeOrigin: true,
+        secure: false
+      },
+      "/answer-images": {
+        target: "https://localhost:8443",
+        changeOrigin: true,
+        secure: false
+      },
+      "/api/answer-image": {
+        target: "https://localhost:8443",
+        changeOrigin: true,
+        secure: false
       }
     }
   }

@@ -13,6 +13,7 @@ WORKDIR /app
 
 RUN addgroup -S app && adduser -S app -G app
 
+COPY server/fig ./fig
 COPY --from=build /workspace/build/libs/*.jar /app/app.jar
 
 ENV SERVER_PORT=8080 \
