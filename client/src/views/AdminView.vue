@@ -20,7 +20,6 @@
       </nav>
 
       <div class="sidebar-actions">
-        <el-button :loading="avatarSaving" @click="handleResetAvatar">恢复默认头像</el-button>
         <el-button text type="danger" @click="handleLogout">退出登录</el-button>
       </div>
 
@@ -35,21 +34,47 @@
 
     <main class="main-panel">
       <section class="card panel-card" v-if="activeMenu === 'profile'">
-        <h2 class="panel-title">个人信息</h2>
-        <div class="admin-info-wrap">
-          <div class="avatar-wrap">
-            <div class="avatar-click" @click="triggerAvatarPicker">
-              <img :src="avatarUrl" alt="管理员头像" class="admin-avatar" />
-            </div>
-            <div class="avatar-tip">点击修改头像</div>
+        <div class="profile-head">
+          <h2 class="panel-title">简介</h2>
+          <div class="profile-head-actions">
+            <el-button class="profile-op" type="primary" size="small" @click="triggerAvatarPicker">修改个人信息</el-button>
+            <el-button class="profile-op" size="small" :loading="avatarSaving" @click="handleResetAvatar">
+              恢复默认头像
+            </el-button>
           </div>
-          <el-descriptions :column="1" border>
-            <el-descriptions-item label="卡号">{{ loginInfo?.cardNo || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="姓名">{{ loginInfo?.name || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="性别">{{ sexText }}</el-descriptions-item>
-            <el-descriptions-item label="手机号">{{ displayPhone }}</el-descriptions-item>
-            <el-descriptions-item label="邮箱">{{ loginInfo?.email || '-' }}</el-descriptions-item>
-          </el-descriptions>
+        </div>
+        <div class="admin-info-wrap">
+          <table class="profile-info-table">
+            <tbody>
+              <tr>
+                <th class="avatar-label" rowspan="3">头像</th>
+                <td class="avatar-cell" rowspan="3">
+                  <div class="table-avatar-wrap">
+                    <div class="avatar-click" @click="triggerAvatarPicker">
+                      <img :src="avatarUrl" alt="管理员头像" class="admin-avatar" />
+                    </div>
+                    <div class="avatar-tip">点击修改头像</div>
+                  </div>
+                </td>
+                <th>卡号</th>
+                <td>{{ loginInfo?.cardNo || '-' }}</td>
+                <th>姓名</th>
+                <td>{{ loginInfo?.name || '-' }}</td>
+              </tr>
+              <tr>
+                <th>性别</th>
+                <td>{{ sexText }}</td>
+                <th>手机号</th>
+                <td>{{ displayPhone }}</td>
+              </tr>
+              <tr>
+                <th>邮箱</th>
+                <td>{{ loginInfo?.email || '-' }}</td>
+                <th>角色</th>
+                <td>{{ loginInfo?.type || 'admin' }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -738,8 +763,38 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+.profile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.profile-head .panel-title {
+  margin-bottom: 0;
+}
+
+.profile-op {
+  min-width: 64px;
+}
+
+.profile-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .avatar-wrap {
-  width: 92px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.table-avatar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .avatar-click {
@@ -765,16 +820,59 @@ onBeforeUnmount(() => {
 
 .admin-info-wrap {
   display: grid;
-  grid-template-columns: 92px 1fr;
   gap: 16px;
   align-items: start;
 }
 
+.profile-info-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.profile-info-table th,
+.profile-info-table td {
+  border: 1px solid #e5e7eb;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.profile-info-table th {
+  width: 10%;
+  background: #f5f7fa;
+  color: #6b7280;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.profile-info-table td {
+  width: 23.333%;
+  color: #111827;
+  word-break: break-all;
+}
+
+.profile-info-table .avatar-label {
+  vertical-align: top;
+}
+
+.profile-info-table .avatar-cell {
+  text-align: center;
+  background: #ffffff;
+  vertical-align: top;
+}
+
 .admin-avatar {
-  width: 92px;
-  height: 92px;
+  width: 86px;
+  height: 86px;
   border-radius: 50%;
   object-fit: cover;
+}
+
+.profile-info-table .avatar-click {
+  width: 86px;
+  height: 86px;
 }
 
 :deep(.male-radio .el-radio__input.is-checked .el-radio__inner) {
@@ -872,8 +970,10 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
-  .admin-info-wrap {
-    grid-template-columns: 1fr;
+  .profile-info-table th,
+  .profile-info-table td {
+    font-size: 13px;
+    padding: 8px 10px;
   }
 }
 </style>

@@ -1,5 +1,8 @@
 <template>
   <section class="login-wrap">
+    <div class="login-bg-container">
+      <img class="login-bg-image" :src="bgUrl" alt="background" />
+    </div>
     <div class="card login-card">
       <div class="login-brand">
         <img class="login-logo" :src="logoUrl" alt="NexEval Logo" />
@@ -13,11 +16,6 @@
         <h1 class="card-title">考生登录</h1>
         <p class="card-subtitle">支持卡号、手机号或邮箱 + 密码登录</p>
       </div>
-
-      <p class="ws-line">
-        WebSocket:
-        <el-tag size="small" :type="wsTagType">{{ wsStatus }}</el-tag>
-      </p>
 
       <div class="login-note">
         <span class="login-note-label">提示</span>
@@ -46,6 +44,7 @@ import { ElMessage } from "element-plus";
 import { saveLogin } from "../auth";
 import { createExamSocket } from "../ws";
 import logoUrl from "../assets/logo.png";
+import bgUrl from "../assets/bg.png";
 
 const router = useRouter();
 const account = ref("");
@@ -126,6 +125,34 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   padding: 16px 0 28px;
+  gap: 40px;
+}
+
+.login-bg-container {
+  display: none;
+  flex: 0 0 auto;
+  width: 400px;
+  height: 480px;
+  overflow: hidden;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+.login-bg-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (min-width: 1200px) {
+  .login-wrap {
+    justify-content: flex-start;
+    padding-left: 60px;
+  }
+
+  .login-bg-container {
+    display: flex;
+  }
 }
 
 .login-hero-mini {
@@ -200,12 +227,6 @@ onBeforeUnmount(() => {
   width: min(640px, calc(100% - 32px));
   border: 1px solid rgba(42, 92, 255, 0.12);
   box-shadow: 0 18px 44px rgba(15, 23, 42, 0.14), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
-}
-
-.ws-line {
-  margin: 0 0 14px;
-  color: #6b7280;
-  font-size: 14px;
 }
 
 .login-form {

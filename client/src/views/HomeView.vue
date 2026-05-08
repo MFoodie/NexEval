@@ -20,11 +20,6 @@
         </button>
       </nav>
 
-      <div class="side-status">
-        <div class="status-label">WebSocket</div>
-        <el-tag size="small" :type="wsTagType">{{ wsStatus }}</el-tag>
-      </div>
-
       <div class="side-actions">
         <el-button text type="danger" @click="handleLogout">退出登录</el-button>
       </div>
@@ -50,37 +45,60 @@
       </div>
 
       <section class="card panel-card" v-if="activeMenu === 'profile'">
-        <h2 class="panel-title">个人信息</h2>
-        <div class="avatar-wrap">
-          <div class="avatar-click" @click="triggerAvatarPicker">
-            <img :src="avatarUrl" alt="默认头像" class="avatar-image" />
+        <div class="profile-head">
+          <h2 class="panel-title">简介</h2>
+          <div class="profile-head-actions">
+            <el-button class="profile-op" type="primary" size="small" @click="openEditDialog">修改个人信息</el-button>
+            <el-button class="profile-op" size="small" :loading="avatarSaving" @click="handleResetAvatar">
+              恢复默认头像
+            </el-button>
           </div>
-          <div class="avatar-tip">点击修改头像</div>
         </div>
-        <el-descriptions :column="1" border>
-          <el-descriptions-item label="卡号">{{ cardNo }}</el-descriptions-item>
-          <el-descriptions-item label="姓名">{{ userName }}</el-descriptions-item>
-          <el-descriptions-item label="性别">{{ sexText }}</el-descriptions-item>
-          <el-descriptions-item label="手机号">{{ displayPhone }}</el-descriptions-item>
-          <el-descriptions-item label="邮箱">{{ email }}</el-descriptions-item>
-          <template v-if="isStudent && studentInfo">
-            <el-descriptions-item label="学号">{{ studentInfo.sno || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="入学年份">{{ studentInfo.enterYear || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="专业">{{ studentInfo.major || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="学院">{{ studentInfo.department || '-' }}</el-descriptions-item>
-          </template>
-          <template v-if="isTeacher && teacherInfo">
-            <el-descriptions-item label="工号">{{ teacherInfo.eid || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="入职年份">{{ teacherInfo.enterYear || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="职称">{{ teacherInfo.title || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="学院">{{ teacherInfo.department || '-' }}</el-descriptions-item>
-          </template>
-        </el-descriptions>
-
-        <div class="action-row">
-          <el-button :loading="avatarSaving" @click="handleResetAvatar">恢复默认头像</el-button>
-          <el-button type="primary" plain @click="openEditDialog">修改信息</el-button>
-        </div>
+        <table class="profile-info-table">
+          <tbody>
+            <tr>
+              <th class="avatar-label" rowspan="3">头像</th>
+              <td class="avatar-cell" rowspan="3">
+                <div class="table-avatar-wrap">
+                  <div class="avatar-click" @click="triggerAvatarPicker">
+                    <img :src="avatarUrl" alt="默认头像" class="avatar-image" />
+                  </div>
+                  <div class="avatar-tip">点击修改头像</div>
+                </div>
+              </td>
+              <th>卡号</th>
+              <td>{{ cardNo }}</td>
+              <th>姓名</th>
+              <td>{{ userName }}</td>
+            </tr>
+            <tr>
+              <th>性别</th>
+              <td>{{ sexText }}</td>
+              <th>手机号</th>
+              <td>{{ displayPhone }}</td>
+            </tr>
+            <tr>
+              <th>邮箱</th>
+              <td>{{ email }}</td>
+              <th>{{ isStudent ? '学号' : '工号' }}</th>
+              <td>
+                {{ isStudent ? (studentInfo?.sno || '-') : (teacherInfo?.eid || '-') }}
+              </td>
+            </tr>
+            <tr v-if="isStudent || isTeacher">
+              <th>{{ isStudent ? '入学年份' : '入职年份' }}</th>
+              <td>
+                {{ isStudent ? (studentInfo?.enterYear || '-') : (teacherInfo?.enterYear || '-') }}
+              </td>
+              <th>{{ isStudent ? '专业' : '职称' }}</th>
+              <td>
+                {{ isStudent ? (studentInfo?.major || '-') : (teacherInfo?.title || '-') }}
+              </td>
+              <th>学院</th>
+              <td>{{ isStudent ? (studentInfo?.department || '-') : (teacherInfo?.department || '-') }}</td>
+            </tr>
+          </tbody>
+        </table>
       </section>
 
       <section class="card panel-card exam-panel-card" v-else>
@@ -1128,20 +1146,6 @@ onBeforeUnmount(() => {
   box-shadow: var(--ne-shadow-soft);
 }
 
-.side-status {
-  display: grid;
-  gap: 6px;
-  padding: 10px 12px;
-  border: 1px solid var(--ne-border);
-  border-radius: 10px;
-  background: linear-gradient(135deg, rgba(42, 92, 255, 0.06), rgba(0, 194, 255, 0.08));
-}
-
-.status-label {
-  color: var(--ne-text-muted);
-  font-size: 12px;
-}
-
 .side-actions {
   margin-top: auto;
   display: flex;
@@ -1278,10 +1282,86 @@ onBeforeUnmount(() => {
 }
 
 .avatar-tip {
-  margin-top: 8px;
+  margin-top: 6px;
   text-align: center;
   font-size: 12px;
   color: var(--ne-primary);
+}
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.profile-head .panel-title {
+  margin-bottom: 0;
+}
+
+.profile-op {
+  min-width: 64px;
+}
+
+.profile-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-avatar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.profile-info-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.profile-info-table th,
+.profile-info-table td {
+  border: 1px solid var(--ne-border);
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.profile-info-table th {
+  width: 10%;
+  background: #f5f7fa;
+  color: var(--ne-text-muted);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.profile-info-table td {
+  width: 23.333%;
+  color: var(--ne-text-strong);
+  word-break: break-all;
+}
+
+.profile-info-table .avatar-label {
+  vertical-align: top;
+}
+
+.profile-info-table .avatar-cell {
+  text-align: center;
+  background: #ffffff;
+  vertical-align: top;
+}
+
+.profile-info-table .avatar-click {
+  width: 86px;
+  height: 86px;
+}
+
+.profile-info-table .avatar-image {
+  width: 86px;
+  height: 86px;
 }
 
 .avatar-input {
@@ -1478,6 +1558,12 @@ onBeforeUnmount(() => {
   .profile-summary,
   .exam-intro {
     grid-template-columns: 1fr;
+  }
+
+  .profile-info-table th,
+  .profile-info-table td {
+    font-size: 13px;
+    padding: 8px 10px;
   }
 }
 
