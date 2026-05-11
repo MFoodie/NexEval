@@ -50,6 +50,9 @@ public class ExamAnswer {
   @Column(name = "review_note", length = 255)
   private String reviewNote;
 
+  @Column(name = "ai_review_log", length = 255)
+  private String aiReviewLog;
+
   @Column(name = "reviewed", nullable = false)
   private boolean reviewed;
 
@@ -148,6 +151,14 @@ public class ExamAnswer {
 
   public void setReviewNote(String reviewNote) {
     this.reviewNote = reviewNote;
+  }
+
+  public String getAiReviewLog() {
+    return aiReviewLog;
+  }
+
+  public void setAiReviewLog(String aiReviewLog) {
+    this.aiReviewLog = aiReviewLog;
   }
 
   public boolean isReviewed() {

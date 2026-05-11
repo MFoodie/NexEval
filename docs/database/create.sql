@@ -36,6 +36,7 @@ CREATE TABLE teacher (
     enteryear int NOT NULL,
     title ENUM('professor', 'associate_professor', 'lecture') NOT NULL,
     department varchar(30) NOT NULL,
+    vip boolean NOT NULL DEFAULT false,
     PRIMARY KEY (eid),
     FOREIGN KEY (id) REFERENCES users(id)
 );
@@ -49,6 +50,22 @@ INSERT INTO teacher (id, eid, enteryear, title, department)
 VALUES 
     ('101010001', '09T10001', 2010, 'professor', '计算机学院'),
     ('101010002', '71T15002', 2015, 'associate_professor', '软件学院');
+
+SET @col_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+        AND table_name = 'teacher'
+        AND column_name = 'vip'
+);
+SET @sql := IF(
+    @col_exists = 0,
+    'ALTER TABLE teacher ADD COLUMN vip boolean NOT NULL DEFAULT false',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE course(
     cno char(8),

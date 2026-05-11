@@ -251,6 +251,46 @@
         </el-table>
       </section>
 
+      <section class="card panel-card" v-if="activeMenu === 'teacher-vip'">
+        <div class="panel-head">
+          <h2 class="panel-title">教师权限</h2>
+          <div class="vip-toolbar">
+            <el-input
+              v-model="vipKeyword"
+              clearable
+              placeholder="搜索工号/卡号/姓名"
+              class="vip-search"
+              @keyup.enter="loadTeacherVips"
+            />
+            <el-select v-model="vipStatus" class="vip-filter" placeholder="VIP 状态">
+              <el-option label="全部" value="all" />
+              <el-option label="仅 VIP" value="vip" />
+              <el-option label="非 VIP" value="nonvip" />
+            </el-select>
+            <el-button type="primary" :loading="vipLoading" @click="loadTeacherVips">查询</el-button>
+          </div>
+        </div>
+
+        <div v-if="vipLoading" class="placeholder">正在加载教师列表...</div>
+        <div v-else-if="vipTeachers.length === 0" class="placeholder">暂无教师数据</div>
+        <el-table v-else :data="vipTeachers" size="small" class="vip-table">
+          <el-table-column prop="eid" label="工号" width="120" />
+          <el-table-column prop="userId" label="卡号" width="120" />
+          <el-table-column prop="name" label="姓名" width="120" />
+          <el-table-column prop="department" label="学院" min-width="160" />
+          <el-table-column prop="title" label="职称" width="120" />
+          <el-table-column label="VIP" width="110">
+            <template #default="scope">
+              <el-switch
+                :model-value="scope.row.vip"
+                :loading="vipUpdatingId === scope.row.eid"
+                @change="(value) => handleVipToggle(scope.row, value)"
+              />
+            </template>
+          </el-table-column>
+        </el-table>
+      </section>
+
       <input
         ref="importInputRef"
         class="avatar-input"
@@ -276,6 +316,9 @@ const wsClient = createExamSocket(null, {
     if (activeMenu.value === "review") {
       loadScoreAppeals();
     }
+    if (activeMenu.value === "teacher-vip") {
+      loadTeacherVips();
+    }
   }
 });
 const avatarSaving = ref(false);
@@ -289,6 +332,11 @@ const importResult = ref(null);
 const scoreAppeals = ref([]);
 const appealLoading = ref(false);
 const appealActionLoading = ref(null);
+const vipTeachers = ref([]);
+const vipLoading = ref(false);
+const vipUpdatingId = ref("");
+const vipKeyword = ref("");
+const vipStatus = ref("all");
 
 const menuItems = [
   { key: "profile", label: "个人信息" },
@@ -296,12 +344,16 @@ const menuItems = [
   { key: "course", label: "课程信息管理" },
   { key: "class", label: "教学班管理" },
   { key: "batch", label: "批量导入" },
-  { key: "review", label: "成绩复核审理" }
+  { key: "review", label: "成绩复核审理" },
+  { key: "teacher-vip", label: "教师权限" }
 ];
 
 watch(activeMenu, (value) => {
   if (value === "review") {
     loadScoreAppeals();
+  }
+  if (value === "teacher-vip") {
+    loadTeacherVips();
   }
 });
 
@@ -680,9 +732,61 @@ async function handleReviewAppeal(appeal, approved) {
   }
 }
 
+async function loadTeacherVips() {
+  if (!wsClient.isOpen()) {
+    return;
+  }
+
+  vipLoading.value = true;
+  try {
+    const data = await wsClient.request("GET_TEACHER_VIPS", {
+      keyword: vipKeyword.value.trim(),
+      vipStatus: vipStatus.value
+    }, 20000);
+    vipTeachers.value = Array.isArray(data) ? data : [];
+  } catch (error) {
+    ElMessage.error(error.message || "教师列表获取失败");
+  } finally {
+    vipLoading.value = false;
+  }
+}
+
+async function handleVipToggle(row, value) {
+  if (!wsClient.isOpen()) {
+    ElMessage.error("WebSocket 未连接，请稍后再试");
+    return;
+  }
+  if (!row?.eid) {
+    return;
+  }
+
+  const previous = row.vip;
+  row.vip = value;
+  vipUpdatingId.value = row.eid;
+  try {
+    const payload = await wsClient.request("UPDATE_TEACHER_VIP", {
+      eid: row.eid,
+      vip: value
+    });
+    const index = vipTeachers.value.findIndex((item) => item.eid === payload.eid);
+    if (index !== -1) {
+      vipTeachers.value.splice(index, 1, payload);
+    }
+    ElMessage.success("VIP 权限已更新");
+  } catch (error) {
+    row.vip = previous;
+    ElMessage.error(error.message || "VIP 权限更新失败");
+  } finally {
+    vipUpdatingId.value = "";
+  }
+}
+
 onMounted(() => {
   if (activeMenu.value === "review") {
     loadScoreAppeals();
+  }
+  if (activeMenu.value === "teacher-vip") {
+    loadTeacherVips();
   }
 });
 
@@ -782,6 +886,29 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.vip-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.vip-search {
+  width: 220px;
+}
+
+.vip-filter {
+  width: 120px;
 }
 
 .avatar-wrap {

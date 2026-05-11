@@ -379,15 +379,24 @@
             <span v-else>{{ scope.row.score ?? '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="评语" min-width="180">
+        <el-table-column label="批改状态" width="120">
           <template #default="scope">
-            <el-input
-              v-if="canReviewAnswer(scope.row)"
-              v-model="scope.row.reviewNote"
+            <el-tag v-if="reviewStatus(scope.row) === 'reviewed'" type="success">已批改</el-tag>
+            <el-tag v-else-if="reviewStatus(scope.row) === 'needs_review'" type="warning">需人工复核</el-tag>
+            <el-tag v-else type="info">待批改</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="AI 日志" width="120">
+          <template #default="scope">
+            <el-button
+              v-if="hasAiLog(scope.row)"
               size="small"
-              placeholder="填写评语"
-            />
-            <span v-else>{{ scope.row.reviewNote || '-' }}</span>
+              plain
+              @click="openAiLog(scope.row)"
+            >
+              查看
+            </el-button>
+            <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="120">
@@ -400,10 +409,33 @@
             >
               保存
             </el-button>
+            <el-button
+              v-if="canAiReviewAnswer(scope.row)"
+              size="small"
+              type="primary"
+              plain
+              :loading="aiReviewingId === scope.row.answerId"
+              @click="handleAiReviewAnswer(scope.row)"
+            >
+              AI 批改
+            </el-button>
             <span v-else>自动批改</span>
           </template>
         </el-table-column>
       </el-table>
+    </el-dialog>
+
+    <el-dialog v-model="aiLogVisible" title="AI 批改日志" width="560px">
+      <el-input
+        v-model="aiLogContent"
+        type="textarea"
+        :rows="8"
+        readonly
+      />
+      <template #footer>
+        <el-button @click="copyAiLog">复制</el-button>
+        <el-button @click="aiLogVisible = false">关闭</el-button>
+      </template>
     </el-dialog>
   </section>
 </template>
@@ -457,6 +489,7 @@ const wsTagType = computed(() => {
 });
 const isStudent = computed(() => userType.value === "student");
 const isTeacher = computed(() => userType.value === "teacher");
+const isVipTeacher = computed(() => Boolean(isTeacher.value && teacherInfo.value?.vip));
 const displayPhone = computed(() => formatPhoneForDisplay(phone.value));
 const actionPanelTitle = computed(() => (isTeacher.value ? "考试批改" : "题目练习与考试"));
 const activeMenu = ref("action");
@@ -476,6 +509,9 @@ const gradingAttempts = ref([]);
 const gradingAnswers = ref([]);
 const selectedAttemptId = ref("");
 const gradingSaving = ref(false);
+const aiReviewingId = ref("");
+const aiLogVisible = ref(false);
+const aiLogContent = ref("");
 const appealVisible = ref(false);
 const appealSubmitting = ref(false);
 const appealCourse = ref(null);
@@ -1027,6 +1063,60 @@ function canReviewAnswer(answer) {
   return answer?.type === "essay";
 }
 
+function canAiReviewAnswer(answer) {
+  return isVipTeacher.value && answer?.type === "essay";
+}
+
+function hasAiLog(answer) {
+  return Boolean(answer?.aiReviewLog);
+}
+
+function openAiLog(answer) {
+  aiLogContent.value = formatAiLog(String(answer?.aiReviewLog || ""));
+  aiLogVisible.value = true;
+}
+
+function formatAiLog(raw) {
+  const text = String(raw || "").trim();
+  if (!text) {
+    return "";
+  }
+  try {
+    const value = JSON.parse(text);
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return text;
+  }
+}
+
+async function copyAiLog() {
+  const text = aiLogContent.value || "";
+  if (!text) {
+    ElMessage.warning("没有可复制的内容");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+    ElMessage.success("已复制 AI 日志");
+  } catch {
+    ElMessage.error("复制失败，请手动复制");
+  }
+}
+
+function reviewStatus(answer) {
+  if (!answer || answer.type !== "essay") {
+    return "reviewed";
+  }
+  if (answer.reviewed === true) {
+    return "reviewed";
+  }
+  if (answer.reviewed === false && answer.score != null) {
+    return "needs_review";
+  }
+  return "pending";
+}
+
 function normalizeAnswerImageSrc(path) {
   const text = String(path || "").trim();
   if (!text) {
@@ -1052,7 +1142,6 @@ async function handleReviewAnswer(answer) {
     const payload = await wsClient.request("REVIEW_ANSWER", {
       answerId: String(answer.answerId),
       score: answer.score,
-      reviewNote: answer.reviewNote || "",
       reviewerId: cardNo.value
     });
     const index = gradingAnswers.value.findIndex((item) => item.answerId === payload.answerId);
@@ -1064,6 +1153,33 @@ async function handleReviewAnswer(answer) {
     ElMessage.error(error.message || "批改保存失败");
   } finally {
     gradingSaving.value = false;
+  }
+}
+
+async function handleAiReviewAnswer(answer) {
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket is not connected. Please wait for reconnect.");
+    return;
+  }
+  if (!answer?.answerId) {
+    return;
+  }
+
+  aiReviewingId.value = answer.answerId;
+  try {
+    const payload = await wsClient.request("AI_REVIEW_ANSWER", {
+      answerId: String(answer.answerId),
+      reviewerId: cardNo.value
+    }, 30000);
+    const index = gradingAnswers.value.findIndex((item) => item.answerId === payload.answerId);
+    if (index !== -1) {
+      gradingAnswers.value.splice(index, 1, payload);
+    }
+    ElMessage.success("AI 批改已完成");
+  } catch (error) {
+    ElMessage.error(error.message || "AI 批改失败");
+  } finally {
+    aiReviewingId.value = "";
   }
 }
 

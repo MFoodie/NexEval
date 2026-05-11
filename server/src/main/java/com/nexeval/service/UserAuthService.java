@@ -385,7 +385,8 @@ public class UserAuthService {
       profile.getEnterYear(),
       toZhTitle(profile.getTitle()),
       "-",
-      profile.getDepartment()
+      profile.getDepartment(),
+      profile.isVip()
     );
   }
 

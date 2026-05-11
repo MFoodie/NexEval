@@ -27,6 +27,7 @@ import com.nexeval.model.QuestionBank;
 import com.nexeval.model.QuestionItem;
 import com.nexeval.model.QuestionOption;
 import com.nexeval.model.QuestionType;
+import com.nexeval.model.TeacherProfile;
 import com.nexeval.model.SessionMode;
 import com.nexeval.repository.BlankQuestionBankRepository;
 import com.nexeval.repository.ExamAttemptRepository;
@@ -38,6 +39,7 @@ import com.nexeval.repository.JudgeQuestionBankRepository;
 import com.nexeval.repository.PracticePaperQuestionRepository;
 import com.nexeval.repository.PracticePaperRepository;
 import com.nexeval.repository.ScoreAppealRepository;
+import com.nexeval.repository.TeacherProfileRepository;
 import com.nexeval.repository.QuestionBankRepository;
 import com.nexeval.ws.ExamWebSocketHub;
 import java.time.Instant;
@@ -79,6 +81,8 @@ public class CatExamService {
   private final ExamAnswerRepository examAnswerRepository;
   private final ExamAttemptRepository examAttemptRepository;
   private final ScoreAppealRepository scoreAppealRepository;
+  private final TeacherProfileRepository teacherProfileRepository;
+  private final AiGradingService aiGradingService;
 
   private final Map<String, ExamSession> sessions = new ConcurrentHashMap<>();
 
@@ -96,7 +100,9 @@ public class CatExamService {
     EssayQuestionBankRepository essayQuestionBankRepository,
     ExamAnswerRepository examAnswerRepository,
     ExamAttemptRepository examAttemptRepository,
-    ScoreAppealRepository scoreAppealRepository
+    ScoreAppealRepository scoreAppealRepository,
+    TeacherProfileRepository teacherProfileRepository,
+    AiGradingService aiGradingService
   ) {
     this.webSocketHub = webSocketHub;
     this.examDefinitionRepository = examDefinitionRepository;
@@ -110,6 +116,8 @@ public class CatExamService {
     this.examAnswerRepository = examAnswerRepository;
     this.examAttemptRepository = examAttemptRepository;
     this.scoreAppealRepository = scoreAppealRepository;
+    this.teacherProfileRepository = teacherProfileRepository;
+    this.aiGradingService = aiGradingService;
   }
 
   public StartExamResponse startSession(String userId, String sourceId) {
@@ -367,9 +375,49 @@ public class CatExamService {
       .orElseThrow(() -> new NoSuchElementException("Answer not found: " + answerId));
     Integer cappedScore = capReviewScore(score, answer);
     answer.setScore(cappedScore);
-    answer.setReviewNote(reviewNote == null || reviewNote.isBlank() ? null : reviewNote.trim());
+    answer.setReviewNote(null);
     answer.setReviewerId(reviewerId == null || reviewerId.isBlank() ? null : reviewerId.trim());
     answer.setReviewed(true);
+    answer.setReviewedAt(Instant.now());
+
+    ExamAnswer saved = examAnswerRepository.save(answer);
+    return toAnswerDetailView(saved);
+  }
+
+  public ExamAnswerDetailView aiReviewAnswer(Long answerId, String reviewerId) {
+    ExamAnswer answer = examAnswerRepository.findById(answerId)
+      .orElseThrow(() -> new NoSuchElementException("Answer not found: " + answerId));
+    if (answer.getQuestionType() != QuestionType.ESSAY) {
+      throw new IllegalArgumentException("仅支持大题 AI 批改");
+    }
+
+    String reviewer = normalizeSourceId(reviewerId);
+    if (reviewer.isBlank()) {
+      throw new IllegalArgumentException("reviewerId is required");
+    }
+    if (!isVipTeacher(reviewer)) {
+      throw new IllegalStateException("仅 VIP 教师可使用 AI 批改");
+    }
+
+    EssayQuestionBank question = essayQuestionBankRepository.findById(answer.getQuestionId())
+      .orElseThrow(() -> new NoSuchElementException("Essay question not found: " + answer.getQuestionId()));
+
+    AiGradeResult aiResult = aiGradingService.gradeEssay(
+      question.getStem(),
+      question.getPoints(),
+      question.getStandardAnswer(),
+      question.getScoringRubric(),
+      answer.getAnswerText(),
+      answer.getAnswerImagePath(),
+      question.getImagePath()
+    );
+
+    int cappedScore = capReviewScore(aiResult.score(), answer);
+    answer.setScore(cappedScore);
+    answer.setReviewNote(null);
+    answer.setAiReviewLog(aiResult.aiLog());
+    answer.setReviewerId(reviewer);
+    answer.setReviewed(aiResult.confidence() >= aiGradingService.getConfidenceThreshold());
     answer.setReviewedAt(Instant.now());
 
     ExamAnswer saved = examAnswerRepository.save(answer);
@@ -386,6 +434,12 @@ public class CatExamService {
       return normalizedScore;
     }
     return Math.min(normalizedScore, maxScore);
+  }
+
+  private boolean isVipTeacher(String userId) {
+    return teacherProfileRepository.findFirstById(userId)
+      .map(TeacherProfile::isVip)
+      .orElse(false);
   }
 
   public NextQuestionResponse getNextQuestion(String sessionId) {
@@ -959,6 +1013,7 @@ public class CatExamService {
       answer.getScore(),
       answer.isReviewed(),
       answer.getReviewNote(),
+      answer.getAiReviewLog(),
       resolveQuestionMaxScore(answer.getQuestionType(), answer.getQuestionId())
     );
   }

@@ -182,6 +182,18 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
             requireText(payload, "eid")
           );
           break;
+        case "GET_TEACHER_VIPS":
+          responsePayload = adminManagementService.listTeacherVipViews(
+            optionalText(payload, "keyword"),
+            optionalText(payload, "vipStatus")
+          );
+          break;
+        case "UPDATE_TEACHER_VIP":
+          responsePayload = adminManagementService.updateTeacherVip(
+            requireText(payload, "eid"),
+            optionalBoolean(payload, "vip")
+          );
+          break;
         case "IMPORT_BATCH":
           responsePayload = adminManagementService.importBatch(
             requireText(payload, "importType"),
@@ -250,6 +262,12 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
             optionalInt(payload, "score"),
             optionalText(payload, "reviewNote"),
             optionalText(payload, "reviewerId")
+          );
+          break;
+        case "AI_REVIEW_ANSWER":
+          responsePayload = catExamService.aiReviewAnswer(
+            Long.parseLong(requireText(payload, "answerId")),
+            requireText(payload, "reviewerId")
           );
           break;
         case "CREATE_SCORE_APPEAL":

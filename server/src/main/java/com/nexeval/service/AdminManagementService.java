@@ -4,6 +4,7 @@ import com.nexeval.dto.BulkImportResult;
 import com.nexeval.model.Course;
 import com.nexeval.model.ScRecord;
 import com.nexeval.model.ScRecordId;
+import com.nexeval.dto.TeacherVipView;
 import com.nexeval.model.StudentProfile;
 import com.nexeval.model.TeacherProfile;
 import com.nexeval.model.TeachingClass;
@@ -62,6 +63,37 @@ public class AdminManagementService {
     this.teachingClassRepository = teachingClassRepository;
     this.scRecordRepository = scRecordRepository;
     this.passwordEncoder = passwordEncoder;
+  }
+
+  public List<TeacherVipView> listTeacherVipViews(String keyword, String vipStatus) {
+    String normalizedKeyword = normalizeNullable(keyword);
+    String normalizedStatus = normalizeNullable(vipStatus).toLowerCase(Locale.ROOT);
+    String status = switch (normalizedStatus) {
+      case "vip", "nonvip" -> normalizedStatus;
+      default -> "all";
+    };
+    return teacherProfileRepository.findTeacherVipViews(normalizedKeyword, status);
+  }
+
+  @Transactional
+  public TeacherVipView updateTeacherVip(String eid, boolean vip) {
+    String normalizedEid = required(eid, "eid");
+    TeacherProfile profile = teacherProfileRepository.findFirstByEid(normalizedEid)
+      .orElseThrow(() -> new IllegalArgumentException("教师工号不存在"));
+    profile.setVip(vip);
+    teacherProfileRepository.save(profile);
+
+    UserAccount account = userAccountRepository.findById(profile.getId())
+      .orElseThrow(() -> new IllegalArgumentException("教师账户不存在"));
+
+    return new TeacherVipView(
+      profile.getEid(),
+      account.getId(),
+      account.getName(),
+      profile.getTitle(),
+      profile.getDepartment(),
+      profile.isVip()
+    );
   }
 
   @Transactional
@@ -355,6 +387,10 @@ public class AdminManagementService {
       throw new IllegalArgumentException(fieldName + " 不能为空");
     }
     return text;
+  }
+
+  private String normalizeNullable(String value) {
+    return value == null ? "" : value.trim();
   }
 
   private boolean parseSex(String value) {

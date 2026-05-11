@@ -4,6 +4,8 @@ SET NAMES utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 CREATE TABLE IF NOT EXISTS essay_question_bank (
     id varchar(32) NOT NULL,
     stem varchar(512) NOT NULL,
+    standard_answer varchar(1024),
+    scoring_rubric varchar(2048),
     points int NOT NULL,
     difficulty decimal(3,1) NOT NULL,
     cno char(8),
@@ -83,6 +85,38 @@ INSERT IGNORE INTO essay_question_bank (id, stem, points, difficulty, cno, activ
 ('E040', '【知识点：写作结构】说明引言-正文-结论的基本功能。', 6, 1.5, 'B17M0001', true),
 ('E041', '【知识点：论证】阐述论点、论据、论证之间的关系。', 8, 3.0, 'B17M0001', true),
 ('E042', '【知识点：阅读策略】描述精读与略读的使用场景。', 10, 4.5, 'B17M0001', true);
+
+SET @col_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+        AND table_name = 'essay_question_bank'
+        AND column_name = 'standard_answer'
+);
+SET @sql := IF(
+    @col_exists = 0,
+    'ALTER TABLE essay_question_bank ADD COLUMN standard_answer varchar(1024) DEFAULT NULL AFTER stem',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+        AND table_name = 'essay_question_bank'
+        AND column_name = 'scoring_rubric'
+);
+SET @sql := IF(
+    @col_exists = 0,
+    'ALTER TABLE essay_question_bank ADD COLUMN scoring_rubric varchar(2048) DEFAULT NULL AFTER standard_answer',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 INSERT IGNORE INTO essay_exam_paper (id, name, active) VALUES
 ('PAPER_DEFAULT', '大题题库', true),

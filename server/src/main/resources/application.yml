@@ -34,3 +34,8 @@ management:
 nexeval:
   security:
     allowed-origins: ${ALLOWED_ORIGINS:https://localhost:5173}
+
+dashscope:
+  api-key: "sk-f5396c4057cb49a4a3ffb16117d0e37e"
+  model: ${DASHSCOPE_MODEL:qwen3-vl-flash}
+  confidence-threshold: ${DASHSCOPE_CONFIDENCE_THRESHOLD:0.8}

@@ -15,6 +15,12 @@ java {
   }
 }
 
+configurations {
+    all {
+        exclude group: 'org.slf4j', module: 'slf4j-simple'
+    }
+}
+
 repositories {
   mavenCentral()
 }
@@ -27,6 +33,7 @@ dependencies {
   implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
   implementation 'org.springframework.security:spring-security-crypto'
   implementation 'org.apache.poi:poi-ooxml:5.2.5'
+  implementation 'com.alibaba:dashscope-sdk-java:2.22.5'
 
   runtimeOnly 'com.mysql:mysql-connector-j'
 

@@ -26,6 +26,12 @@ public class EssayQuestionBank {
   @Column(name = "points", nullable = false)
   private int points;
 
+  @Column(name = "standard_answer", length = 1024)
+  private String standardAnswer;
+
+  @Column(name = "scoring_rubric", length = 2048)
+  private String scoringRubric;
+
   @Column(name = "difficulty", nullable = false)
   private double difficulty;
 
@@ -73,6 +79,22 @@ public class EssayQuestionBank {
 
   public void setPoints(int points) {
     this.points = points;
+  }
+
+  public String getStandardAnswer() {
+    return standardAnswer;
+  }
+
+  public void setStandardAnswer(String standardAnswer) {
+    this.standardAnswer = standardAnswer;
+  }
+
+  public String getScoringRubric() {
+    return scoringRubric;
+  }
+
+  public void setScoringRubric(String scoringRubric) {
+    this.scoringRubric = scoringRubric;
   }
 
   public double getDifficulty() {

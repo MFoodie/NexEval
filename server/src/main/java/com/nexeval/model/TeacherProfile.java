@@ -25,6 +25,9 @@ public class TeacherProfile {
   @Column(name = "department", nullable = false, length = 30)
   private String department;
 
+  @Column(name = "vip", nullable = false)
+  private boolean vip;
+
   public String getEid() {
     return eid;
   }
@@ -63,5 +66,13 @@ public class TeacherProfile {
 
   public void setDepartment(String department) {
     this.department = department;
+  }
+
+  public boolean isVip() {
+    return vip;
+  }
+
+  public void setVip(boolean vip) {
+    this.vip = vip;
   }
 }
