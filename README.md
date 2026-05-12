@@ -77,21 +77,25 @@ docker compose up -d
   - 提交成绩复核申请，并查看当前课程的复核记录。
 - 教师端：
   - 查看教学班与学生列表。
-  - 查看学生历史考试记录与答题详情。
+  - 进入独立教师批改页（`/grading`），按学生与考试记录逐题批改。
+  - 查看学生历史考试记录、题目详情、作答文本与作答图片。
   - 对主观题进行人工批改（分数会按题目上限自动截断）。
+  - VIP 教师支持 AI 批改大题，并可查看 AI 批改日志。
 - 管理员端：
   - 用户信息注册、课程信息管理、教学班管理、批量导入。
   - 成绩复核审理（同意时将该次考试主观题分数置 0，拒绝则保留原分）。
+  - 教师权限管理：支持按条件检索教师并切换 VIP 状态（启用后前端开关为金色样式）。
+  - 教师权限列表中的职称统一中文展示（教授 / 副教授 / 讲师）。
 
 ## WebSocket 通道
 
 - WS 端点：/ws/exam 或 /ws/exam?sessionId={sessionId}
 - 请求动作：
   - 登录/资料：LOGIN、UPDATE_PROFILE、UPDATE_AVATAR、RESET_AVATAR
-  - 管理端：REGISTER_USER、CREATE_COURSE、CREATE_CLASS、IMPORT_BATCH
+  - 管理端：REGISTER_USER、CREATE_COURSE、CREATE_CLASS、IMPORT_BATCH、GET_TEACHER_VIPS、UPDATE_TEACHER_VIP
   - 教学班：GET_TEACHER_CLASSES、GET_STUDENT_CLASSES
   - 考试会话：START_SESSION、START_PRACTICE、START_EXAM、GET_EXAM_QUESTIONS、GET_SESSION_STATE、GET_SESSION_ANSWERS、FINISH_SESSION、NEXT_QUESTION、SUBMIT_ANSWER
-  - 记录与批改：GET_EXAM_ATTEMPTS、GET_ATTEMPT_ANSWERS、REVIEW_ANSWER
+  - 记录与批改：GET_EXAM_ATTEMPTS、GET_ATTEMPT_ANSWERS、REVIEW_ANSWER、AI_REVIEW_ANSWER
   - 成绩复核：CREATE_SCORE_APPEAL、GET_SCORE_APPEALS、REVIEW_SCORE_APPEAL
 - 响应格式：RESPONSE（requestId/action/success/payload）
 - 服务端事件：CONNECTED、PONG、ANSWER_UPDATED、ERROR
@@ -173,6 +177,16 @@ gradle bootRun
   - 答题记录、考试尝试、复核申请与审理结果持久化到 MySQL。
 - MySQL 与 Redis 已预留，后续可继续扩展缓存、并发与审计能力。
 - 后续可继续扩展认证、题库管理、考试编排、AI 阅卷、统计分析等模块。
+
+## 最近更新（2026-05）
+
+- 新增独立教师批改页：教师从首页学生列表进入 `/grading`，按题导航逐题批改，界面风格与学生答题页保持一致。
+- 教师批改页支持：
+  - 顶部按考试记录切换。
+  - 右侧题号导航（每行 6 个圆点）与批改统计。
+  - 主观题人工评分保存、AI 批改、AI 日志查看。
+- AI 批改权限联动：前端会按教师 VIP 状态显示 AI 按钮，后端在 `AI_REVIEW_ANSWER` 中执行 VIP 校验。
+- 管理员“教师权限”页面优化：职称中文化展示；VIP 开关开启态使用金色主题。
 
 ## Docker 启停（常用）
 

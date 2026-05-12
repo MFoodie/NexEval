@@ -234,13 +234,49 @@ public class CatExamService {
 
   public Map<String, Object> finishSession(String sessionId) {
     ExamSession session = requireSession(sessionId);
+    // mark session finished
     session.submit(Instant.now());
+
+    // Auto-grade objective questions (choice/judge/blank) on final submission
+    try {
+      List<ExamAnswer> answers = examAnswerRepository.findAllBySessionIdOrderByAnsweredAtAsc(sessionId);
+      boolean changed = false;
+      for (ExamAnswer a : answers) {
+        if (a.getQuestionType() == null) continue;
+        switch (a.getQuestionType()) {
+          case CHOICE, JUDGE, BLANK -> {
+            Integer max = resolveQuestionMaxScore(a.getQuestionType(), a.getQuestionId());
+            int score = 0;
+            if (a.getCorrect() != null && a.getCorrect()) {
+              score = max == null ? 1 : Math.max(0, max);
+            } else {
+              score = 0;
+            }
+            a.setScore(score);
+            a.setReviewed(true);
+            a.setReviewedAt(Instant.now());
+            changed = true;
+          }
+          default -> {
+            // skip essay; will be reviewed separately
+          }
+        }
+      }
+      if (changed) {
+        examAnswerRepository.saveAll(answers);
+      }
+    } catch (DataAccessException ex) {
+      log.warn("Failed to auto-grade objective answers for sessionId={}: {}", sessionId, ex.getMessage());
+    }
+
+    // persist attempt status as submitted
     updateAttemptStatus(session, ExamAttemptStatus.SUBMITTED, Instant.now());
 
     return Map.of(
       "sessionId", session.getSessionId(),
       "finished", session.isFinished(),
-      "submittedAt", session.getSubmittedAt() == null ? "" : session.getSubmittedAt().toString()
+      "submittedAt", session.getSubmittedAt() == null ? "" : session.getSubmittedAt().toString(),
+      "totalScore", resolveAttemptTotalScore(session.getSessionId())
     );
   }
 
@@ -453,9 +489,14 @@ public class CatExamService {
 
     QuestionItem next = pickNextQuestion(session);
     if (next == null) {
-      session.finish();
-      updateAttemptStatus(session, ExamAttemptStatus.SUBMITTED, session.getSubmittedAt());
-      return buildFinishedResponse(session);
+      return new NextQuestionResponse(
+        session.getSessionId(),
+        session.getAnsweredCount(),
+        session.getMaxQuestions(),
+        session.getTheta(),
+        false,
+        null
+      );
     }
 
     return new NextQuestionResponse(
@@ -487,11 +528,6 @@ public class CatExamService {
 
     session.markAnswered(question.id(), correct, question.difficulty(), scoreEnabled);
     saveAnswer(session, question, answerText, answerImagePath, scoreEnabled, correct);
-
-    if (session.isFinished()) {
-      session.submit(Instant.now());
-      updateAttemptStatus(session, ExamAttemptStatus.SUBMITTED, session.getSubmittedAt());
-    }
 
     boolean reportedCorrect = scoreEnabled ? correct : true;
     webSocketHub.pushToExam(sessionId, Map.of(

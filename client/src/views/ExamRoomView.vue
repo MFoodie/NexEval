@@ -40,13 +40,14 @@
             </template>
           </el-result>
 
-          <template v-else-if="currentQuestion">
-            <div class="question-head">
-              <div class="question-index">第 {{ currentIndex + 1 }} 题</div>
-              <div class="question-meta">
-                <span class="question-type">{{ currentTypeLabel }}</span>
+            <template v-else-if="currentQuestion">
+            <div v-if="!reviewMode">
+              <div class="question-head">
+                <div class="question-index">第 {{ currentIndex + 1 }} 题</div>
+                <div class="question-meta">
+                  <span class="question-type">{{ currentTypeLabel }}</span>
+                </div>
               </div>
-            </div>
             <h2 class="question-title">{{ currentQuestion.stem }}</h2>
 
             <div v-if="questionImageSrc" class="question-image-wrap" :style="questionImageWrapStyle">
@@ -114,21 +115,69 @@
                 type="button"
                 class="question-node"
                 :class="questionNodeClass(index, item.id)"
+                :title="item.stem"
                 @click="goToQuestion(index)"
               >
                 {{ index + 1 }}
               </button>
             </div>
 
-            <div class="question-actions">
-              <el-button @click="goToPrevQuestion">上一题</el-button>
-              <el-button @click="goToNextQuestion">下一题</el-button>
-              <el-button type="primary" :loading="submitting" @click="handleSubmit">
-                提交答案
-              </el-button>
-              <el-button v-if="isExamMode" type="danger" :loading="finishing" @click="handleFinishExam">
-                交卷
-              </el-button>
+              <div class="question-actions">
+                <el-button :loading="savingAnswer" @click="goToPrevQuestion">上一题</el-button>
+                <el-button v-if="!isLastQuestion" :loading="savingAnswer" @click="goToNextQuestion">下一题</el-button>
+                <el-button v-else type="primary" :loading="savingAnswer" @click="enterReviewMode">
+                  提交
+                </el-button>
+              </div>
+            </div>
+
+            <div v-else class="review-list card">
+              <div class="review-title">整卷复核（可编辑）</div>
+              <el-collapse v-model="activeReviewPanels">
+                <el-collapse-item
+                  v-for="(q, idx) in questions"
+                  :key="q.id"
+                  :title="`第 ${idx + 1} 题 · ${q.stem || '无题干'}`"
+                  :name="String(q.id)"
+                >
+                  <div class="review-question-stem">{{ q.stem }}</div>
+                  <div v-if="q.imagePath" class="review-question-image-wrap">
+                    <img :src="q.imagePath.startsWith('/') ? q.imagePath : '/' + q.imagePath" class="review-question-image" />
+                  </div>
+
+                  <div v-if="q.type === 'choice' || q.type === 'judge'" class="review-answer-section">
+                    <el-radio-group v-model="answerMap[q.id]" class="option-group">
+                      <el-radio v-for="(opt, oi) in q.options" :key="oi" :label="opt">{{ formatOptionText(opt) }}</el-radio>
+                    </el-radio-group>
+                  </div>
+
+                  <div v-if="q.type === 'blank'" class="review-answer-section">
+                    <el-input v-model="answerMap[q.id]" placeholder="请输入答案" clearable />
+                  </div>
+
+                  <div v-if="q.type === 'essay'" class="review-answer-section">
+                    <el-input v-model="answerMap[q.id]" type="textarea" :rows="6" placeholder="请输入作答内容" />
+                    <div class="essay-image-actions">
+                      <input type="file" :ref="setEssayInputRef(q.id)" accept="image/png,image/jpeg,image/webp" class="essay-image-input" @change="event => handleReviewEssayImageSelected(event, q.id)" />
+                      <el-button size="small" @click="() => triggerReviewEssayPicker(q.id)">上传作答图片</el-button>
+                      <el-button v-if="answerImageMap[q.id]" size="small" type="danger" plain @click="() => removeReviewEssayImage(q.id)">移除图片</el-button>
+                    </div>
+                    <div v-if="answerImageMap[q.id]" class="essay-image-preview-wrap">
+                      <img :src="answerImageMap[q.id].startsWith('/') ? answerImageMap[q.id] : '/' + answerImageMap[q.id]" class="essay-image-preview" />
+                    </div>
+                  </div>
+
+                  <div class="review-item-actions">
+                    <el-button type="primary" size="small" @click="() => saveReviewAnswer(q)">保存</el-button>
+                    <el-button size="small" @click="() => goToQuestion(idx)">跳转到该题</el-button>
+                  </div>
+                </el-collapse-item>
+              </el-collapse>
+
+              <div class="review-actions">
+                <el-button type="danger" :loading="finishing" @click="confirmAndFinishExam">交卷</el-button>
+                <el-button @click="exitReviewMode">返回答题</el-button>
+              </div>
             </div>
           </template>
         </template>
@@ -153,7 +202,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { createExamSocket } from "../ws";
 
 const route = useRoute();
@@ -164,7 +213,6 @@ const courseNoText = computed(() => String(route.query.courseNo || "").trim() ||
 const courseNameText = computed(() => String(route.query.courseName || "").trim());
 const courseTitle = computed(() => courseNameText.value || `课程 ${courseNoText.value}`);
 const loading = ref(false);
-const submitting = ref(false);
 const finishing = ref(false);
 const uploadingEssayImage = ref(false);
 const sessionMode = ref("practice");
@@ -185,7 +233,13 @@ const answeredCount = ref(0);
 const maxQuestions = ref(10);
 const finished = ref(false);
 const answeredSet = ref(new Set());
+const reviewMode = ref(false);
+const savingAnswer = ref(false);
+const isLastQuestion = computed(() => questions.value.length > 0 && currentIndex.value === questions.value.length - 1);
 let wsClient = null;
+
+const activeReviewPanels = ref([]);
+const essayInputRefs = new Map();
 
 const typeLabels = {
   choice: "选择题",
@@ -298,7 +352,7 @@ function startTimer() {
     }
     remainingSeconds.value = Math.max(0, remainingSeconds.value - 1);
     if (remainingSeconds.value <= 0) {
-      handleFinishExam("timeout");
+      finishExam("timeout");
       stopTimer();
     }
   }, 1000);
@@ -386,30 +440,34 @@ async function loadSessionAnswers() {
   }
 }
 
-async function handleSubmit() {
+async function persistCurrentAnswer() {
   if (!currentQuestion.value) {
-    return;
+    return true;
   }
 
-  const isEssay = currentQuestion.value.type === "essay";
+  const question = currentQuestion.value;
+  const isEssay = question.type === "essay";
   const textValue = String(answerValue.value || "").trim();
   const imageValue = String(essayImagePath.value || "").trim();
 
   if (!isEssay && !textValue) {
-    ElMessage.warning(isOptionQuestion.value ? "请选择一个选项。" : "请输入答案。");
-    return;
+    return true;
   }
 
   if (isEssay && !textValue && !imageValue) {
-    ElMessage.warning("请至少填写文字答案或上传一张图片。");
-    return;
+    return true;
   }
 
-  submitting.value = true;
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket 未连接，请稍后重试。");
+    return false;
+  }
+
+  savingAnswer.value = true;
   try {
     const payload = await wsClient.request("SUBMIT_ANSWER", {
       sessionId: sessionId.value,
-      questionId: currentQuestion.value.id,
+      questionId: question.id,
       selectedOption: textValue,
       answerImagePath: isEssay ? imageValue : ""
     });
@@ -417,28 +475,53 @@ async function handleSubmit() {
     theta.value = payload.theta;
     answeredCount.value = payload.answeredCount;
     finished.value = payload.finished;
-    answeredSet.value = new Set([...answeredSet.value, currentQuestion.value.id]);
-    saveAnswerForQuestion(currentQuestion.value.id, textValue);
-    saveAnswerImageForQuestion(currentQuestion.value.id, isEssay ? imageValue : "");
-
-    if (payload.correct) {
-      ElMessage.success("提交成功。");
-    } else {
-      ElMessage.info("提交成功。");
-    }
-    if (!payload.finished) {
-      goToNextQuestion();
-    } else {
-      stopTimer();
-    }
+    answeredSet.value = new Set([...answeredSet.value, question.id]);
+    saveAnswerForQuestion(question.id, textValue);
+    saveAnswerImageForQuestion(question.id, isEssay ? imageValue : "");
+    return true;
   } catch (error) {
-    ElMessage.error(error.message || "提交失败。");
+    ElMessage.error(error.message || "保存失败。");
+    return false;
   } finally {
-    submitting.value = false;
+    savingAnswer.value = false;
   }
 }
 
-async function handleFinishExam(reason = "manual") {
+async function enterReviewMode() {
+  const saved = await persistCurrentAnswer();
+  if (!saved) {
+    return;
+  }
+  reviewMode.value = true;
+}
+
+async function confirmAndFinishExam() {
+  if (finishing.value || finished.value) {
+    return;
+  }
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket 未连接，请稍后重试。");
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      "确认交卷后将无法继续修改答案，是否继续？",
+      "确认交卷",
+      {
+        confirmButtonText: "确认",
+        cancelButtonText: "取消",
+        type: "warning"
+      }
+    );
+  } catch {
+    return;
+  }
+
+  await finishExam("manual");
+}
+
+async function finishExam(reason = "manual") {
   if (finishing.value || finished.value) {
     return;
   }
@@ -463,28 +546,76 @@ async function handleFinishExam(reason = "manual") {
   }
 }
 
-function goToPrevQuestion() {
+async function goToPrevQuestion() {
   if (!questions.value.length) {
+    return;
+  }
+  const saved = await persistCurrentAnswer();
+  if (!saved) {
     return;
   }
   currentIndex.value = currentIndex.value > 0 ? currentIndex.value - 1 : questions.value.length - 1;
   syncAnswerForCurrentQuestion();
 }
 
-function goToNextQuestion() {
+async function goToNextQuestion() {
   if (!questions.value.length) {
+    return;
+  }
+  const saved = await persistCurrentAnswer();
+  if (!saved) {
     return;
   }
   currentIndex.value = currentIndex.value < questions.value.length - 1 ? currentIndex.value + 1 : 0;
   syncAnswerForCurrentQuestion();
 }
 
-function goToQuestion(index) {
+async function goToQuestion(index) {
   if (!questions.value.length) {
+    return;
+  }
+  const saved = await persistCurrentAnswer();
+  if (!saved) {
     return;
   }
   currentIndex.value = index;
   syncAnswerForCurrentQuestion();
+}
+
+async function saveReviewAnswer(question) {
+  const questionId = question.id;
+  const textValue = String(answerMap.value[questionId] || "").trim();
+  const isEssay = question.type === "essay";
+  const imageValue = String(answerImageMap.value[questionId] || "").trim();
+
+  if (!isEssay && !textValue) {
+    ElMessage.warning("答案为空，未保存。请填写后保存。");
+    return;
+  }
+
+  savingAnswer.value = true;
+  try {
+    const payload = await wsClient.request("SUBMIT_ANSWER", {
+      sessionId: sessionId.value,
+      questionId,
+      selectedOption: textValue,
+      answerImagePath: isEssay ? imageValue : ""
+    });
+
+    theta.value = payload.theta;
+    answeredCount.value = payload.answeredCount;
+    finished.value = payload.finished;
+    answeredSet.value = new Set([...answeredSet.value, questionId]);
+    ElMessage.success("已保存");
+  } catch (err) {
+    ElMessage.error(err.message || "保存失败");
+  } finally {
+    savingAnswer.value = false;
+  }
+}
+
+function exitReviewMode() {
+  reviewMode.value = false;
 }
 
 function formatOptionText(option) {
@@ -612,6 +743,66 @@ function clearEssayImage() {
   if (questionId) {
     saveAnswerImageForQuestion(questionId, "");
   }
+}
+
+function setEssayInputRef(questionId) {
+  return (el) => {
+    if (!el) {
+      essayInputRefs.delete(questionId);
+      return;
+    }
+    essayInputRefs.set(questionId, el);
+  };
+}
+
+function triggerReviewEssayPicker(questionId) {
+  const el = essayInputRefs.get(questionId);
+  el?.click();
+}
+
+async function handleReviewEssayImageSelected(event, questionId) {
+  const file = event?.target?.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  if (!sessionId.value) {
+    ElMessage.error("会话不存在，无法上传图片");
+    return;
+  }
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket 未连接，请稍后重试。");
+    return;
+  }
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+    ElMessage.warning("仅支持 JPG/PNG/WEBP 图片");
+    return;
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    ElMessage.warning("图片不能超过 8MB");
+    return;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("sessionId", String(sessionId.value));
+
+    const response = await fetch("/api/answer-image/upload", {
+      method: "POST",
+      body: formData,
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload?.message || "上传失败");
+    answerImageMap.value = { ...answerImageMap.value, [questionId]: String(payload?.imagePath || "") };
+    ElMessage.success("图片上传成功");
+  } catch (error) {
+    ElMessage.error(error.message || "上传失败");
+  }
+}
+
+function removeReviewEssayImage(questionId) {
+  const next = { ...answerImageMap.value };
+  delete next[questionId];
+  answerImageMap.value = next;
 }
 
 watch(currentQuestion, () => {
@@ -1000,5 +1191,45 @@ onBeforeUnmount(() => {
   .exam-body {
     grid-template-columns: 1fr;
   }
+}
+
+.review-list {
+  padding: 16px;
+  display: block;
+}
+.review-title {
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.review-list :deep(.el-collapse-item__header) {
+  white-space: normal;
+  line-height: 1.5;
+  align-items: flex-start;
+  padding: 12px 16px;
+}
+
+.review-list :deep(.el-collapse-item__title) {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.review-question-stem {
+  margin-bottom: 8px;
+  color: var(--ne-text-strong);
+}
+.review-item-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+}
+.review-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+}
+.review-question-image-wrap img {
+  max-width: 100%;
+  border-radius: 8px;
 }
 </style>

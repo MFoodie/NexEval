@@ -3,8 +3,13 @@
     <aside class="home-sidebar card">
       <div class="side-profile">
         <img :src="avatarUrl" alt="默认头像" class="side-avatar" @click="triggerAvatarPicker" />
-        <div class="side-name">{{ userName }}</div>
-        <div class="side-id">卡号 {{ cardNo }}</div>
+        <div class="side-profile-meta">
+          <div class="side-name-row">
+            <div class="side-name">{{ userName }}</div>
+            <img v-if="isVipTeacher" :src="vipIconUrl" alt="VIP" class="side-vip-icon" />
+          </div>
+          <div class="side-id">卡号 {{ cardNo }}</div>
+        </div>
       </div>
 
       <nav class="side-nav">
@@ -331,6 +336,7 @@
           <div>课程：{{ selectedClass?.cno || '-' }} {{ selectedClass?.cname || '' }}</div>
         </div>
         <el-select
+          class="grading-attempt-select"
           v-model="selectedAttemptId"
           placeholder="选择考试记录"
           size="small"
@@ -347,82 +353,90 @@
 
       <div v-if="gradingLoading" class="placeholder">正在加载答卷...</div>
       <div v-else-if="gradingAttempts.length === 0" class="placeholder">暂无考试记录</div>
-      <el-table v-else :data="gradingAnswers" size="small">
-        <el-table-column prop="stem" label="题目" min-width="240" />
-        <el-table-column label="作答" min-width="220">
-          <template #default="scope">
-            <div>{{ scope.row.answerText || '-' }}</div>
-            <img
-              v-if="scope.row.answerImagePath"
-              :src="normalizeAnswerImageSrc(scope.row.answerImagePath)"
-              alt="作答图片"
-              class="grading-answer-image"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column label="判定" width="90">
-          <template #default="scope">
-            <span v-if="scope.row.correct === true">正确</span>
-            <span v-else-if="scope.row.correct === false">错误</span>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="得分" width="120">
-          <template #default="scope">
-            <el-input-number
-              v-if="canReviewAnswer(scope.row)"
-              v-model="scope.row.score"
-              :min="0"
-              :max="scope.row.maxScore ?? 100"
-              size="small"
-            />
-            <span v-else>{{ scope.row.score ?? '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="批改状态" width="120">
-          <template #default="scope">
-            <el-tag v-if="reviewStatus(scope.row) === 'reviewed'" type="success">已批改</el-tag>
-            <el-tag v-else-if="reviewStatus(scope.row) === 'needs_review'" type="warning">需人工复核</el-tag>
-            <el-tag v-else type="info">待批改</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="AI 日志" width="120">
-          <template #default="scope">
-            <el-button
-              v-if="hasAiLog(scope.row)"
-              size="small"
-              plain
-              @click="openAiLog(scope.row)"
-            >
-              查看
-            </el-button>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="120">
-          <template #default="scope">
-            <el-button
-              v-if="canReviewAnswer(scope.row)"
-              size="small"
-              :loading="gradingSaving"
-              @click="handleReviewAnswer(scope.row)"
-            >
-              保存
-            </el-button>
-            <el-button
-              v-if="canAiReviewAnswer(scope.row)"
-              size="small"
-              type="primary"
-              plain
-              :loading="aiReviewingId === scope.row.answerId"
-              @click="handleAiReviewAnswer(scope.row)"
-            >
-              AI 批改
-            </el-button>
-            <span v-else>自动批改</span>
-          </template>
-        </el-table-column>
-      </el-table>
+      <div v-else class="grading-table">
+        <div class="grading-table-head">
+          <div class="grading-table-cell grading-table-cell--stem">题目</div>
+          <div class="grading-table-cell grading-table-cell--answer">作答</div>
+          <div class="grading-table-cell grading-table-cell--center">判定</div>
+          <div class="grading-table-cell grading-table-cell--center">得分</div>
+          <div class="grading-table-cell grading-table-cell--center">批改状态</div>
+          <div class="grading-table-cell grading-table-cell--center">AI 日志</div>
+          <div class="grading-table-cell grading-table-cell--center">操作</div>
+        </div>
+
+        <div
+          v-for="answer in gradingAnswers"
+          :key="answer.answerId"
+          class="grading-table-row-scroll"
+        >
+          <div class="grading-table-row-content">
+            <div class="grading-table-cell grading-table-cell--stem grading-table-question">
+              {{ answer.stem || '-' }}
+            </div>
+            <div class="grading-table-cell grading-table-cell--answer grading-table-answer">
+              <div class="grading-answer-text">{{ answer.answerText || '-' }}</div>
+              <img
+                v-if="answer.answerImagePath"
+                :src="normalizeAnswerImageSrc(answer.answerImagePath)"
+                alt="作答图片"
+                class="grading-answer-image"
+              />
+            </div>
+            <div class="grading-table-cell grading-table-cell--center">
+              <span v-if="answer.correct === true">正确</span>
+              <span v-else-if="answer.correct === false">错误</span>
+              <span v-else>-</span>
+            </div>
+            <div class="grading-table-cell grading-table-cell--center">
+              <el-input-number
+                v-if="canReviewAnswer(answer)"
+                v-model="answer.score"
+                :min="0"
+                :max="answer.maxScore ?? 100"
+                size="small"
+              />
+              <span v-else>{{ answer.score ?? '-' }}</span>
+            </div>
+            <div class="grading-table-cell grading-table-cell--center">
+              <el-tag v-if="reviewStatus(answer) === 'reviewed'" type="success">已批改</el-tag>
+              <el-tag v-else-if="reviewStatus(answer) === 'needs_review'" type="warning">需人工复核</el-tag>
+              <el-tag v-else type="info">待批改</el-tag>
+            </div>
+            <div class="grading-table-cell grading-table-cell--center">
+              <el-button
+                v-if="hasAiLog(answer)"
+                size="small"
+                plain
+                @click="openAiLog(answer)"
+              >
+                查看
+              </el-button>
+              <span v-else>-</span>
+            </div>
+            <div class="grading-table-cell grading-table-cell--center">
+              <el-button
+                v-if="canReviewAnswer(answer)"
+                size="small"
+                :loading="gradingSaving"
+                @click="handleReviewAnswer(answer)"
+              >
+                保存
+              </el-button>
+              <el-button
+                v-if="canAiReviewAnswer(answer)"
+                size="small"
+                type="primary"
+                plain
+                :loading="aiReviewingId === answer.answerId"
+                @click="handleAiReviewAnswer(answer)"
+              >
+                AI 批改
+              </el-button>
+              <span v-else>自动批改</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </el-dialog>
 
     <el-dialog v-model="aiLogVisible" title="AI 批改日志" width="560px">
@@ -459,6 +473,7 @@ const email = ref(loginInfo?.email || "-");
 const studentInfo = ref(loginInfo?.studentInfo || null);
 const teacherInfo = ref(loginInfo?.teacherInfo || null);
 const avatarUrl = ref(withAvatarVersion(loginInfo?.avatarUrl || "/avatar/student_male.png"));
+const vipIconUrl = "/avatar/vip.svg";
 const userId = ref(loginInfo?.cardNo || "");
 const startingPractice = ref(false);
 const startingExam = ref(false);
@@ -995,9 +1010,18 @@ async function handleGradeStudent(row) {
   if (!selectedClass.value) {
     return;
   }
-  gradingStudent.value = row || null;
-  gradingVisible.value = true;
-  await loadExamAttempts();
+
+  await router.push({
+    name: "grading",
+    query: {
+      courseNo: selectedClass.value.cno || "",
+      courseName: selectedClass.value.cname || "",
+      teacherEid: selectedClass.value.eid || "",
+      userId: row?.userId || "",
+      studentName: row?.name || "",
+      sno: row?.sno || ""
+    }
+  });
 }
 
 async function loadExamAttempts() {
@@ -1205,7 +1229,27 @@ onBeforeUnmount(() => {
 }
 
 .side-profile {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.side-profile-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.side-name-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  flex-wrap: nowrap;
+  max-width: 100%;
 }
 
 .side-avatar {
@@ -1219,14 +1263,18 @@ onBeforeUnmount(() => {
 }
 
 .side-name {
-  margin-top: 10px;
   font-size: 16px;
   font-weight: 700;
   color: var(--ne-text-strong);
 }
 
+.side-vip-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
 .side-id {
-  margin-top: 2px;
   color: var(--ne-text-muted);
   font-size: 13px;
 }
@@ -1568,10 +1616,17 @@ onBeforeUnmount(() => {
 }
 
 .grading-meta {
+  flex: 1 1 auto;
+  min-width: 0;
   display: grid;
   gap: 6px;
   color: var(--ne-text-muted);
   font-size: 13px;
+}
+
+.grading-attempt-select {
+  flex: 0 0 260px;
+  width: 260px;
 }
 
 .grading-answer-image {
@@ -1582,6 +1637,89 @@ onBeforeUnmount(() => {
   display: block;
 }
 
+.grading-answer-text {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.grading-table {
+  border: 1px solid var(--ne-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--ne-surface);
+}
+
+.grading-table-head,
+.grading-table-row-content {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(240px, 320px) 90px 120px 120px 120px 120px;
+  align-items: stretch;
+}
+
+.grading-table-head {
+  background: #f8fafc;
+  color: var(--ne-text-muted);
+  font-weight: 600;
+}
+
+.grading-table-row-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-top: 1px solid var(--ne-border);
+}
+
+.grading-table-row-content {
+  width: max-content;
+  min-width: 100%;
+}
+
+.grading-table-cell {
+  padding: 14px 16px;
+  border-right: 1px solid var(--ne-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.grading-table-head .grading-table-cell {
+  justify-content: center;
+}
+
+.grading-table-cell:last-child {
+  border-right: none;
+}
+
+.grading-table-cell--stem,
+.grading-table-cell--answer {
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.grading-table-question,
+.grading-table-answer {
+  min-width: 0;
+}
+
+.grading-table-question {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.grading-table-answer {
+  flex-direction: column;
+}
+
+.grading-table-cell--center {
+  justify-content: center;
+}
+
 .student-subtitle {
   color: var(--ne-text-strong);
   font-weight: 600;
@@ -1590,6 +1728,18 @@ onBeforeUnmount(() => {
 .student-count {
   color: var(--ne-text-muted);
   font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .grading-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .grading-attempt-select {
+    flex: 1 1 auto;
+    width: 100%;
+  }
 }
 
 .class-list {

@@ -278,10 +278,15 @@
           <el-table-column prop="userId" label="卡号" width="120" />
           <el-table-column prop="name" label="姓名" width="120" />
           <el-table-column prop="department" label="学院" min-width="160" />
-          <el-table-column prop="title" label="职称" width="120" />
+          <el-table-column label="职称" width="120">
+            <template #default="scope">
+              {{ formatTeacherTitle(scope.row.title) }}
+            </template>
+          </el-table-column>
           <el-table-column label="VIP" width="110">
             <template #default="scope">
               <el-switch
+                class="vip-switch"
                 :model-value="scope.row.vip"
                 :loading="vipUpdatingId === scope.row.eid"
                 @change="(value) => handleVipToggle(scope.row, value)"
@@ -419,6 +424,20 @@ function resetForm() {
   form.teacherEnterYear = "";
   form.title = "lecture";
   form.teacherDepartment = "";
+}
+
+function formatTeacherTitle(title) {
+  const normalized = String(title || "").trim().toLowerCase();
+  if (normalized === "professor") {
+    return "教授";
+  }
+  if (normalized === "associate_professor") {
+    return "副教授";
+  }
+  if (normalized === "lecture" || normalized === "lecturer") {
+    return "讲师";
+  }
+  return title || "-";
 }
 
 function withAvatarVersion(url) {
@@ -1018,6 +1037,15 @@ onBeforeUnmount(() => {
 
 :deep(.female-radio .el-radio__input.is-checked + .el-radio__label) {
   color: #ff00ff;
+}
+
+:deep(.vip-switch.is-checked .el-switch__core) {
+  border-color: #E0BF09;
+  background-color: #E0BF09;
+}
+
+:deep(.vip-switch.is-checked .el-switch__action) {
+  color: #E0BF09;
 }
 
 .panel-card {

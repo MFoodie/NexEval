@@ -75,9 +75,6 @@ public class ExamSession {
       updateTheta(correct, questionDifficulty);
     }
 
-    if (answeredCount >= maxQuestions) {
-      finished = true;
-    }
   }
 
   public synchronized void finish() {

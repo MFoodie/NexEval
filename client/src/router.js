@@ -5,6 +5,7 @@ import RegisterView from "./views/RegisterView.vue";
 import HomeView from "./views/HomeView.vue";
 import ExamRoomView from "./views/ExamRoomView.vue";
 import AdminView from "./views/AdminView.vue";
+import GradingView from "./views/GradingView.vue";
 
 const routes = [
   {
@@ -47,6 +48,15 @@ const routes = [
     meta: {
       requiresAuth: true
     }
+  },
+  {
+    path: "/grading",
+    name: "grading",
+    component: GradingView,
+    meta: {
+      requiresAuth: true,
+      teacherOnly: true
+    }
   }
 ];
 
@@ -58,6 +68,7 @@ const router = createRouter({
 router.beforeEach((to) => {
   const login = getLogin();
   const isAdmin = login?.type === "admin";
+  const isTeacher = login?.type === "teacher";
 
   if (to.meta.requiresAuth && !isLoggedIn()) {
     return { name: "login" };
@@ -65,6 +76,10 @@ router.beforeEach((to) => {
 
   if (to.meta.adminOnly && !isAdmin) {
     return { name: "home" };
+  }
+
+  if (to.meta.teacherOnly && !isTeacher) {
+    return isAdmin ? { name: "admin" } : { name: "home" };
   }
 
   if (to.name === "home" && isAdmin) {
