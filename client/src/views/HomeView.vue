@@ -220,7 +220,6 @@
                 <div class="student-action-buttons">
                   <el-button
                     size="small"
-                    :loading="startingPractice"
                     @click="handleStartPracticeForClass(scope.row)"
                   >
                     题目练习
@@ -244,7 +243,7 @@
           </el-form-item>
 
           <div class="action-row">
-            <el-button :loading="startingPractice" @click="handleStartPractice">题目练习</el-button>
+            <el-button @click="handleStartPractice">题目练习</el-button>
             <el-button type="primary" :loading="startingExam" @click="handleStartExam">进入考试</el-button>
           </div>
         </el-form>
@@ -325,6 +324,47 @@
       <template #footer>
         <el-button @click="appealVisible = false">取消</el-button>
         <el-button type="primary" :loading="appealSubmitting" @click="handleSubmitScoreAppeal">提交申请</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="practiceDialogVisible" width="560px">
+      <template #title>
+        <div class="practice-dialog-title">
+          <img src="../assets/AI.svg" alt="AI" class="ai-icon" />
+          题目练习设置
+        </div>
+      </template>
+      <div class="practice-dialog-meta">
+        <div class="practice-dialog-course">{{ practiceCourseLabel }}</div>
+        <div class="practice-dialog-tip">AI 会读取当前课程题库，按你选的难度和题量生成练习题。</div>
+      </div>
+
+      <div class="practice-section">
+        <div class="practice-section-label">难度</div>
+        <div class="practice-level-grid">
+          <button
+            v-for="level in practiceLevels"
+            :key="level.value"
+            type="button"
+            class="practice-level-card"
+            :class="{ selected: practiceDifficulty === level.value }"
+            :style="practiceLevelCardStyle(level)"
+            @click="practiceDifficulty = level.value"
+          >
+            <span class="practice-level-dot" :style="{ backgroundColor: level.color }"></span>
+            <span class="practice-level-label">{{ level.value }}</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="practice-section">
+        <div class="practice-section-label">练习题数量</div>
+        <el-input-number v-model="practiceQuestionCount" :min="1" :max="50" :step="1" />
+      </div>
+
+      <template #footer>
+        <el-button @click="practiceDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="startingPractice" @click="confirmPracticeStart">开始练习</el-button>
       </template>
     </el-dialog>
 
@@ -476,6 +516,10 @@ const vipIconUrl = "/avatar/vip.svg";
 const userId = ref(loginInfo?.cardNo || "");
 const startingPractice = ref(false);
 const startingExam = ref(false);
+const practiceDialogVisible = ref(false);
+const practiceCourse = ref(null);
+const practiceDifficulty = ref("中");
+const practiceQuestionCount = ref(10);
 const avatarSaving = ref(false);
 const wsStatus = ref("connecting");
 const avatarInputRef = ref(null);
@@ -506,6 +550,18 @@ const isTeacher = computed(() => userType.value === "teacher");
 const isVipTeacher = computed(() => Boolean(isTeacher.value && teacherInfo.value?.vip));
 const displayPhone = computed(() => formatPhoneForDisplay(phone.value));
 const actionPanelTitle = computed(() => (isTeacher.value ? "考试批改" : "题目练习与考试"));
+const practiceLevels = [
+  { value: "易", color: "#A5E617" },
+  { value: "中", color: "#02A1E8" },
+  { value: "难", color: "#8213E6" }
+];
+const practiceCourseLabel = computed(() => {
+  if (!practiceCourse.value) {
+    return "请选择教学班后再开始练习";
+  }
+
+  return `${practiceCourse.value.cno || "-"} ｜ ${practiceCourse.value.cname || "未命名课程"}`;
+});
 const activeMenu = ref("action");
 const menuItems = computed(() => [
   { key: "profile", label: "个人信息" },
@@ -857,6 +913,32 @@ async function handleSaveProfile() {
 }
 
 async function handleStartPractice(courseNo = "", courseName = "") {
+  openPracticeDialog({ cno: courseNo, cname: courseName });
+}
+
+function openPracticeDialog(clazz) {
+  practiceCourse.value = clazz || null;
+  practiceDifficulty.value = "中";
+  practiceQuestionCount.value = 10;
+  practiceDialogVisible.value = true;
+}
+
+function practiceLevelCardStyle(level) {
+  return {
+    borderColor: practiceDifficulty.value === level.value ? level.color : "rgba(42, 92, 255, 0.16)",
+    background: practiceDifficulty.value === level.value ? `${level.color}18` : "#ffffff"
+  };
+}
+
+async function confirmPracticeStart() {
+  const courseNo = String(practiceCourse.value?.cno || "").trim();
+  const courseName = String(practiceCourse.value?.cname || "").trim();
+
+  if (!courseNo) {
+    ElMessage.warning("请先选择教学班");
+    return;
+  }
+
   if (!userId.value.trim()) {
     ElMessage.warning("Please input user id.");
     return;
@@ -871,17 +953,22 @@ async function handleStartPractice(courseNo = "", courseName = "") {
   try {
     const payload = await wsClient.request("START_PRACTICE", {
       userId: userId.value.trim(),
-      courseNo: String(courseNo || "").trim()
+      courseNo,
+      difficulty: practiceDifficulty.value,
+      questionCount: practiceQuestionCount.value
     });
+    practiceDialogVisible.value = false;
     router.push({
       name: "exam",
       params: {
         sessionId: payload.sessionId
       },
       query: {
-        courseNo: String(courseNo || "").trim(),
-        courseName: String(courseName || "").trim(),
-        mode: "practice"
+        courseNo,
+        courseName,
+        mode: "practice",
+        difficulty: practiceDifficulty.value,
+        questionCount: String(practiceQuestionCount.value)
       }
     });
   } catch (error) {
@@ -927,7 +1014,7 @@ async function handleStartExam(courseNo = "", courseName = "") {
 }
 
 function handleStartPracticeForClass(clazz) {
-  handleStartPractice(clazz?.cno || "", clazz?.cname || "");
+  openPracticeDialog(clazz || null);
 }
 
 function handleStartExamForClass(clazz) {
@@ -1557,6 +1644,91 @@ onBeforeUnmount(() => {
   width: 90px; 
   max-width: 100%;
   box-sizing: border-box;
+}
+
+.practice-dialog-meta {
+  margin: 12px 0 18px;
+}
+
+.practice-dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ai-icon {
+  width: 50px;
+  height: 50px;
+  display: inline-block;
+}
+
+.practice-dialog-course {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.practice-dialog-tip {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.practice-section {
+  margin-bottom: 18px;
+}
+
+.practice-section-label {
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.practice-level-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.practice-level-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 54px;
+  border-radius: 14px;
+  border: 1px solid rgba(42, 92, 255, 0.16);
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.practice-level-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+
+.practice-level-card.selected {
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+.practice-level-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.62) inset;
+}
+
+.practice-level-label {
+  letter-spacing: 0.2px;
 }
 
 /* 放大表格中某些列的字号 */

@@ -72,8 +72,10 @@ docker compose up -d
 
 - 学生端：
   - 查看个人信息、所属教学班与课程成绩。
-  - 按课程发起题目练习/进入考试。
+  - 按课程发起题目练习/进入考试；题目练习支持按难度与题量生成练习题。
   - 在考试页读取考试剩余时间（`remainingSeconds`）并提交答题。
+  - 题目练习交卷后自动判分客观题，并展示总分。
+  - 对大题可在交卷后使用 AI 评估，查看 AI 给出的评分与评价。
   - 提交成绩复核申请，并查看当前课程的复核记录。
 - 教师端：
   - 查看教学班与学生列表。
@@ -96,6 +98,7 @@ docker compose up -d
   - 教学班：GET_TEACHER_CLASSES、GET_STUDENT_CLASSES
   - 考试会话：START_SESSION、START_PRACTICE、START_EXAM、GET_EXAM_QUESTIONS、GET_SESSION_STATE、GET_SESSION_ANSWERS、FINISH_SESSION、NEXT_QUESTION、SUBMIT_ANSWER
   - 记录与批改：GET_EXAM_ATTEMPTS、GET_ATTEMPT_ANSWERS、REVIEW_ANSWER、AI_REVIEW_ANSWER
+    - 学生练习 AI 评估：STUDENT_AI_REVIEW_ANSWER
   - 成绩复核：CREATE_SCORE_APPEAL、GET_SCORE_APPEALS、REVIEW_SCORE_APPEAL
 - 响应格式：RESPONSE（requestId/action/success/payload）
 - 服务端事件：CONNECTED、PONG、ANSWER_UPDATED、ERROR

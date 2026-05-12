@@ -83,6 +83,7 @@ public class CatExamService {
   private final ScoreAppealRepository scoreAppealRepository;
   private final TeacherProfileRepository teacherProfileRepository;
   private final AiGradingService aiGradingService;
+  private final AiPracticeService aiPracticeService;
 
   private final Map<String, ExamSession> sessions = new ConcurrentHashMap<>();
 
@@ -102,7 +103,8 @@ public class CatExamService {
     ExamAttemptRepository examAttemptRepository,
     ScoreAppealRepository scoreAppealRepository,
     TeacherProfileRepository teacherProfileRepository,
-    AiGradingService aiGradingService
+    AiGradingService aiGradingService,
+    AiPracticeService aiPracticeService
   ) {
     this.webSocketHub = webSocketHub;
     this.examDefinitionRepository = examDefinitionRepository;
@@ -118,6 +120,7 @@ public class CatExamService {
     this.scoreAppealRepository = scoreAppealRepository;
     this.teacherProfileRepository = teacherProfileRepository;
     this.aiGradingService = aiGradingService;
+    this.aiPracticeService = aiPracticeService;
   }
 
   public StartExamResponse startSession(String userId, String sourceId) {
@@ -125,33 +128,41 @@ public class CatExamService {
   }
 
   public StartExamResponse startPracticeSession(String userId, String courseNo) {
+    return startPracticeSession(userId, courseNo, "中", 10);
+  }
+
+  public StartExamResponse startPracticeSession(String userId, String courseNo, String difficultyLevel, Integer questionCount) {
     String normalizedCourseNo = normalizeSourceId(courseNo);
-    PracticePaper practicePaper = resolvePracticePaper(normalizedCourseNo);
-
-    String sourceId = normalizedCourseNo;
-    String paperId = null;
-    List<QuestionItem> questionBank;
-
-    if (practicePaper != null) {
-      paperId = practicePaper.getId();
-      sourceId = paperId;
-      questionBank = loadPracticeQuestionBank(paperId, normalizedCourseNo);
-    } else if (!normalizedCourseNo.isBlank() && isCourseSource(normalizedCourseNo)) {
-      questionBank = loadCourseQuestionBank(normalizedCourseNo);
-    } else {
-      questionBank = loadExamQuestionBank(resolveExamDefinition(null));
+    if (normalizedCourseNo.isBlank()) {
+      throw new IllegalArgumentException("courseNo is required for practice sessions");
     }
 
-    int maxQuestions = questionBank.size();
+    List<QuestionItem> allCourseQuestions = loadAllCourseQuestionBank(normalizedCourseNo);
+    if (allCourseQuestions.isEmpty()) {
+      throw new NoSuchElementException("No practice questions configured for course: " + normalizedCourseNo);
+    }
+
+    PracticeDifficulty practiceDifficulty = PracticeDifficulty.fromLabel(difficultyLevel);
+    int requestedCount = normalizePracticeCount(questionCount, allCourseQuestions.size());
+    List<QuestionItem> selectedQuestions = selectPracticeQuestions(
+      normalizedCourseNo,
+      practiceDifficulty,
+      requestedCount,
+      allCourseQuestions
+    );
+
+    int maxQuestions = selectedQuestions.size();
     ExamSession session = createSession(
       userId,
       normalizedCourseNo,
-      sourceId,
+      normalizedCourseNo,
       maxQuestions,
       SessionMode.PRACTICE,
-      paperId,
+      null,
       null
     );
+
+    examQuestionCache.put(session.getSessionId(), selectedQuestions);
 
     return toStartResponse(session);
   }
@@ -460,6 +471,54 @@ public class CatExamService {
     return toAnswerDetailView(saved);
   }
 
+  public ExamAnswerDetailView studentAiReviewAnswer(Long answerId, String userId) {
+    ExamAnswer answer = examAnswerRepository.findById(answerId)
+      .orElseThrow(() -> new NoSuchElementException("Answer not found: " + answerId));
+    if (answer.getQuestionType() != QuestionType.ESSAY) {
+      throw new IllegalArgumentException("仅支持大题 AI 批改");
+    }
+
+    String normalizedUserId = normalizeSourceId(userId);
+    if (normalizedUserId.isBlank()) {
+      throw new IllegalArgumentException("userId is required");
+    }
+    if (!Objects.equals(normalizedUserId, normalizeSourceId(answer.getUserId()))) {
+      throw new IllegalStateException("无权评估该答案");
+    }
+
+    ExamSession session = requireSession(answer.getSessionId());
+    if (session.getMode() != SessionMode.PRACTICE) {
+      throw new IllegalStateException("仅练习模式支持学生 AI 评估");
+    }
+    if (!session.isFinished()) {
+      throw new IllegalStateException("请先交卷后再进行 AI 评估");
+    }
+
+    EssayQuestionBank question = essayQuestionBankRepository.findById(answer.getQuestionId())
+      .orElseThrow(() -> new NoSuchElementException("Essay question not found: " + answer.getQuestionId()));
+
+    AiGradeResult aiResult = aiGradingService.gradeEssay(
+      question.getStem(),
+      question.getPoints(),
+      question.getStandardAnswer(),
+      question.getScoringRubric(),
+      answer.getAnswerText(),
+      answer.getAnswerImagePath(),
+      question.getImagePath()
+    );
+
+    int cappedScore = capReviewScore(aiResult.score(), answer);
+    answer.setScore(cappedScore);
+    answer.setReviewNote(null);
+    answer.setAiReviewLog(aiResult.aiLog());
+    answer.setReviewerId(normalizedUserId);
+    answer.setReviewed(true);
+    answer.setReviewedAt(Instant.now());
+
+    ExamAnswer saved = examAnswerRepository.save(answer);
+    return toAnswerDetailView(saved);
+  }
+
   private Integer capReviewScore(Integer score, ExamAnswer answer) {
     if (score == null) {
       return null;
@@ -628,15 +687,9 @@ public class CatExamService {
         cacheKey = session.getMode().name() + ":COURSE:" + courseNo;
       }
     } else if (session.getMode() == SessionMode.PRACTICE) {
-      // Prefer course-specific cache key for practice sessions when courseNo is provided
-      String courseNo = normalizeSourceId(session.getCourseNo());
-      if (!courseNo.isBlank() && isCourseSource(courseNo)) {
-        cacheKey = session.getMode().name() + ":COURSE:" + courseNo;
-      } else if (!sourceId.isBlank()) {
-        cacheKey = session.getMode().name() + ":PAPER:" + sourceId;
-      } else {
-        cacheKey = session.getMode().name() + ":DEFAULT";
-      }
+      // Practice sessions must not reuse another session's generated bank.
+      // Use sessionId so difficulty/questionCount can produce independent result sets.
+      cacheKey = session.getMode().name() + ":SESSION:" + session.getSessionId();
     }
 
     // Log cache decisions to help diagnose cross-course reuse
@@ -659,6 +712,14 @@ public class CatExamService {
   }
 
   private List<QuestionItem> loadQuestionBankForSession(ExamSession session) {
+    if (session.getMode() == SessionMode.PRACTICE) {
+      List<QuestionItem> selected = examQuestionCache.get(session.getSessionId());
+      if (selected != null && !selected.isEmpty()) {
+        log.info("loadQuestionBankForSession: using selected practice session bank for sessionId={} size={}", session.getSessionId(), selected.size());
+        return selected;
+      }
+    }
+
     if (session.getMode() == SessionMode.EXAM) {
       String courseNo = normalizeSourceId(session.getCourseNo());
       if (!courseNo.isBlank() && isCourseSource(courseNo)) {
@@ -669,24 +730,177 @@ public class CatExamService {
       return loadExamQuestionBank(resolveExamDefinition(session.getExamId()));
     }
 
-    if (session.getPaperId() != null && !session.getPaperId().isBlank()) {
-      log.info("loadQuestionBankForSession: using practice paper id={} courseNo={}", session.getPaperId(), session.getCourseNo());
-      return loadPracticeQuestionBank(session.getPaperId(), session.getCourseNo());
-    }
-
     String courseNo = normalizeSourceId(session.getCourseNo());
     if (!courseNo.isBlank() && isCourseSource(courseNo)) {
       log.info("loadQuestionBankForSession: fallback course question bank for course={}", courseNo);
       return loadCourseQuestionBank(courseNo);
     }
 
-    PracticePaper fallbackPaper = resolvePracticePaper(courseNo);
-    if (fallbackPaper != null) {
-      log.info("loadQuestionBankForSession: using fallback practice paper id={} for course={}", fallbackPaper.getId(), courseNo);
-      return loadPracticeQuestionBank(fallbackPaper.getId(), courseNo);
+    return loadExamQuestionBank(resolveExamDefinition(null));
+  }
+
+  private List<QuestionItem> loadAllCourseQuestionBank(String courseNo) {
+    List<QuestionItem> items = new ArrayList<>();
+
+    items.addAll(questionBankRepository.findAllByActiveTrueAndCno(courseNo).stream()
+      .sorted(Comparator.comparingDouble(QuestionBank::getDifficulty).thenComparing(QuestionBank::getId))
+      .map(this::toQuestionItem)
+      .toList());
+
+    items.addAll(judgeQuestionBankRepository.findAllByActiveTrueAndCno(courseNo).stream()
+      .sorted(Comparator.comparingDouble(JudgeQuestionBank::getDifficulty).thenComparing(JudgeQuestionBank::getId))
+      .map(this::toQuestionItem)
+      .toList());
+
+    items.addAll(blankQuestionBankRepository.findAllByActiveTrueAndCno(courseNo).stream()
+      .sorted(Comparator.comparingDouble(BlankQuestionBank::getDifficulty).thenComparing(BlankQuestionBank::getId))
+      .map(this::toQuestionItem)
+      .toList());
+
+    items.addAll(essayQuestionBankRepository.findAllByActiveTrueAndCno(courseNo).stream()
+      .sorted(Comparator.comparingDouble(EssayQuestionBank::getDifficulty).thenComparing(EssayQuestionBank::getId))
+      .map(this::toQuestionItem)
+      .toList());
+
+    return items.stream()
+      .sorted(Comparator.comparingInt((QuestionItem item) -> typeOrder(item.type()))
+        .thenComparingDouble(QuestionItem::difficulty)
+        .thenComparing(QuestionItem::id))
+      .collect(Collectors.toCollection(ArrayList::new));
+  }
+
+  private List<QuestionItem> selectPracticeQuestions(
+    String courseNo,
+    PracticeDifficulty practiceDifficulty,
+    int questionCount,
+    List<QuestionItem> allCourseQuestions
+  ) {
+    List<QuestionItem> bandCandidates = filterPracticeDifficultyBand(allCourseQuestions, practiceDifficulty);
+    List<QuestionItem> workingPool = bandCandidates.isEmpty() ? new ArrayList<>(allCourseQuestions) : new ArrayList<>(bandCandidates);
+    int cappedCount = Math.max(1, Math.min(questionCount, allCourseQuestions.size()));
+
+    List<AiPracticeService.PracticeQuestionCandidate> candidates = workingPool.stream()
+      .limit(40)
+      .map(item -> new AiPracticeService.PracticeQuestionCandidate(
+        item.id(),
+        item.type().name().toLowerCase(),
+        item.difficulty(),
+        item.points(),
+        trimStem(item.stem())
+      ))
+      .toList();
+
+    List<String> aiSelectedIds = aiPracticeService.selectPracticeQuestionIds(
+      courseNo,
+      practiceDifficulty.label,
+      cappedCount,
+      candidates
+    );
+
+    Map<String, QuestionItem> itemById = allCourseQuestions.stream()
+      .collect(Collectors.toMap(QuestionItem::id, item -> item, (left, right) -> left, LinkedHashMap::new));
+
+    List<QuestionItem> selected = new ArrayList<>();
+    for (String id : aiSelectedIds) {
+      QuestionItem item = itemById.get(id);
+      if (item != null && selected.stream().noneMatch(existing -> existing.id().equals(item.id()))) {
+        selected.add(item);
+      }
+      if (selected.size() >= cappedCount) {
+        break;
+      }
     }
 
-    return loadExamQuestionBank(resolveExamDefinition(null));
+    if (selected.size() < cappedCount) {
+      List<QuestionItem> fallback = new ArrayList<>(workingPool);
+      Collections.shuffle(fallback, ThreadLocalRandom.current());
+      for (QuestionItem item : fallback) {
+        if (selected.stream().anyMatch(existing -> existing.id().equals(item.id()))) {
+          continue;
+        }
+        selected.add(item);
+        if (selected.size() >= cappedCount) {
+          break;
+        }
+      }
+    }
+
+    if (selected.size() < cappedCount) {
+      List<QuestionItem> backup = new ArrayList<>(allCourseQuestions);
+      Collections.shuffle(backup, ThreadLocalRandom.current());
+      for (QuestionItem item : backup) {
+        if (selected.stream().anyMatch(existing -> existing.id().equals(item.id()))) {
+          continue;
+        }
+        selected.add(item);
+        if (selected.size() >= cappedCount) {
+          break;
+        }
+      }
+    }
+
+    return selected;
+  }
+
+  private List<QuestionItem> filterPracticeDifficultyBand(List<QuestionItem> questions, PracticeDifficulty difficulty) {
+    if (questions == null || questions.isEmpty()) {
+      return List.of();
+    }
+
+    List<QuestionItem> sorted = questions.stream()
+      .sorted(Comparator.comparingDouble(QuestionItem::difficulty).thenComparing(QuestionItem::id))
+      .toList();
+
+    if (sorted.size() <= 3) {
+      return new ArrayList<>(sorted);
+    }
+
+    int third = Math.max(1, sorted.size() / 3);
+    return switch (difficulty) {
+      case EASY -> new ArrayList<>(sorted.subList(0, Math.min(third, sorted.size())));
+      case MEDIUM -> new ArrayList<>(sorted.subList(Math.min(third, sorted.size()), Math.min(third * 2, sorted.size())));
+      case HARD -> new ArrayList<>(sorted.subList(Math.min(third * 2, sorted.size()), sorted.size()));
+    };
+  }
+
+  private int normalizePracticeCount(Integer questionCount, int maxAvailable) {
+    int requested = questionCount == null ? 10 : questionCount;
+    if (requested < 1) {
+      requested = 1;
+    }
+    return Math.min(requested, Math.max(1, maxAvailable));
+  }
+
+  private String trimStem(String stem) {
+    String text = stem == null ? "" : stem.trim();
+    if (text.length() <= 120) {
+      return text;
+    }
+    return text.substring(0, 120);
+  }
+
+  private enum PracticeDifficulty {
+    EASY("易"),
+    MEDIUM("中"),
+    HARD("难");
+
+    private final String label;
+
+    PracticeDifficulty(String label) {
+      this.label = label;
+    }
+
+    private static PracticeDifficulty fromLabel(String label) {
+      String normalized = label == null ? "" : label.trim().toLowerCase();
+      if (normalized.isBlank()) {
+        return MEDIUM;
+      }
+      return switch (normalized) {
+        case "easy", "easy-level", "low", "易", "简单" -> EASY;
+        case "hard", "high", "难", "困难" -> HARD;
+        default -> MEDIUM;
+      };
+    }
   }
 
   private boolean isCourseSource(String sourceId) {

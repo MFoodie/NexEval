@@ -216,7 +216,9 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
         case "START_PRACTICE":
           responsePayload = catExamService.startPracticeSession(
             requireText(payload, "userId"),
-            optionalText(payload, "courseNo")
+            optionalText(payload, "courseNo"),
+            optionalText(payload, "difficulty"),
+            optionalInt(payload, "questionCount")
           );
           break;
         case "START_EXAM":
@@ -268,6 +270,12 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
           responsePayload = catExamService.aiReviewAnswer(
             Long.parseLong(requireText(payload, "answerId")),
             requireText(payload, "reviewerId")
+          );
+          break;
+        case "STUDENT_AI_REVIEW_ANSWER":
+          responsePayload = catExamService.studentAiReviewAnswer(
+            Long.parseLong(requireText(payload, "answerId")),
+            requireText(payload, "userId")
           );
           break;
         case "CREATE_SCORE_APPEAL":

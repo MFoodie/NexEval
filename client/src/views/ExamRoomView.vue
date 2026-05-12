@@ -34,11 +34,69 @@
         <el-skeleton :rows="6" animated v-if="loading" />
 
         <template v-else>
-          <el-result v-if="finished" icon="success" :title="finishedTitle">
-            <template #extra>
+          <template v-if="finished">
+            <div class="finish-summary card">
+              <div class="finish-summary-main">
+                <div class="finish-eyebrow">{{ finishedTitle }}</div>
+                <h2 class="finish-title">总得分 {{ totalScore }} / {{ totalMaxScore || maxQuestions }}</h2>
+                <p class="finish-subtitle">客观题已自动判分，大题可点击 AI 评估查看评分与评价。</p>
+              </div>
               <el-button type="primary" @click="router.push('/')">返回首页</el-button>
-            </template>
-          </el-result>
+            </div>
+
+            <div v-if="attemptAnswers.length === 0" class="placeholder">正在加载成绩...</div>
+
+            <div v-else class="finish-review-list">
+              <div v-for="(item, index) in finishedReviewItems" :key="item.question.id" class="finish-review-item">
+                <div class="finish-review-head">
+                  <div class="question-index">第 {{ index + 1 }} 题</div>
+                  <div class="question-meta">
+                    <span class="question-type">{{ typeLabels[item.question.type] || '题目' }}</span>
+                  </div>
+                </div>
+
+                <h3 class="finish-review-title">{{ item.question.stem }}</h3>
+
+                <div v-if="item.question.imagePath" class="finish-review-image-wrap">
+                  <img :src="item.question.imagePath.startsWith('/') ? item.question.imagePath : '/' + item.question.imagePath" class="finish-review-image" />
+                </div>
+
+                <div v-if="item.answer" class="finish-review-answer">
+                  <div class="finish-review-row">
+                    <span>作答</span>
+                    <strong>{{ item.answer.answerText || (item.answer.answerImagePath ? '仅图片作答' : '未作答') }}</strong>
+                  </div>
+                  <div class="finish-review-row">
+                    <span>得分</span>
+                    <strong>{{ item.answer.score ?? '-' }} / {{ item.answer.maxScore ?? '-' }}</strong>
+                  </div>
+                  <div v-if="item.answer.correct != null" class="finish-review-row">
+                    <span>判定</span>
+                    <strong>{{ item.answer.correct ? '正确' : '错误' }}</strong>
+                  </div>
+                </div>
+
+                <div v-if="item.answer?.answerImagePath" class="finish-review-answer-image-wrap">
+                  <img :src="item.answer.answerImagePath.startsWith('/') ? item.answer.answerImagePath : '/' + item.answer.answerImagePath" class="finish-review-answer-image" />
+                </div>
+
+                <div v-if="!isExamMode && item.question.type === 'essay' && item.answer" class="finish-review-ai">
+                  <el-button
+                    type="primary"
+                    plain
+                    size="small"
+                    :loading="aiEvaluatingAnswerId === item.answer.answerId"
+                    @click="handleStudentAiReviewAnswer(item.answer)"
+                  >
+                    AI 评估
+                  </el-button>
+                  <div v-if="item.answer.aiReviewLog" class="finish-review-ai-comment">
+                    {{ formatAiComment(item.answer.aiReviewLog) }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
 
             <template v-else-if="currentQuestion">
             <div v-if="!reviewMode">
@@ -203,12 +261,15 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
+import { getLogin } from "../auth";
 import { createExamSocket } from "../ws";
 
 const route = useRoute();
 const router = useRouter();
+const loginInfo = getLogin();
 
 const sessionId = computed(() => route.params.sessionId);
+const currentUserId = computed(() => String(loginInfo?.cardNo || loginInfo?.id || "").trim());
 const courseNoText = computed(() => String(route.query.courseNo || "").trim() || "-");
 const courseNameText = computed(() => String(route.query.courseName || "").trim());
 const courseTitle = computed(() => courseNameText.value || `课程 ${courseNoText.value}`);
@@ -221,6 +282,7 @@ const remainingSeconds = ref(-1);
 let timerId = null;
 
 const questions = ref([]);
+const attemptAnswers = ref([]);
 const currentIndex = ref(0);
 const currentQuestion = computed(() => questions.value[currentIndex.value] || null);
 const answerValue = ref("");
@@ -240,6 +302,7 @@ let wsClient = null;
 
 const activeReviewPanels = ref([]);
 const essayInputRefs = new Map();
+const aiEvaluatingAnswerId = ref("");
 
 const typeLabels = {
   choice: "选择题",
@@ -313,6 +376,17 @@ const isExamMode = computed(() => sessionMode.value === "exam");
 
 const finishedTitle = computed(() => (isExamMode.value ? "考试完成" : "练习完成"));
 
+const totalScore = computed(() => attemptAnswers.value.reduce((sum, item) => sum + (Number(item.score ?? 0) || 0), 0));
+
+const totalMaxScore = computed(() => attemptAnswers.value.reduce((sum, item) => sum + (Number(item.maxScore ?? 0) || 0), 0));
+
+const finishedReviewItems = computed(() => {
+  return questions.value.map((question) => ({
+    question,
+    answer: getAttemptAnswer(question.id)
+  }));
+});
+
 const remainingLabel = computed(() => formatSeconds(remainingSeconds.value));
 
 const progressPercent = computed(() => {
@@ -356,6 +430,31 @@ function startTimer() {
       stopTimer();
     }
   }, 1000);
+}
+
+async function loadAttemptAnswers() {
+  if (!wsClient || !wsClient.isOpen()) {
+    return;
+  }
+
+  try {
+    const payload = await wsClient.request("GET_ATTEMPT_ANSWERS", {
+      sessionId: sessionId.value
+    });
+    attemptAnswers.value = Array.isArray(payload) ? payload : [];
+  } catch (error) {
+    ElMessage.error(error.message || "成绩加载失败。");
+  }
+}
+
+async function initializeSessionData() {
+  await loadSessionState();
+  await loadQuestions();
+  if (finished.value) {
+    await loadAttemptAnswers();
+  } else {
+    await loadSessionAnswers();
+  }
 }
 
 async function loadQuestions() {
@@ -538,6 +637,7 @@ async function finishExam(reason = "manual") {
     });
     finished.value = payload.finished ?? true;
     stopTimer();
+    await loadAttemptAnswers();
     ElMessage.success("已交卷。");
   } catch (error) {
     ElMessage.error(error.message || "交卷失败。");
@@ -661,6 +761,77 @@ function questionNodeClass(index, questionId) {
     return "is-answered";
   }
   return "is-unanswered";
+}
+
+function getAttemptAnswer(questionId) {
+  return attemptAnswers.value.find((item) => item.questionId === questionId) || null;
+}
+
+function parseAiReviewLog(raw) {
+  const text = String(raw || "").trim();
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { raw: text };
+  }
+}
+
+function formatAiComment(raw) {
+  const parsed = parseAiReviewLog(raw);
+  if (!parsed) {
+    return "";
+  }
+
+  if (parsed.raw) {
+    return parsed.raw;
+  }
+
+  const parts = [];
+  if (parsed.comment) {
+    parts.push(parsed.comment);
+  }
+  if (parsed.confidence != null) {
+    parts.push(`置信度：${Math.round(Number(parsed.confidence) * 100)}%`);
+  }
+  return parts.join(" | ");
+}
+
+async function handleStudentAiReviewAnswer(answer) {
+  if (!answer?.answerId) {
+    return;
+  }
+
+  if (!currentUserId.value) {
+    ElMessage.error("未找到当前用户信息，无法进行 AI 评估");
+    return;
+  }
+
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket 未连接，请稍后重试。");
+    return;
+  }
+
+  aiEvaluatingAnswerId.value = answer.answerId;
+  try {
+    const payload = await wsClient.request("STUDENT_AI_REVIEW_ANSWER", {
+      answerId: String(answer.answerId),
+      userId: currentUserId.value
+    }, 30000);
+
+    const index = attemptAnswers.value.findIndex((item) => item.answerId === payload.answerId);
+    if (index !== -1) {
+      attemptAnswers.value.splice(index, 1, payload);
+    }
+    ElMessage.success("AI 评估已完成");
+  } catch (error) {
+    ElMessage.error(error.message || "AI 评估失败");
+  } finally {
+    aiEvaluatingAnswerId.value = "";
+  }
 }
 
 function syncAnswerForCurrentQuestion() {
@@ -812,9 +983,7 @@ watch(currentQuestion, () => {
 function connectWebSocket() {
   wsClient = createExamSocket(sessionId.value, {
     onOpen() {
-      loadSessionState();
-      loadSessionAnswers();
-      loadQuestions();
+      initializeSessionData();
     },
     onClose() {
     },
@@ -1231,5 +1400,109 @@ onBeforeUnmount(() => {
 .review-question-image-wrap img {
   max-width: 100%;
   border-radius: 8px;
+}
+
+.finish-summary {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.finish-summary-main {
+  display: grid;
+  gap: 8px;
+}
+
+.finish-eyebrow {
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ne-text-muted);
+}
+
+.finish-title {
+  margin: 0;
+  font-size: 26px;
+  color: var(--ne-text-strong);
+}
+
+.finish-subtitle {
+  margin: 0;
+  color: var(--ne-text-muted);
+}
+
+.finish-review-list {
+  display: grid;
+  gap: 14px;
+}
+
+.finish-review-item {
+  padding: 16px;
+  border: 1px solid var(--ne-border);
+  border-radius: 16px;
+  background: var(--ne-surface);
+  display: grid;
+  gap: 12px;
+}
+
+.finish-review-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.finish-review-title {
+  margin: 0;
+  font-size: 18px;
+  color: var(--ne-text-strong);
+}
+
+.finish-review-image-wrap,
+.finish-review-answer-image-wrap {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  overflow: hidden;
+}
+
+.finish-review-image,
+.finish-review-answer-image {
+  width: 100%;
+  display: block;
+  border-radius: 8px;
+}
+
+.finish-review-answer {
+  display: grid;
+  gap: 8px;
+}
+
+.finish-review-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ne-text-muted);
+}
+
+.finish-review-row strong {
+  color: var(--ne-text-strong);
+}
+
+.finish-review-ai {
+  display: grid;
+  gap: 8px;
+}
+
+.finish-review-ai-comment {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(42, 92, 255, 0.06);
+  color: var(--ne-text-strong);
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 </style>
