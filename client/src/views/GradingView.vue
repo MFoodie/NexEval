@@ -59,7 +59,15 @@
 
             <div class="grading-answer-panel">
               <div class="aside-title">学生作答</div>
-              <div class="grading-answer-text">{{ currentAnswer.answerText || '未作答' }}</div>
+              <div class="grading-answer-text">
+                <template v-if="currentAnswer.answerText && String(currentAnswer.answerText).trim() !== ''">
+                  {{ currentAnswer.answerText }}
+                </template>
+                <template v-else-if="currentAnswer.answerImagePath">
+                  <!-- image only: show nothing here, image preview appears below -->
+                </template>
+                <template v-else>未作答</template>
+              </div>
               <img
                 v-if="currentAnswer.answerImagePath"
                 :src="normalizeAnswerImageSrc(currentAnswer.answerImagePath)"

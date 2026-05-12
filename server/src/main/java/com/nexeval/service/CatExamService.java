@@ -627,10 +627,29 @@ public class CatExamService {
       if (!courseNo.isBlank() && isCourseSource(courseNo)) {
         cacheKey = session.getMode().name() + ":COURSE:" + courseNo;
       }
+    } else if (session.getMode() == SessionMode.PRACTICE) {
+      // Prefer course-specific cache key for practice sessions when courseNo is provided
+      String courseNo = normalizeSourceId(session.getCourseNo());
+      if (!courseNo.isBlank() && isCourseSource(courseNo)) {
+        cacheKey = session.getMode().name() + ":COURSE:" + courseNo;
+      } else if (!sourceId.isBlank()) {
+        cacheKey = session.getMode().name() + ":PAPER:" + sourceId;
+      } else {
+        cacheKey = session.getMode().name() + ":DEFAULT";
+      }
+    }
+
+    // Log cache decisions to help diagnose cross-course reuse
+    try {
+      log.info("getQuestionBank sessionId={} mode={} examId={} courseNo={} cacheKey={}",
+        session.getSessionId(), session.getMode(), session.getExamId(), session.getCourseNo(), cacheKey);
+    } catch (Exception ignore) {
+      // best-effort logging
     }
 
     List<QuestionItem> cached = examQuestionCache.get(cacheKey);
     if (cached != null && !cached.isEmpty()) {
+      log.info("getQuestionBank cache hit: key={} size={}", cacheKey, cached.size());
       return cached;
     }
 
@@ -643,22 +662,27 @@ public class CatExamService {
     if (session.getMode() == SessionMode.EXAM) {
       String courseNo = normalizeSourceId(session.getCourseNo());
       if (!courseNo.isBlank() && isCourseSource(courseNo)) {
+        log.info("loadQuestionBankForSession: using course question bank for course={}", courseNo);
         return loadCourseQuestionBank(courseNo);
       }
+      log.info("loadQuestionBankForSession: using exam paper for examId={}", session.getExamId());
       return loadExamQuestionBank(resolveExamDefinition(session.getExamId()));
     }
 
     if (session.getPaperId() != null && !session.getPaperId().isBlank()) {
+      log.info("loadQuestionBankForSession: using practice paper id={} courseNo={}", session.getPaperId(), session.getCourseNo());
       return loadPracticeQuestionBank(session.getPaperId(), session.getCourseNo());
     }
 
     String courseNo = normalizeSourceId(session.getCourseNo());
     if (!courseNo.isBlank() && isCourseSource(courseNo)) {
+      log.info("loadQuestionBankForSession: fallback course question bank for course={}", courseNo);
       return loadCourseQuestionBank(courseNo);
     }
 
     PracticePaper fallbackPaper = resolvePracticePaper(courseNo);
     if (fallbackPaper != null) {
+      log.info("loadQuestionBankForSession: using fallback practice paper id={} for course={}", fallbackPaper.getId(), courseNo);
       return loadPracticeQuestionBank(fallbackPaper.getId(), courseNo);
     }
 

@@ -219,14 +219,13 @@
               <template #default="scope">
                 <div class="student-action-buttons">
                   <el-button
-                    type="primary"
                     size="small"
                     :loading="startingPractice"
                     @click="handleStartPracticeForClass(scope.row)"
                   >
                     题目练习
                   </el-button>
-                  <el-button size="small" :loading="startingExam" @click="handleStartExamForClass(scope.row)">
+                  <el-button type="primary" size="small" :loading="startingExam" @click="handleStartExamForClass(scope.row)">
                     进入考试
                   </el-button>
                   <el-button type="warning" plain size="small" @click="openAppealHistory(scope.row)">
@@ -245,8 +244,8 @@
           </el-form-item>
 
           <div class="action-row">
-            <el-button type="primary" :loading="startingPractice" @click="handleStartPractice">题目练习</el-button>
-            <el-button :loading="startingExam" @click="handleStartExam">进入考试</el-button>
+            <el-button :loading="startingPractice" @click="handleStartPractice">题目练习</el-button>
+            <el-button type="primary" :loading="startingExam" @click="handleStartExam">进入考试</el-button>
           </div>
         </el-form>
       </section>
