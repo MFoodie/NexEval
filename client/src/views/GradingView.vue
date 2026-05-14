@@ -672,7 +672,7 @@ onBeforeUnmount(() => {
 .progress-track {
   width: 160px;
   height: 6px;
-  background: rgba(42, 92, 255, 0.1);
+  background: rgba(var(--ne-primary-rgb), 0.1);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -826,7 +826,7 @@ onBeforeUnmount(() => {
 }
 
 .legend-answered::before {
-  background: rgba(42, 92, 255, 0.35);
+  background: rgba(var(--ne-primary-rgb), 0.35);
 }
 
 .legend-current::before {
@@ -834,7 +834,7 @@ onBeforeUnmount(() => {
 }
 
 .legend-unanswered::before {
-  background: #d5dbe5;
+  background: var(--ne-border);
 }
 
 .question-grid {
@@ -849,7 +849,7 @@ onBeforeUnmount(() => {
   aspect-ratio: 1;
   border-radius: 50%;
   border: 1px solid var(--ne-border);
-  background: #f2f4f8;
+  background: var(--ne-primary-soft);
   color: var(--ne-text-muted);
   font-size: 12px;
   cursor: pointer;
@@ -857,8 +857,8 @@ onBeforeUnmount(() => {
 }
 
 .question-node.is-answered {
-  background: rgba(42, 92, 255, 0.18);
-  border-color: rgba(42, 92, 255, 0.4);
+  background: rgba(var(--ne-primary-rgb), 0.18);
+  border-color: rgba(var(--ne-primary-rgb), 0.4);
   color: var(--ne-primary);
 }
 
@@ -871,6 +871,8 @@ onBeforeUnmount(() => {
 
 .question-node:hover {
   transform: translateY(-1px);
+  border-color: var(--ne-hover-border);
+  background: var(--ne-hover-bg);
 }
 
 .question-actions {

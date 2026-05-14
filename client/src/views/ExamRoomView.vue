@@ -1089,7 +1089,7 @@ onBeforeUnmount(() => {
 .progress-track {
   width: 160px;
   height: 6px;
-  background: rgba(42, 92, 255, 0.1);
+  background: rgba(var(--ne-primary-rgb), 0.1);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -1150,9 +1150,9 @@ onBeforeUnmount(() => {
 .question-image-wrap {
   margin: 0 0 18px;
   padding: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
+  border: 1px solid rgba(var(--ne-primary-rgb), 0.12);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.82);
   overflow: auto;
 }
 
@@ -1183,10 +1183,10 @@ onBeforeUnmount(() => {
 
 .essay-image-preview-wrap {
   margin-bottom: 20px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
+  border: 1px solid rgba(var(--ne-primary-rgb), 0.12);
   border-radius: 12px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.82);
   max-width: 72%;
 }
 
@@ -1224,7 +1224,7 @@ onBeforeUnmount(() => {
 }
 
 .legend-answered::before {
-  background: rgba(42, 92, 255, 0.35);
+  background: rgba(var(--ne-primary-rgb), 0.35);
 }
 
 .legend-current::before {
@@ -1232,7 +1232,7 @@ onBeforeUnmount(() => {
 }
 
 .legend-unanswered::before {
-  background: #d5dbe5;
+  background: var(--ne-border);
 }
 
 .question-grid {
@@ -1247,7 +1247,7 @@ onBeforeUnmount(() => {
   height: 32px;
   border-radius: 50%;
   border: 1px solid var(--ne-border);
-  background: #f2f4f8;
+  background: var(--ne-primary-soft);
   color: var(--ne-text-muted);
   font-size: 12px;
   cursor: pointer;
@@ -1255,8 +1255,8 @@ onBeforeUnmount(() => {
 }
 
 .question-node.is-answered {
-  background: rgba(42, 92, 255, 0.18);
-  border-color: rgba(42, 92, 255, 0.4);
+  background: rgba(var(--ne-primary-rgb), 0.18);
+  border-color: rgba(var(--ne-primary-rgb), 0.4);
   color: var(--ne-primary);
 }
 
@@ -1269,6 +1269,8 @@ onBeforeUnmount(() => {
 
 .question-node:hover {
   transform: translateY(-1px);
+  border-color: var(--ne-hover-border);
+  background: var(--ne-hover-bg);
 }
 
 .option-item {
@@ -1281,13 +1283,14 @@ onBeforeUnmount(() => {
 }
 
 .option-item:hover {
-  border-color: rgba(42, 92, 255, 0.35);
+  border-color: var(--ne-hover-border);
+  background: var(--ne-hover-bg);
   box-shadow: var(--ne-shadow-soft);
   transform: translateY(-1px);
 }
 
 .option-item.is-checked {
-  border-color: rgba(42, 92, 255, 0.6);
+  border-color: rgba(var(--ne-primary-rgb), 0.6);
   background: var(--ne-primary-soft);
 }
 
@@ -1298,7 +1301,7 @@ onBeforeUnmount(() => {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: rgba(42, 92, 255, 0.12);
+  background: rgba(var(--ne-primary-rgb), 0.12);
   color: var(--ne-primary);
   font-weight: 600;
   font-size: 12px;
@@ -1500,7 +1503,7 @@ onBeforeUnmount(() => {
 .finish-review-ai-comment {
   padding: 12px 14px;
   border-radius: 12px;
-  background: rgba(42, 92, 255, 0.06);
+  background: rgba(var(--ne-primary-rgb), 0.06);
   color: var(--ne-text-strong);
   line-height: 1.6;
   white-space: pre-wrap;

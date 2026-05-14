@@ -294,12 +294,12 @@ function buildGrowthChartOption() {
       boundaryGap: false,
       data: growthXAxis.value,
       axisLabel: {
-        color: "#64748b",
+        color: "#6f6659",
         fontSize: 11
       },
       axisLine: {
         lineStyle: {
-          color: "rgba(100, 116, 139, 0.4)"
+          color: "rgba(111, 102, 89, 0.4)"
         }
       },
       axisTick: {
@@ -312,7 +312,7 @@ function buildGrowthChartOption() {
       max: 100,
       splitNumber: 5,
       axisLabel: {
-        color: "#64748b",
+        color: "#6f6659",
         fontSize: 11
       },
       axisLine: {
@@ -320,7 +320,7 @@ function buildGrowthChartOption() {
       },
       splitLine: {
         lineStyle: {
-          color: "rgba(100, 116, 139, 0.16)"
+          color: "rgba(111, 102, 89, 0.16)"
         }
       }
     },
@@ -334,17 +334,17 @@ function buildGrowthChartOption() {
         data: growthSeries.value,
         lineStyle: {
           width: 3,
-          color: "#5B7CFA"
+          color: "#111111"
         },
         itemStyle: {
-          color: "#5B7CFA",
+          color: "#111111",
           borderColor: "#ffffff",
           borderWidth: 2
         },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: "rgba(91, 124, 250, 0.34)" },
-            { offset: 1, color: "rgba(91, 124, 250, 0.03)" }
+            { offset: 0, color: "rgba(17, 17, 17, 0.26)" },
+            { offset: 1, color: "rgba(17, 17, 17, 0.04)" }
           ])
         }
       }
@@ -551,27 +551,27 @@ onBeforeUnmount(() => {
 
 .status-label {
   font-size: 13px;
-  color: #475569;
+  color: var(--ne-text-muted);
 }
 
 .progress-text {
   font-size: 13px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ne-text-strong);
 }
 
 .progress-track--hero {
   width: 100%;
   height: 8px;
   border-radius: 999px;
-  background: rgba(59, 130, 246, 0.14);
+  background: rgba(var(--ne-primary-rgb), 0.14);
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #2f6bff, #4fa3ff);
+  background: linear-gradient(90deg, var(--ne-primary), var(--ne-accent));
 }
 
 .question-head {
@@ -640,13 +640,13 @@ onBeforeUnmount(() => {
   width: 100%;
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ne-text-strong);
 }
 
 .ai-panel-subtitle {
   width: 100%;
   font-size: 13px;
-  color: #475569;
+  color: var(--ne-text-muted);
 }
 
 .dashboard-row {
@@ -675,18 +675,18 @@ onBeforeUnmount(() => {
   font-size: 38px;
   line-height: 1;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ne-text-strong);
 }
 
 .dashboard-caption-text {
   font-size: 22px;
   line-height: 1;
-  color: #475569;
+  color: var(--ne-text-muted);
   font-weight: 500;
 }
 
 .dashboard-caption {
-  color: #64748b;
+  color: var(--ne-text-muted);
 }
 
 .ai-metrics {
@@ -699,19 +699,19 @@ onBeforeUnmount(() => {
 .ai-metric-card {
   padding: 12px 12px 10px;
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.02), rgba(15, 23, 42, 0.01));
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: linear-gradient(180deg, rgba(var(--ne-primary-rgb), 0.04), rgba(var(--ne-primary-rgb), 0.02));
+  border: 1px solid rgba(var(--ne-primary-rgb), 0.12);
 }
 
 .ai-metric-card--primary {
-  background: linear-gradient(135deg, rgba(91, 124, 250, 0.12), rgba(91, 124, 250, 0.04));
-  border-color: rgba(91, 124, 250, 0.18);
+  background: linear-gradient(135deg, rgba(var(--ne-accent-rgb), 0.14), rgba(var(--ne-accent-rgb), 0.06));
+  border-color: rgba(var(--ne-accent-rgb), 0.2);
 }
 
 .ai-metric-label {
   font-size: 12px;
   line-height: 1.4;
-  color: #64748b;
+  color: var(--ne-text-muted);
 }
 
 .ai-metric-value {
@@ -719,31 +719,31 @@ onBeforeUnmount(() => {
   font-size: 22px;
   font-weight: 800;
   line-height: 1;
-  color: #0f172a;
+  color: var(--ne-text-strong);
 }
 
 .ai-metric-value--accent {
-  color: #0b69ff;
+  color: var(--ne-primary);
 }
 
 .chart-placeholder {
   width: 100%;
   height: 300px;
   border-radius: 12px;
-  border: 1px dashed rgba(15, 23, 42, 0.2);
-  background: linear-gradient(135deg, rgba(42, 92, 255, 0.05), rgba(130, 19, 230, 0.05));
+  border: 1px dashed rgba(var(--ne-primary-rgb), 0.2);
+  background: linear-gradient(135deg, rgba(var(--ne-primary-rgb), 0.05), rgba(var(--ne-accent-rgb), 0.06));
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: #475569;
+  color: var(--ne-text-muted);
 }
 
 .chart-placeholder-title {
   font-size: 14px;
   font-weight: 600;
-  color: #334155;
+  color: var(--ne-text-strong);
 }
 
 .chart-placeholder-sub {

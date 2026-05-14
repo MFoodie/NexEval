@@ -13,13 +13,43 @@
         </div>
       </div>
       <div class="login-card">
-      <div class="login-brand">
-        <img class="login-logo" :src="logoUrl" alt="NexEval Logo" />
-        <div class="login-brand-text">
-          <div class="login-brand-title">NexEval</div>
-          <div class="login-brand-subtitle">智能评估系统</div>
+        <div class="login-card-head">
+          <div class="login-brand">
+            <img class="login-logo" :src="logoUrl" alt="NexEval Logo" />
+            <div class="login-brand-text">
+              <div class="login-brand-title">NexEval</div>
+              <div class="login-brand-subtitle">智能评估系统</div>
+            </div>
+          </div>
+          <div class="login-theme">
+            <div class="theme-switch" aria-label="主题切换">
+              <span class="theme-switch-label">主题</span>
+              <div class="theme-pill-group" role="group">
+                <button
+                  v-for="item in themeOptions"
+                  :key="item.value"
+                  type="button"
+                  class="theme-pill"
+                  :class="{ 'is-active': theme === item.value }"
+                  @click="theme = item.value"
+                >
+                  <span class="theme-pill-icon" aria-hidden="true">
+                    <svg v-if="item.value === 'beige'" viewBox="0 0 24 24">
+                      <path d="M12 4.5a1 1 0 0 1 1 1V7a1 1 0 1 1-2 0V5.5a1 1 0 0 1 1-1Zm0 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7-4a1 1 0 0 1 1 1 1 1 0 0 1-1 1h-1.5a1 1 0 1 1 0-2H19ZM6.5 12.5a1 1 0 0 1-1 1H4a1 1 0 1 1 0-2h1.5a1 1 0 0 1 1 1Zm9.19-6.69a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.41 1.41l-1.07-1.06a1 1 0 0 1 0-1.41ZM6.92 15.5a1 1 0 0 1 1.41 0l1.07 1.06a1 1 0 0 1-1.42 1.41l-1.06-1.06a1 1 0 0 1 0-1.41Zm9.19 1.06a1 1 0 0 1 0 1.41l-1.06 1.06a1 1 0 1 1-1.42-1.41l1.07-1.06a1 1 0 0 1 1.41 0ZM7.98 7.56a1 1 0 0 1 0 1.41L6.92 10.03a1 1 0 0 1-1.41-1.42L6.56 7.56a1 1 0 0 1 1.42 0Z" />
+                    </svg>
+                    <svg v-else-if="item.value === 'classic'" viewBox="0 0 24 24">
+                      <path d="M6 12a6 6 0 0 1 9.79-4.65 1 1 0 1 1-1.32 1.5A4 4 0 1 0 16 12a4 4 0 0 0-1.53-3.15 1 1 0 0 1 1.23-1.58A6 6 0 0 1 18 12c0 3.31-2.69 6-6 6s-6-2.69-6-6Zm10 1a1 1 0 1 1 0-2h4a1 1 0 1 1 0 2h-4Z" />
+                    </svg>
+                    <svg v-else viewBox="0 0 24 24">
+                      <path d="M14.5 3a1 1 0 0 1 1 1 7.5 7.5 0 0 0 7.5 7.5 1 1 0 0 1 1 1 9.5 9.5 0 1 1-9.5-9.5Z" />
+                    </svg>
+                  </span>
+                  <span>{{ item.label }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
       <h1 class="card-title">用户注册</h1>
       <p class="card-subtitle">注册新用户账号</p>
@@ -101,7 +131,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { createExamSocket } from "../ws";
@@ -118,6 +148,15 @@ const currentBgIndex = ref(0);
 const currentBgUrl = computed(() => bgImages[currentBgIndex.value]);
 let bgTimer = null;
 const wsStatus = ref("connecting");
+const themeKey = "nexeval.theme";
+const themeEvent = "nexeval-theme-change";
+const themeOptions = [
+  { value: "beige", label: "米白" },
+  { value: "classic", label: "经典" },
+  { value: "dark", label: "深色" }
+];
+const theme = ref("beige");
+const suppressEmit = ref(false);
 const wsTagType = computed(() => {
   if (wsStatus.value === "connected") return "success";
   if (wsStatus.value === "error") return "danger";
@@ -147,6 +186,26 @@ function connectWebSocket() {
     onClose() { wsStatus.value = "closed"; },
     onError() { wsStatus.value = "error"; }
   });
+}
+
+function applyTheme(value) {
+  document.documentElement.setAttribute("data-theme", value);
+}
+
+function emitTheme(value) {
+  window.dispatchEvent(new CustomEvent(themeEvent, { detail: value }));
+}
+
+function handleThemeEvent(event) {
+  const value = event?.detail;
+  if (!value || value === theme.value) {
+    return;
+  }
+  suppressEmit.value = true;
+  theme.value = value;
+  window.setTimeout(() => {
+    suppressEmit.value = false;
+  }, 0);
 }
 
 async function handleRegister() {
@@ -189,9 +248,32 @@ async function handleRegister() {
 
 onMounted(connectWebSocket);
 onMounted(() => {
+  try {
+    const saved = localStorage.getItem(themeKey);
+    if (saved && themeOptions.some((item) => item.value === saved)) {
+      theme.value = saved;
+    }
+  } catch {
+    // ignore storage read errors
+  }
+
+  applyTheme(theme.value);
+  window.addEventListener(themeEvent, handleThemeEvent);
   bgTimer = window.setInterval(() => {
     currentBgIndex.value = (currentBgIndex.value + 1) % bgImages.length;
   }, 3000);
+});
+
+watch(theme, (value) => {
+  applyTheme(value);
+  if (!suppressEmit.value) {
+    emitTheme(value);
+  }
+  try {
+    localStorage.setItem(themeKey, value);
+  } catch {
+    // ignore storage write errors
+  }
 });
 
 onBeforeUnmount(() => {
@@ -199,6 +281,7 @@ onBeforeUnmount(() => {
     window.clearInterval(bgTimer);
     bgTimer = null;
   }
+  window.removeEventListener(themeEvent, handleThemeEvent);
   wsClient?.close();
 });
 </script>
@@ -229,7 +312,7 @@ onBeforeUnmount(() => {
   content: "";
   position: fixed;
   inset: 0;
-  background: rgba(246, 248, 252, 0.58);
+  background: var(--ne-login-overlay);
   z-index: 0;
 }
 
@@ -245,9 +328,9 @@ onBeforeUnmount(() => {
   gap: 40px;
   padding: 24px;
   border-radius: 18px;
-  border: 1px solid rgba(42, 92, 255, 0.14);
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+  border: 1px solid var(--ne-border);
+  background: var(--ne-surface);
+  box-shadow: var(--ne-shadow);
   align-items: center;
 }
 
@@ -259,7 +342,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   position: relative;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--ne-border);
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
 }
 
@@ -320,6 +403,20 @@ onBeforeUnmount(() => {
   margin-bottom: 16px;
 }
 
+.login-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.login-theme {
+  display: flex;
+  align-items: center;
+}
+
 .login-logo {
   width: 44px;
   height: 44px;
@@ -339,13 +436,13 @@ onBeforeUnmount(() => {
 .login-brand-title {
   font-size: 24px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ne-text-strong);
   letter-spacing: 0.2px;
 }
 
 .login-brand-subtitle {
   font-size: 14px;
-  color: #64748b;
+  color: var(--ne-text-muted);
 }
 
 .login-card {
@@ -359,7 +456,7 @@ onBeforeUnmount(() => {
   margin-top: 14px;
   text-align: center;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--ne-text-muted);
 }
 
 .register-form {
@@ -388,34 +485,34 @@ onBeforeUnmount(() => {
 }
 
 .sex-radio--male :deep(.el-radio__inner) {
-  border-color: #0059f5;
+  border-color: var(--ne-primary);
 }
 
 .sex-radio--male :deep(.el-radio__input.is-checked .el-radio__inner) {
-  border-color: #0059f5;
-  background: #0059f5;
+  border-color: var(--ne-primary);
+  background: var(--ne-primary);
 }
 
 .sex-radio--male :deep(.el-radio__input.is-checked + .el-radio__label) {
-  color: #0059f5;
+  color: var(--ne-primary);
 }
 
 .sex-radio--female :deep(.el-radio__inner) {
-  border-color: #ff00ff;
+  border-color: var(--ne-accent);
 }
 
 .sex-radio--female :deep(.el-radio__input.is-checked .el-radio__inner) {
-  border-color: #ff00ff;
-  background: #ff00ff;
+  border-color: var(--ne-accent);
+  background: var(--ne-accent);
 }
 
 .sex-radio--female :deep(.el-radio__input.is-checked + .el-radio__label) {
-  color: #ff00ff;
+  color: var(--ne-accent);
 }
 
 .login-submit {
   width: 96px;
-  box-shadow: 0 10px 24px rgba(42, 92, 255, 0.2);
+  box-shadow: 0 10px 24px rgba(var(--ne-primary-rgb), 0.2);
   margin: 12px auto 0;
 }
 

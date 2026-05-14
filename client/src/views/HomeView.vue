@@ -601,13 +601,13 @@ const isVipTeacher = computed(() => Boolean(isTeacher.value && teacherInfo.value
 const displayPhone = computed(() => formatPhoneForDisplay(phone.value));
 const actionPanelTitle = computed(() => (isTeacher.value ? "考试批改" : "题目练习与考试"));
 const practiceLevels = [
-  { value: "易", color: "#A5E617" },
-  { value: "中", color: "#02A1E8" },
-  { value: "难", color: "#8213E6" }
+  { value: "易", color: "#b59b6a" },
+  { value: "中", color: "#6f6659" },
+  { value: "难", color: "#111111" }
 ];
 
 function getPracticeDifficultyColor(value) {
-  return practiceLevels.find((level) => level.value === value)?.color || "#02A1E8";
+  return practiceLevels.find((level) => level.value === value)?.color || "#6f6659";
 }
 
 const practiceCourseLabel = computed(() => {
@@ -1015,7 +1015,7 @@ async function handleConfirmPracticeStart() {
 
 function practiceLevelCardStyle(level) {
   return {
-    borderColor: practiceDifficulty.value === level.value ? level.color : "rgba(42, 92, 255, 0.16)",
+    borderColor: practiceDifficulty.value === level.value ? level.color : "rgba(var(--ne-primary-rgb), 0.16)",
     background: practiceDifficulty.value === level.value ? `${level.color}18` : "#ffffff"
   };
 }
@@ -1484,7 +1484,8 @@ onBeforeUnmount(() => {
 
 .side-collapse-btn:hover {
   color: var(--ne-primary);
-  border-color: rgba(42, 92, 255, 0.4);
+  border-color: var(--ne-hover-border);
+  background: var(--ne-hover-bg);
 }
 
 .side-collapse-icon {
@@ -1629,13 +1630,14 @@ onBeforeUnmount(() => {
 }
 
 .side-item:hover {
-  border-color: rgba(42, 92, 255, 0.35);
+  border-color: var(--ne-hover-border);
+  background: var(--ne-hover-bg);
   box-shadow: var(--ne-shadow-soft);
   transform: translateY(-1px);
 }
 
 .side-item.active {
-  border-color: rgba(42, 92, 255, 0.6);
+  border-color: rgba(var(--ne-primary-rgb), 0.6);
   color: var(--ne-primary);
   background: var(--ne-primary-soft);
   box-shadow: var(--ne-shadow-soft);
@@ -1710,7 +1712,7 @@ onBeforeUnmount(() => {
   color: #ffffff;
   font-size: 12px;
   font-weight: 600;
-  box-shadow: 0 8px 18px rgba(42, 92, 255, 0.14);
+  box-shadow: 0 8px 18px rgba(var(--ne-primary-rgb), 0.14);
 }
 
 .panel-card {
@@ -1747,7 +1749,7 @@ onBeforeUnmount(() => {
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid var(--ne-border);
-  background: linear-gradient(135deg, rgba(42, 92, 255, 0.04), rgba(0, 194, 255, 0.06));
+  background: linear-gradient(135deg, rgba(var(--ne-primary-rgb), 0.04), rgba(var(--ne-accent-rgb), 0.08));
 }
 .exam-intro-title {
   color: var(--ne-text-muted);
@@ -1837,7 +1839,7 @@ onBeforeUnmount(() => {
 
 .profile-info-table th {
   width: 10%;
-  background: #f5f7fa;
+  background: var(--ne-primary-soft);
   color: var(--ne-text-muted);
   font-weight: 600;
   text-align: left;
@@ -1856,7 +1858,7 @@ onBeforeUnmount(() => {
 
 .profile-info-table .avatar-cell {
   text-align: center;
-  background: #ffffff;
+  background: var(--ne-surface);
   vertical-align: top;
 }
 
@@ -1912,7 +1914,7 @@ onBeforeUnmount(() => {
   gap: 8px;
   font-size: 18px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ne-text-strong);
 }
 
 .ai-icon {
@@ -1924,12 +1926,12 @@ onBeforeUnmount(() => {
 .practice-dialog-course {
   font-size: 20px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ne-text-strong);
 }
 
 .practice-dialog-tip {
   margin-top: 6px;
-  color: #64748b;
+  color: var(--ne-text-muted);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -1942,7 +1944,7 @@ onBeforeUnmount(() => {
   margin-bottom: 10px;
   font-size: 14px;
   font-weight: 600;
-  color: #334155;
+  color: var(--ne-text-muted);
 }
 
 .practice-mode-switch-card {
@@ -1950,10 +1952,10 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  border: 1px solid rgba(42, 92, 255, 0.18);
+  border: 1px solid rgba(var(--ne-primary-rgb), 0.18);
   border-radius: 14px;
   padding: 12px 14px;
-  background: linear-gradient(135deg, rgba(42, 92, 255, 0.06), rgba(2, 161, 232, 0.08));
+  background: linear-gradient(135deg, rgba(var(--ne-primary-rgb), 0.06), rgba(var(--ne-accent-rgb), 0.08));
 }
 
 .practice-mode-switch-copy {
@@ -1978,9 +1980,9 @@ onBeforeUnmount(() => {
   gap: 10px;
   min-height: 54px;
   border-radius: 14px;
-  border: 1px solid rgba(42, 92, 255, 0.16);
-  background: #ffffff;
-  color: #0f172a;
+  border: 1px solid rgba(var(--ne-primary-rgb), 0.16);
+  background: var(--ne-surface);
+  color: var(--ne-text-strong);
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -1989,11 +1991,13 @@ onBeforeUnmount(() => {
 
 .practice-level-card:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 22px rgba(var(--ne-primary-rgb), 0.08);
+  border-color: var(--ne-hover-border);
+  background: var(--ne-hover-bg);
 }
 
 .practice-level-card.selected {
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 12px 24px rgba(var(--ne-primary-rgb), 0.12);
 }
 
 .practice-level-card.disabled {
@@ -2018,8 +2022,8 @@ onBeforeUnmount(() => {
 }
 
 .practice-mode-card {
-  border: 1px solid rgba(42, 92, 255, 0.18);
-  background: #ffffff;
+  border: 1px solid rgba(var(--ne-primary-rgb), 0.18);
+  background: var(--ne-surface);
   border-radius: 14px;
   min-height: 98px;
   padding: 12px;
@@ -2030,21 +2034,23 @@ onBeforeUnmount(() => {
 
 .practice-mode-card:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 22px rgba(var(--ne-primary-rgb), 0.08);
+  border-color: var(--ne-hover-border);
+  background: var(--ne-hover-bg);
 }
 
 .practice-mode-card.selected {
-  border-color: rgba(42, 92, 255, 0.6);
-  background: linear-gradient(135deg, rgba(42, 92, 255, 0.08), rgba(2, 161, 232, 0.1));
+  border-color: rgba(var(--ne-primary-rgb), 0.6);
+  background: linear-gradient(135deg, rgba(var(--ne-primary-rgb), 0.08), rgba(var(--ne-accent-rgb), 0.1));
 }
 
 .practice-mode-card--cat.selected {
-  border-color: rgba(130, 19, 230, 0.7);
-  background: linear-gradient(135deg, rgba(130, 19, 230, 0.14), rgba(2, 161, 232, 0.08));
+  border-color: rgba(var(--ne-accent-rgb), 0.6);
+  background: linear-gradient(135deg, rgba(var(--ne-accent-rgb), 0.14), rgba(var(--ne-primary-rgb), 0.08));
 }
 
 .practice-mode-title {
-  color: #0f172a;
+  color: var(--ne-text-strong);
   font-size: 14px;
   font-weight: 700;
 }
@@ -2052,7 +2058,7 @@ onBeforeUnmount(() => {
 .practice-mode-desc {
   margin-top: 6px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--ne-text-muted);
   line-height: 1.5;
 }
 
@@ -2062,10 +2068,10 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #475569;
+  color: var(--ne-text-muted);
   line-height: 1.55;
-  background: rgba(130, 19, 230, 0.08);
-  border: 1px solid rgba(130, 19, 230, 0.2);
+  background: rgba(var(--ne-accent-rgb), 0.08);
+  border: 1px solid rgba(var(--ne-accent-rgb), 0.2);
   border-radius: 10px;
   padding: 8px 10px;
 }
@@ -2090,7 +2096,7 @@ onBeforeUnmount(() => {
 
 .ws-line {
   margin: 0 0 14px;
-  color: #6b7280;
+  color: var(--ne-text-muted);
   font-size: 14px;
 }
 
@@ -2177,7 +2183,7 @@ onBeforeUnmount(() => {
 }
 
 .grading-table-head {
-  background: #f8fafc;
+  background: var(--ne-primary-soft);
   color: var(--ne-text-muted);
   font-weight: 600;
 }
@@ -2277,13 +2283,14 @@ onBeforeUnmount(() => {
 }
 
 .class-card:hover {
-  border-color: rgba(42, 92, 255, 0.35);
+  border-color: var(--ne-hover-border);
+  background: var(--ne-hover-bg);
   box-shadow: var(--ne-shadow-soft);
   transform: translateY(-1px);
 }
 
 .class-card.active {
-  border-color: rgba(42, 92, 255, 0.6);
+  border-color: rgba(var(--ne-primary-rgb), 0.6);
   background: var(--ne-primary-soft);
 }
 
