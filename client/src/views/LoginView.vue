@@ -15,6 +15,19 @@
       </div>
     </div>
     <div class="card login-card">
+    <div class="card login-panel">
+      <div class="login-bg-container">
+        <img class="login-bg-image" :src="currentBgUrl" alt="background" />
+        <div class="login-bg-dots" aria-label="背景切换指示器">
+          <span
+            v-for="(item, index) in bgImages"
+            :key="item"
+            class="login-bg-dot"
+            :class="{ active: currentBgIndex === index }"
+          />
+        </div>
+      </div>
+      <div class="login-card">
       <div class="login-brand">
         <img class="login-logo" :src="logoUrl" alt="NexEval Logo" />
         <div class="login-brand-text">
@@ -44,6 +57,10 @@
 
         <el-button class="login-submit" type="primary" native-type="submit" :loading="submitting">登录</el-button>
       </el-form>
+      <p class="switch-line">
+        没有账号？<RouterLink to="/register">去注册</RouterLink>
+      </p>
+      </div>
     </div>
   </section>
 </template>
@@ -145,7 +162,11 @@ async function handleLogin() {
 }
 
 onMounted(connectWebSocket);
-onMounted(startBackgroundRotation);
+onMounted(() => {
+  bgTimer = window.setInterval(() => {
+    currentBgIndex.value = (currentBgIndex.value + 1) % bgImages.length;
+  }, 3000);
+});
 
 onBeforeUnmount(() => {
   if (bgTimer) {
@@ -164,6 +185,44 @@ onBeforeUnmount(() => {
   justify-content: center;
   padding: 16px 0 28px;
   gap: 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-wrap::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: url("../assets/background.jpg") center/cover no-repeat fixed;
+  filter: blur(3px);
+  transform: scale(1.04);
+  z-index: 0;
+}
+
+.login-wrap::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(246, 248, 252, 0.58);
+  z-index: 0;
+}
+
+.login-wrap > * {
+  position: relative;
+  z-index: 1;
+}
+
+.login-panel {
+  width: min(980px, calc(100% - 32px));
+  display: grid;
+  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
+  gap: 40px;
+  padding: 24px;
+  border-radius: 18px;
+  border: 1px solid rgba(42, 92, 255, 0.14);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+  align-items: center;
 }
 
 .login-bg-container {
@@ -172,9 +231,10 @@ onBeforeUnmount(() => {
   width: 400px;
   height: 480px;
   overflow: hidden;
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
   position: relative;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
 }
 
 .login-bg-image {
@@ -217,6 +277,7 @@ onBeforeUnmount(() => {
   transform: scale(1.15);
 }
 
+
 @media (min-width: 1200px) {
   .login-wrap {
     justify-content: flex-start;
@@ -225,6 +286,12 @@ onBeforeUnmount(() => {
 
   .login-bg-container {
     display: flex;
+  }
+}
+
+@media (max-width: 1199px) {
+  .login-panel {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -297,9 +364,10 @@ onBeforeUnmount(() => {
 }
 
 .login-card {
-  width: min(640px, calc(100% - 32px));
-  border: 1px solid rgba(42, 92, 255, 0.12);
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.14), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
 }
 
 .login-form {
@@ -313,7 +381,18 @@ onBeforeUnmount(() => {
   margin: 16px auto 0;
 }
 
+.switch-line {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 13px;
+  color: #6b7280;
+}
+
 @media (max-width: 640px) {
+  .login-panel {
+    width: 100%;
+  }
+
   .login-card {
     padding: 20px;
   }
