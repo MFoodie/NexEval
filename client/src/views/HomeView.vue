@@ -392,12 +392,13 @@
             <span class="practice-level-label">{{ level.value }}</span>
           </button>
         </div>
-        <div v-if="catPracticeEnabled" class="practice-cat-tip">
-          💡 CAT 模式下，AI 将根据您的作答情况动态调整题目难度
+        <div v-if="catPracticeEnabled" class="practice-cat-tip" :style="practiceTipCardStyle()">
+          <img :src="bulbIcon" alt="提示" class="practice-tip-icon" />
+          CAT 模式下，AI 将根据您的作答情况动态调整题目难度
         </div>
       </div>
 
-      <div class="practice-section">
+      <div v-if="!catPracticeEnabled" class="practice-section">
         <div class="practice-section-label">练习题数量</div>
         <el-input-number v-model="practiceQuestionCount" :min="1" :max="50" :step="1" />
       </div>
@@ -543,6 +544,7 @@ import iconPersonalInfo from "../assets/personal_info.svg";
 import iconExam from "../assets/exam.svg";
 import iconCorrect from "../assets/correct.svg";
 import iconExit from "../assets/exit.svg";
+import bulbIcon from "../assets/bulb.svg";
 
 const router = useRouter();
 const loginInfo = getLogin();
@@ -603,6 +605,11 @@ const practiceLevels = [
   { value: "中", color: "#02A1E8" },
   { value: "难", color: "#8213E6" }
 ];
+
+function getPracticeDifficultyColor(value) {
+  return practiceLevels.find((level) => level.value === value)?.color || "#02A1E8";
+}
+
 const practiceCourseLabel = computed(() => {
   if (!practiceCourse.value) {
     return "请选择教学班后再开始练习";
@@ -1010,6 +1017,14 @@ function practiceLevelCardStyle(level) {
   return {
     borderColor: practiceDifficulty.value === level.value ? level.color : "rgba(42, 92, 255, 0.16)",
     background: practiceDifficulty.value === level.value ? `${level.color}18` : "#ffffff"
+  };
+}
+
+function practiceTipCardStyle() {
+  const color = getPracticeDifficultyColor(practiceDifficulty.value);
+  return {
+    background: `linear-gradient(135deg, ${color}18, ${color}08)`,
+    borderColor: `${color}40`
   };
 }
 
@@ -2043,6 +2058,9 @@ onBeforeUnmount(() => {
 
 .practice-cat-tip {
   margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 13px;
   color: #475569;
   line-height: 1.55;
@@ -2050,6 +2068,13 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(130, 19, 230, 0.2);
   border-radius: 10px;
   padding: 8px 10px;
+}
+
+.practice-tip-icon {
+  width: 35px;
+  height: 35px;
+  margin-top: -5px;
+  flex: 0 0 auto;
 }
 
 /* 放大表格中某些列的字号 */

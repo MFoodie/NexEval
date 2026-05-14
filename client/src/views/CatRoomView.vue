@@ -2,7 +2,7 @@
   <section class="exam-shell">
     <header class="exam-hero card">
       <div class="hero-main">
-        <div>
+        <div class="hero-copy">
           <div class="hero-eyebrow">CAT 自适应练习</div>
           <h1 class="hero-title">{{ courseTitle }}</h1>
           <p class="hero-subtitle">
@@ -10,32 +10,24 @@
             <span v-if="courseNameText">｜课程名称：{{ courseNameText }}</span>
           </p>
         </div>
-      </div>
 
-      <div class="hero-status">
-        <div class="status-item">
-          <span class="status-label">进度</span>
-          <div class="progress-inline">
-            <div class="progress-track">
+        <div class="hero-status">
+          <div class="status-item">
+            <div class="status-topline">
+              <span class="status-label">进度</span>
+              <span class="progress-text">{{ answeredCount }}/{{ maxQuestions }}</span>
+            </div>
+            <div class="progress-track progress-track--hero">
               <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
             </div>
-            <span class="progress-text">{{ answeredCount }}/{{ maxQuestions }}</span>
           </div>
-        </div>
-        <div class="status-item">
-          <span class="status-label">AI 预估掌握度</span>
-          <span class="status-value">{{ estimatedScore }}%</span>
-        </div>
-        <div class="status-item">
-          <span class="status-label">系统精准度</span>
-          <span class="status-value">{{ systemPrecision }}%</span>
         </div>
       </div>
     </header>
 
     <section class="exam-body">
       <el-row :gutter="16" class="cat-layout">
-        <el-col :span="16" :xs="24" :md="16">
+        <el-col :span="17" :xs="24" :md="17">
           <div class="exam-question card">
             <el-skeleton :rows="6" animated v-if="loading" />
 
@@ -97,17 +89,33 @@
           </div>
         </el-col>
 
-        <el-col :span="8" :xs="24" :md="8">
+        <el-col :span="7" :xs="24" :md="7">
           <aside class="card ai-panel">
             <div class="ai-panel-title">CAT 动态调度舱</div>
             <div class="ai-panel-subtitle">AI 预估掌握度</div>
-            <el-progress type="dashboard" :percentage="estimatedScore" :stroke-width="12">
-              <template #default="{ percentage }">
-                <div class="dashboard-value">{{ percentage }}%</div>
-                <div class="dashboard-label">当前预估</div>
-              </template>
-            </el-progress>
-            <div class="ai-precision">系统精准度：{{ systemPrecision }}%</div>
+            <div class="dashboard-row">
+              <el-progress
+                class="ai-dashboard"
+                type="dashboard"
+                :percentage="estimatedScore"
+                :stroke-width="12"
+                :show-text="false"
+              />
+              <div class="dashboard-caption">
+                <span class="dashboard-caption-value">{{ estimatedScore }}%</span>
+                <span class="dashboard-caption-text">当前预估</span>
+              </div>
+            </div>
+            <div class="ai-metrics">
+              <div class="ai-metric-card ai-metric-card--primary">
+                <div class="ai-metric-label">AI 预估掌握度</div>
+                <div class="ai-metric-value">{{ estimatedScore }}%</div>
+              </div>
+              <div class="ai-metric-card">
+                <div class="ai-metric-label">系统精准度</div>
+                <div class="ai-metric-value ai-metric-value--accent">{{ systemPrecision }}%</div>
+              </div>
+            </div>
             <div ref="growthChartEl" class="cat-growth-chart"></div>
           </aside>
         </el-col>
@@ -505,6 +513,65 @@ onBeforeUnmount(() => {
 <style scoped>
 .cat-layout {
   margin-top: 16px;
+  align-items: flex-start;
+}
+
+.hero-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.hero-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.hero-status {
+  flex: 0 0 300px;
+  max-width: 100%;
+  align-self: flex-end;
+  margin-bottom: 2px;
+}
+
+.status-item {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.02), rgba(15, 23, 42, 0.01));
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.status-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.status-label {
+  font-size: 13px;
+  color: #475569;
+}
+
+.progress-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.progress-track--hero {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.14);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2f6bff, #4fa3ff);
 }
 
 .question-head {
@@ -520,8 +587,31 @@ onBeforeUnmount(() => {
 
 .question-title--large {
   margin: 14px 0 18px;
-  font-size: 30px;
-  line-height: 1.7;
+  font-size: 22px;
+  line-height: 1.6;
+}
+
+.option-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.option-item {
+  width: 100%;
+  margin-right: 0;
+  padding: 2px 0;
+}
+
+.option-tag {
+  display: inline-block;
+  margin-right: 0.5em;
+}
+
+.option-item :deep(.el-radio__label) {
+  white-space: normal;
+  line-height: 1.6;
 }
 
 .question-actions {
@@ -542,6 +632,10 @@ onBeforeUnmount(() => {
   gap: 10px;
 }
 
+.ai-panel > * {
+  width: 100%;
+}
+
 .ai-panel-title {
   width: 100%;
   font-size: 16px;
@@ -555,22 +649,81 @@ onBeforeUnmount(() => {
   color: #475569;
 }
 
-.dashboard-value {
-  font-size: 20px;
+.dashboard-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.ai-dashboard {
+  margin-top: 0;
+  flex: 0 0 auto;
+}
+
+.dashboard-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  min-width: 96px;
+}
+
+.dashboard-caption-value {
+  font-size: 38px;
+  line-height: 1;
   font-weight: 700;
   color: #0f172a;
 }
 
-.dashboard-label {
-  margin-top: 2px;
-  font-size: 12px;
+.dashboard-caption-text {
+  font-size: 22px;
+  line-height: 1;
+  color: #475569;
+  font-weight: 500;
+}
+
+.dashboard-caption {
   color: #64748b;
 }
 
-.ai-precision {
-  width: 100%;
-  font-size: 13px;
-  color: #334155;
+.ai-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.ai-metric-card {
+  padding: 12px 12px 10px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.02), rgba(15, 23, 42, 0.01));
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.ai-metric-card--primary {
+  background: linear-gradient(135deg, rgba(91, 124, 250, 0.12), rgba(91, 124, 250, 0.04));
+  border-color: rgba(91, 124, 250, 0.18);
+}
+
+.ai-metric-label {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #64748b;
+}
+
+.ai-metric-value {
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  color: #0f172a;
+}
+
+.ai-metric-value--accent {
+  color: #0b69ff;
 }
 
 .chart-placeholder {
@@ -596,5 +749,30 @@ onBeforeUnmount(() => {
 .chart-placeholder-sub {
   margin-top: 6px;
   font-size: 12px;
+}
+
+@media (max-width: 980px) {
+  .hero-main {
+    flex-direction: column;
+  }
+
+  .hero-status {
+    width: 100%;
+    flex: 1 1 auto;
+    align-self: stretch;
+    margin-bottom: 0;
+  }
+
+  .dashboard-row {
+    justify-content: flex-start;
+  }
+
+  .dashboard-caption-value {
+    font-size: 30px;
+  }
+
+  .dashboard-caption-text {
+    font-size: 18px;
+  }
 }
 </style>

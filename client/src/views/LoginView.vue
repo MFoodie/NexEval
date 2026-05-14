@@ -1,20 +1,5 @@
 <template>
   <section class="login-wrap">
-    <div class="login-bg-container">
-      <img class="login-bg-image" :src="currentBgUrl" alt="background" />
-      <div class="login-bg-dots" aria-label="背景切换指示器">
-        <span
-         v-for="(item, index) in bgImages"
-        :key="item"
-        class="login-bg-dot"
-        :class="{ active: currentBgIndex === index }"
-        role="button"
-        :aria-label="`切换到第${index + 1}张背景图`"
-        @click="switchBg(index)"
-      />
-      </div>
-    </div>
-    <div class="card login-card">
     <div class="card login-panel">
       <div class="login-bg-container">
         <img class="login-bg-image" :src="currentBgUrl" alt="background" />
@@ -24,42 +9,47 @@
             :key="item"
             class="login-bg-dot"
             :class="{ active: currentBgIndex === index }"
+            role="button"
+            :aria-label="`切换到第${index + 1}张背景图`"
+            @click="switchBg(index)"
           />
         </div>
       </div>
-      <div class="login-card">
-      <div class="login-brand">
-        <img class="login-logo" :src="logoUrl" alt="NexEval Logo" />
-        <div class="login-brand-text">
-          <div class="login-brand-title">NexEval</div>
-          <div class="login-brand-subtitle">智能评估系统</div>
+
+      <div class="card login-card">
+        <div class="login-brand">
+          <img class="login-logo" :src="logoUrl" alt="NexEval Logo" />
+          <div class="login-brand-text">
+            <div class="login-brand-title">NexEval</div>
+            <div class="login-brand-subtitle">智能评估系统</div>
+          </div>
         </div>
-      </div>
 
-      <div class="login-hero-mini">
-        <h1 class="card-title">考生登录</h1>
-        <p class="card-subtitle">支持卡号、手机号或邮箱 + 密码登录</p>
-      </div>
+        <div class="login-hero-mini">
+          <h1 class="card-title">考生登录</h1>
+          <p class="card-subtitle">支持卡号、手机号或邮箱 + 密码登录</p>
+        </div>
 
-      <div class="login-note">
-        <span class="login-note-label">提示</span>
-        <span class="login-note-text">登录后即可进入课程练习、正式考试、成绩复核与教师批改流程。</span>
-      </div>
+        <div class="login-note">
+          <span class="login-note-label">提示</span>
+          <span class="login-note-text">登录后即可进入课程练习、正式考试、成绩复核与教师批改流程。</span>
+        </div>
 
-      <el-form class="login-form" @submit.prevent="handleLogin">
-        <el-form-item label="账号">
-          <el-input v-model="account" placeholder="请输入卡号/手机号/邮箱" />
-        </el-form-item>
+        <el-form class="login-form" @submit.prevent="handleLogin">
+          <el-form-item label="账号">
+            <el-input v-model="account" placeholder="请输入卡号/手机号/邮箱" />
+          </el-form-item>
 
-        <el-form-item label="密码">
-          <el-input v-model="password" type="password" show-password placeholder="请输入密码" />
-        </el-form-item>
+          <el-form-item label="密码">
+            <el-input v-model="password" type="password" show-password placeholder="请输入密码" />
+          </el-form-item>
 
-        <el-button class="login-submit" type="primary" native-type="submit" :loading="submitting">登录</el-button>
-      </el-form>
-      <p class="switch-line">
-        没有账号？<RouterLink to="/register">去注册</RouterLink>
-      </p>
+          <el-button class="login-submit" type="primary" native-type="submit" :loading="submitting">登录</el-button>
+        </el-form>
+
+        <p class="switch-line">
+          没有账号？<RouterLink to="/register">去注册</RouterLink>
+        </p>
       </div>
     </div>
   </section>
