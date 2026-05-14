@@ -4,11 +4,14 @@
       <img class="login-bg-image" :src="currentBgUrl" alt="background" />
       <div class="login-bg-dots" aria-label="背景切换指示器">
         <span
-          v-for="(item, index) in bgImages"
-          :key="item"
-          class="login-bg-dot"
-          :class="{ active: currentBgIndex === index }"
-        />
+         v-for="(item, index) in bgImages"
+        :key="item"
+        class="login-bg-dot"
+        :class="{ active: currentBgIndex === index }"
+        role="button"
+        :aria-label="`切换到第${index + 1}张背景图`"
+        @click="switchBg(index)"
+      />
       </div>
     </div>
     <div class="card login-card">
@@ -98,6 +101,15 @@ function startBackgroundRotation() {
     currentBgIndex.value = (currentBgIndex.value + 1) % bgImages.length;
   }, 3000);
 }
+
+function switchBg(index) {
+  currentBgIndex.value = index;
+  if (bgTimer) {
+    window.clearInterval(bgTimer);
+  }
+  startBackgroundRotation();
+}
+
 
 async function handleLogin() {
   if (!account.value.trim() || !password.value.trim()) {
@@ -190,7 +202,14 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.45);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
   transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
 }
+
+.login-bg-dot:hover {
+  background: rgba(255, 255, 255, 0.7);
+  transform: scale(1.15);
+}
+
 
 .login-bg-dot.active {
   background: #ffffff;
