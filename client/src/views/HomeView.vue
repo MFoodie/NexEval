@@ -350,7 +350,7 @@
       </template>
       <div class="practice-dialog-meta">
         <div class="practice-dialog-course">{{ practiceCourseLabel }}</div>
-        <div class="practice-dialog-tip">AI 会读取当前课程题库，按你选的难度和题量生成练习题。</div>
+        <div class="practice-dialog-tip">可选择普通练习或 CAT 自适应练习。</div>
       </div>
 
       <div class="practice-section">
@@ -378,6 +378,7 @@
 
       <template #footer>
         <el-button @click="practiceDialogVisible = false">取消</el-button>
+        <el-button :loading="startingCat" @click="confirmCatStart">CAT 练习</el-button>
         <el-button type="primary" :loading="startingPractice" @click="confirmPracticeStart">开始练习</el-button>
       </template>
     </el-dialog>
@@ -532,6 +533,7 @@ const avatarUrl = ref(withAvatarVersion(loginInfo?.avatarUrl || "/avatar/student
 const vipIconUrl = "/avatar/vip.svg";
 const userId = ref(loginInfo?.cardNo || "");
 const startingPractice = ref(false);
+const startingCat = ref(false);
 const startingExam = ref(false);
 const practiceDialogVisible = ref(false);
 const practiceCourse = ref(null);
@@ -1018,6 +1020,50 @@ async function confirmPracticeStart() {
     ElMessage.error(error.message || "Failed to start practice session.");
   } finally {
     startingPractice.value = false;
+  }
+}
+
+async function confirmCatStart() {
+  const courseNo = String(practiceCourse.value?.cno || "").trim();
+  const courseName = String(practiceCourse.value?.cname || "").trim();
+
+  if (!courseNo) {
+    ElMessage.warning("请先选择教学班");
+    return;
+  }
+
+  if (!userId.value.trim()) {
+    ElMessage.warning("Please input user id.");
+    return;
+  }
+
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket is not connected. Please wait for reconnect.");
+    return;
+  }
+
+  startingCat.value = true;
+  try {
+    const payload = await wsClient.request("START_CAT", {
+      userId: userId.value.trim(),
+      courseNo
+    });
+    practiceDialogVisible.value = false;
+    router.push({
+      name: "cat",
+      params: {
+        sessionId: payload.sessionId
+      },
+      query: {
+        courseNo,
+        courseName,
+        mode: "cat"
+      }
+    });
+  } catch (error) {
+    ElMessage.error(error.message || "Failed to start CAT session.");
+  } finally {
+    startingCat.value = false;
   }
 }
 

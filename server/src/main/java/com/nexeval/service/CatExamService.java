@@ -68,6 +68,8 @@ public class CatExamService {
   private static final Logger log = LoggerFactory.getLogger(CatExamService.class);
 
   private static final int DEFAULT_EXAM_DURATION_MINUTES = 60;
+  private static final int CAT_MAX_QUESTIONS = 20;
+  private static final double CAT_SE_THRESHOLD = 0.35;
   private static final List<String> JUDGE_OPTIONS = List.of("true", "false");
   private final ExamWebSocketHub webSocketHub;
   private final ExamDefinitionRepository examDefinitionRepository;
@@ -84,6 +86,7 @@ public class CatExamService {
   private final TeacherProfileRepository teacherProfileRepository;
   private final AiGradingService aiGradingService;
   private final AiPracticeService aiPracticeService;
+  private final IrtCatService irtCatService;
 
   private final Map<String, ExamSession> sessions = new ConcurrentHashMap<>();
 
@@ -104,7 +107,8 @@ public class CatExamService {
     ScoreAppealRepository scoreAppealRepository,
     TeacherProfileRepository teacherProfileRepository,
     AiGradingService aiGradingService,
-    AiPracticeService aiPracticeService
+    AiPracticeService aiPracticeService,
+    IrtCatService irtCatService
   ) {
     this.webSocketHub = webSocketHub;
     this.examDefinitionRepository = examDefinitionRepository;
@@ -121,6 +125,7 @@ public class CatExamService {
     this.teacherProfileRepository = teacherProfileRepository;
     this.aiGradingService = aiGradingService;
     this.aiPracticeService = aiPracticeService;
+    this.irtCatService = irtCatService;
   }
 
   public StartExamResponse startSession(String userId, String sourceId) {
@@ -164,6 +169,36 @@ public class CatExamService {
 
     examQuestionCache.put(session.getSessionId(), selectedQuestions);
 
+    return toStartResponse(session);
+  }
+
+  public StartExamResponse startCatSession(String userId, String courseNo) {
+    String normalizedCourseNo = normalizeSourceId(courseNo);
+    if (normalizedCourseNo.isBlank()) {
+      throw new IllegalArgumentException("courseNo is required for CAT sessions");
+    }
+    if (!isCourseSource(normalizedCourseNo)) {
+      throw new IllegalArgumentException("No questions configured for course: " + normalizedCourseNo);
+    }
+
+    List<QuestionItem> catBank = loadCatQuestionBank(normalizedCourseNo);
+    if (catBank.isEmpty()) {
+      throw new IllegalArgumentException("No objective questions configured for course: " + normalizedCourseNo);
+    }
+
+    int maxQuestions = Math.min(CAT_MAX_QUESTIONS, catBank.size());
+    ExamSession session = createSession(
+      userId,
+      normalizedCourseNo,
+      normalizedCourseNo,
+      maxQuestions,
+      SessionMode.CAT,
+      null,
+      null
+    );
+
+    String cacheKey = SessionMode.CAT.name() + ":SESSION:" + session.getSessionId();
+    examQuestionCache.put(cacheKey, catBank);
     return toStartResponse(session);
   }
 
@@ -221,6 +256,7 @@ public class CatExamService {
     state.put("courseNo", session.getCourseNo());
     state.put("mode", session.getMode().name().toLowerCase());
     state.put("theta", session.getTheta());
+    state.put("standardError", session.getStandardError());
     state.put("answeredCount", session.getAnsweredCount());
     state.put("maxQuestions", session.getMaxQuestions());
     state.put("finished", session.isFinished());
@@ -542,17 +578,29 @@ public class CatExamService {
 
     refreshSessionStatus(session);
 
+    if (session.getMode() == SessionMode.CAT && shouldFinishCat(session)) {
+      session.finish();
+      updateAttemptStatus(session, ExamAttemptStatus.SUBMITTED, session.getSubmittedAt());
+      return buildFinishedResponse(session);
+    }
+
     if (session.isFinished()) {
       return buildFinishedResponse(session);
     }
 
     QuestionItem next = pickNextQuestion(session);
     if (next == null) {
+      if (session.getMode() == SessionMode.CAT) {
+        session.finish();
+        updateAttemptStatus(session, ExamAttemptStatus.SUBMITTED, session.getSubmittedAt());
+        return buildFinishedResponse(session);
+      }
       return new NextQuestionResponse(
         session.getSessionId(),
         session.getAnsweredCount(),
         session.getMaxQuestions(),
         session.getTheta(),
+        session.getStandardError(),
         false,
         null
       );
@@ -563,6 +611,7 @@ public class CatExamService {
       session.getAnsweredCount(),
       session.getMaxQuestions(),
       session.getTheta(),
+      session.getStandardError(),
       false,
       toQuestionView(next)
     );
@@ -585,7 +634,16 @@ public class CatExamService {
     boolean scoreEnabled = question.scorable();
     boolean correct = scoreEnabled && matchesAnswer(question.answerKey(), answerText);
 
-    session.markAnswered(question.id(), correct, question.difficulty(), scoreEnabled);
+    boolean alreadyAnswered = session.getAnsweredQuestionIds().contains(question.id());
+    session.markAnswered(question.id(), correct, question.difficulty(), scoreEnabled && session.getMode() != SessionMode.CAT);
+    if (session.getMode() == SessionMode.CAT && scoreEnabled && !alreadyAnswered) {
+      session.recordIrtAnswer(question.id(), question.discriminationA(), question.difficultyB(), correct);
+      updateCatEstimate(session);
+      if (shouldFinishCat(session)) {
+        session.finish();
+        updateAttemptStatus(session, ExamAttemptStatus.SUBMITTED, session.getSubmittedAt());
+      }
+    }
     saveAnswer(session, question, answerText, answerImagePath, scoreEnabled, correct);
 
     boolean reportedCorrect = scoreEnabled ? correct : true;
@@ -597,21 +655,77 @@ public class CatExamService {
         "questionId", question.id(),
         "correct", reportedCorrect,
         "theta", session.getTheta(),
+        "standardError", session.getStandardError(),
         "answeredCount", session.getAnsweredCount(),
         "finished", session.isFinished()
       )
     ));
-    return new AnswerResponse(reportedCorrect, session.getTheta(), session.getAnsweredCount(), session.isFinished());
+    return new AnswerResponse(
+      reportedCorrect,
+      session.getTheta(),
+      session.getStandardError(),
+      session.getAnsweredCount(),
+      session.isFinished()
+    );
   }
 
   private QuestionItem pickNextQuestion(ExamSession session) {
     List<QuestionItem> questionBank = getQuestionBank(session);
     Set<String> answered = session.getAnsweredQuestionIds();
 
+    if (session.getMode() == SessionMode.CAT) {
+      return pickNextCatQuestion(session, questionBank);
+    }
+
     return questionBank.stream()
       .filter(item -> !answered.contains(item.id()))
       .min(Comparator.comparingDouble(item -> Math.abs(item.difficulty() - session.getTheta())))
       .orElse(null);
+  }
+
+  private QuestionItem pickNextCatQuestion(ExamSession session, List<QuestionItem> questionBank) {
+    if (questionBank == null || questionBank.isEmpty()) {
+      return null;
+    }
+
+    Set<String> answered = session.getAnsweredQuestionIds();
+    Set<String> used = session.getUsedQuestionIds();
+
+    QuestionItem best = null;
+    double bestInfo = -1.0;
+    double theta = session.getTheta();
+
+    for (QuestionItem item : questionBank) {
+      if (!item.scorable() || item.type() == QuestionType.ESSAY) {
+        continue;
+      }
+      if (answered.contains(item.id()) || used.contains(item.id())) {
+        continue;
+      }
+      double info = irtCatService.information(theta, item.discriminationA(), item.difficultyB());
+      if (info > bestInfo) {
+        bestInfo = info;
+        best = item;
+      }
+    }
+
+    if (best != null) {
+      session.markQuestionUsed(best.id());
+    }
+
+    return best;
+  }
+
+  private void updateCatEstimate(ExamSession session) {
+    IrtCatService.IrtEstimate estimate = irtCatService.estimateThetaEap(session.getIrtHistory());
+    session.updateIrtEstimate(estimate.theta(), estimate.standardError());
+  }
+
+  private boolean shouldFinishCat(ExamSession session) {
+    if (session.getAnsweredCount() >= session.getMaxQuestions()) {
+      return true;
+    }
+    return session.getStandardError() > 0.0 && session.getStandardError() < CAT_SE_THRESHOLD;
   }
 
   private void saveAnswer(
@@ -690,6 +804,8 @@ public class CatExamService {
       // Practice sessions must not reuse another session's generated bank.
       // Use sessionId so difficulty/questionCount can produce independent result sets.
       cacheKey = session.getMode().name() + ":SESSION:" + session.getSessionId();
+    } else if (session.getMode() == SessionMode.CAT) {
+      cacheKey = session.getMode().name() + ":SESSION:" + session.getSessionId();
     }
 
     // Log cache decisions to help diagnose cross-course reuse
@@ -718,6 +834,12 @@ public class CatExamService {
         log.info("loadQuestionBankForSession: using selected practice session bank for sessionId={} size={}", session.getSessionId(), selected.size());
         return selected;
       }
+    }
+
+    if (session.getMode() == SessionMode.CAT) {
+      String courseNo = normalizeSourceId(session.getCourseNo());
+      log.info("loadQuestionBankForSession: using CAT bank for course={}", courseNo);
+      return loadCatQuestionBank(courseNo);
     }
 
     if (session.getMode() == SessionMode.EXAM) {
@@ -949,6 +1071,26 @@ public class CatExamService {
     return prioritizeImageQuestion(ordered);
   }
 
+  private List<QuestionItem> loadCatQuestionBank(String courseNo) {
+    List<QuestionItem> items = new ArrayList<>();
+
+    items.addAll(questionBankRepository.findAllByActiveTrueAndCno(courseNo).stream()
+      .map(this::toQuestionItem)
+      .toList());
+
+    items.addAll(judgeQuestionBankRepository.findAllByActiveTrueAndCno(courseNo).stream()
+      .map(this::toQuestionItem)
+      .toList());
+
+    items.addAll(blankQuestionBankRepository.findAllByActiveTrueAndCno(courseNo).stream()
+      .map(this::toQuestionItem)
+      .toList());
+
+    return items.stream()
+      .filter(item -> item.scorable() && item.type() != QuestionType.ESSAY)
+      .collect(Collectors.toCollection(ArrayList::new));
+  }
+
   private List<QuestionItem> loadPracticeQuestionBank(String paperId, String courseNo) {
     List<PracticePaperQuestion> paperQuestions = practicePaperQuestionRepository
       .findAllByPaper_IdOrderByDisplayOrderAsc(paperId);
@@ -1016,6 +1158,8 @@ public class CatExamService {
       options,
       question.getAnswerKey(),
       question.getDifficulty(),
+      question.getDifficultyB(),
+      question.getDiscriminationA(),
       QuestionType.CHOICE,
       1,
       true
@@ -1031,6 +1175,8 @@ public class CatExamService {
       JUDGE_OPTIONS,
       question.isAnswerKey() ? "true" : "false",
       question.getDifficulty(),
+      question.getDifficultyB(),
+      question.getDiscriminationA(),
       QuestionType.JUDGE,
       question.getPoints(),
       true
@@ -1046,6 +1192,8 @@ public class CatExamService {
       List.of(),
       question.getAnswerKey(),
       question.getDifficulty(),
+      question.getDifficultyB(),
+      question.getDiscriminationA(),
       QuestionType.BLANK,
       question.getPoints(),
       true
@@ -1061,6 +1209,8 @@ public class CatExamService {
       List.of(),
       "",
       question.getDifficulty(),
+      question.getDifficultyB(),
+      question.getDiscriminationA(),
       QuestionType.ESSAY,
       question.getPoints(),
       false
@@ -1073,6 +1223,7 @@ public class CatExamService {
       session.getAnsweredCount(),
       session.getMaxQuestions(),
       session.getTheta(),
+      session.getStandardError(),
       true,
       null
     );
@@ -1111,6 +1262,7 @@ public class CatExamService {
       session.getUserId(),
       session.getExamId(),
       session.getTheta(),
+      session.getStandardError(),
       session.getMaxQuestions(),
       session.getMode().name().toLowerCase(),
       session.getTimeLimitSeconds(),

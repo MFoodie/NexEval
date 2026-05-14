@@ -221,6 +221,12 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
             optionalInt(payload, "questionCount")
           );
           break;
+        case "START_CAT":
+          responsePayload = catExamService.startCatSession(
+            requireText(payload, "userId"),
+            requireText(payload, "courseNo")
+          );
+          break;
         case "START_EXAM":
           responsePayload = catExamService.startExamSession(
             requireText(payload, "userId"),

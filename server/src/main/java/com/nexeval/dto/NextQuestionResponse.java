@@ -5,6 +5,7 @@ public record NextQuestionResponse(
   int answeredCount,
   int maxQuestions,
   double theta,
+  double standardError,
   boolean finished,
   QuestionView question
 ) {

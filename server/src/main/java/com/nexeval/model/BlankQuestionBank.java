@@ -32,6 +32,12 @@ public class BlankQuestionBank {
   @Column(name = "difficulty", nullable = false)
   private double difficulty;
 
+  @Column(name = "difficulty_b", nullable = false)
+  private double difficultyB;
+
+  @Column(name = "discrimination_a", nullable = false)
+  private double discriminationA;
+
   @Column(name = "cno", length = 8)
   private String cno;
 
@@ -92,6 +98,22 @@ public class BlankQuestionBank {
 
   public void setDifficulty(double difficulty) {
     this.difficulty = difficulty;
+  }
+
+  public double getDifficultyB() {
+    return difficultyB;
+  }
+
+  public void setDifficultyB(double difficultyB) {
+    this.difficultyB = difficultyB;
+  }
+
+  public double getDiscriminationA() {
+    return discriminationA;
+  }
+
+  public void setDiscriminationA(double discriminationA) {
+    this.discriminationA = discriminationA;
   }
 
   public String getCno() {

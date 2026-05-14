@@ -4,6 +4,7 @@ import LoginView from "./views/LoginView.vue";
 import RegisterView from "./views/RegisterView.vue";
 import HomeView from "./views/HomeView.vue";
 import ExamRoomView from "./views/ExamRoomView.vue";
+import CatRoomView from "./views/CatRoomView.vue";
 import AdminView from "./views/AdminView.vue";
 import GradingView from "./views/GradingView.vue";
 
@@ -50,6 +51,14 @@ const routes = [
     }
   },
   {
+    path: "/cat/:sessionId",
+    name: "cat",
+    component: CatRoomView,
+    meta: {
+      requiresAuth: true
+    }
+  },
+  {
     path: "/grading",
     name: "grading",
     component: GradingView,
@@ -87,6 +96,10 @@ router.beforeEach((to) => {
   }
 
   if (to.name === "exam" && isAdmin) {
+    return { name: "admin" };
+  }
+
+  if (to.name === "cat" && isAdmin) {
     return { name: "admin" };
   }
 

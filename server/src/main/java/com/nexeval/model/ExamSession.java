@@ -2,8 +2,10 @@ package com.nexeval.model;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class ExamSession {
@@ -19,10 +21,13 @@ public class ExamSession {
   private final Integer timeLimitSeconds;
   private Instant submittedAt;
   private final Set<String> answeredQuestionIds = new HashSet<>();
+  private final Set<String> usedQuestionIds = new HashSet<>();
+  private final List<IrtAnswerRecord> irtHistory = new ArrayList<>();
 
   private int answeredCount;
   private int correctCount;
   private double theta;
+  private double standardError;
   private boolean finished;
 
   public ExamSession(
@@ -46,6 +51,7 @@ public class ExamSession {
     this.startedAt = startedAt == null ? Instant.now() : startedAt;
     this.timeLimitSeconds = timeLimitSeconds;
     this.theta = 0.0;
+    this.standardError = 9.99;
     this.finished = false;
   }
 
@@ -143,6 +149,10 @@ public class ExamSession {
     return theta;
   }
 
+  public synchronized double getStandardError() {
+    return standardError;
+  }
+
   public int getMaxQuestions() {
     return maxQuestions;
   }
@@ -178,4 +188,34 @@ public class ExamSession {
   public synchronized Set<String> getAnsweredQuestionIds() {
     return Collections.unmodifiableSet(new HashSet<>(answeredQuestionIds));
   }
+
+  public synchronized Set<String> getUsedQuestionIds() {
+    return Collections.unmodifiableSet(new HashSet<>(usedQuestionIds));
+  }
+
+  public synchronized List<IrtAnswerRecord> getIrtHistory() {
+    return Collections.unmodifiableList(new ArrayList<>(irtHistory));
+  }
+
+  public synchronized void markQuestionUsed(String questionId) {
+    if (questionId == null || questionId.isBlank()) {
+      return;
+    }
+    usedQuestionIds.add(questionId);
+  }
+
+  public synchronized void recordIrtAnswer(String questionId, double discriminationA, double difficultyB, boolean correct) {
+    if (questionId == null || questionId.isBlank()) {
+      return;
+    }
+    usedQuestionIds.add(questionId);
+    irtHistory.add(new IrtAnswerRecord(discriminationA, difficultyB, correct));
+  }
+
+  public synchronized void updateIrtEstimate(double theta, double standardError) {
+    this.theta = theta;
+    this.standardError = standardError;
+  }
+
+  public record IrtAnswerRecord(double discriminationA, double difficultyB, boolean correct) {}
 }

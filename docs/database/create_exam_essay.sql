@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS essay_question_bank (
     scoring_rubric varchar(2048),
     points int NOT NULL,
     difficulty decimal(3,1) NOT NULL,
+    difficulty_b decimal(4,2) NOT NULL DEFAULT 0.00,
+    discrimination_a decimal(4,2) NOT NULL DEFAULT 1.00,
     cno char(8),
     active boolean NOT NULL DEFAULT true,
     PRIMARY KEY (id),

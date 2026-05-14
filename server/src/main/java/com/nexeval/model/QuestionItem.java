@@ -11,6 +11,8 @@ public record QuestionItem(
 	List<String> options,
 	String answerKey,
 	double difficulty,
+	double difficultyB,
+	double discriminationA,
 	QuestionType type,
 	int points,
 	boolean scorable

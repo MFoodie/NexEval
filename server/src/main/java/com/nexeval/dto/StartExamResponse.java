@@ -5,6 +5,7 @@ public record StartExamResponse(
 	String userId,
 	String examId,
 	double theta,
+	double standardError,
 	int maxQuestions,
 	String mode,
 	Integer timeLimitSeconds,
