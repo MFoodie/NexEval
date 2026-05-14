@@ -353,24 +353,47 @@
       </template>
       <div class="practice-dialog-meta">
         <div class="practice-dialog-course">{{ practiceCourseLabel }}</div>
-        <div class="practice-dialog-tip">可选择普通练习或 CAT 自适应练习。</div>
+        <div class="practice-dialog-tip">{{ catPracticeEnabled ? "CAT 模式已启用，系统将自动调度题目难度。" : "可选择普通练习或 CAT 自适应练习。" }}</div>
       </div>
 
       <div class="practice-section">
-        <div class="practice-section-label">难度</div>
-        <div class="practice-level-grid">
+        <div class="practice-section-label">CAT 自适应模式</div>
+        <div class="practice-mode-switch-card">
+          <div class="practice-mode-switch-copy">
+            <div class="practice-mode-title">{{ catPracticeEnabled ? "CAT 自适应练习" : "普通练习" }}</div>
+            <div class="practice-mode-desc">
+              {{ catPracticeEnabled ? "已启用 AI 动态难度调度，系统将按作答实时调整题目。" : "关闭后将按你选择的难度级别与题量出题。" }}
+            </div>
+          </div>
+          <el-switch
+            v-model="catPracticeEnabled"
+            inline-prompt
+            active-text="CAT"
+            inactive-text="普通"
+            size="large"
+          />
+        </div>
+      </div>
+
+      <div class="practice-section">
+        <div class="practice-section-label">难度级别</div>
+        <div class="practice-level-grid" :class="{ disabled: catPracticeEnabled }">
           <button
             v-for="level in practiceLevels"
             :key="level.value"
             type="button"
             class="practice-level-card"
-            :class="{ selected: practiceDifficulty === level.value }"
+            :class="{ selected: practiceDifficulty === level.value, disabled: catPracticeEnabled }"
             :style="practiceLevelCardStyle(level)"
+            :disabled="catPracticeEnabled"
             @click="practiceDifficulty = level.value"
           >
             <span class="practice-level-dot" :style="{ backgroundColor: level.color }"></span>
             <span class="practice-level-label">{{ level.value }}</span>
           </button>
+        </div>
+        <div v-if="catPracticeEnabled" class="practice-cat-tip">
+          💡 CAT 模式下，AI 将根据您的作答情况动态调整题目难度
         </div>
       </div>
 
@@ -381,8 +404,7 @@
 
       <template #footer>
         <el-button @click="practiceDialogVisible = false">取消</el-button>
-        <el-button :loading="startingCat" @click="confirmCatStart">CAT 练习</el-button>
-        <el-button type="primary" :loading="startingPractice" @click="confirmPracticeStart">开始练习</el-button>
+        <el-button type="primary" :loading="practiceStartLoading" @click="handleConfirmPracticeStart">{{ practiceStartText }}</el-button>
       </template>
     </el-dialog>
 
@@ -541,6 +563,7 @@ const startingCat = ref(false);
 const startingExam = ref(false);
 const practiceDialogVisible = ref(false);
 const practiceCourse = ref(null);
+const catPracticeEnabled = ref(false);
 const practiceDifficulty = ref("中");
 const practiceQuestionCount = ref(10);
 const avatarSaving = ref(false);
@@ -587,6 +610,8 @@ const practiceCourseLabel = computed(() => {
 
   return `${practiceCourse.value.cno || "-"} ｜ ${practiceCourse.value.cname || "未命名课程"}`;
 });
+const practiceStartLoading = computed(() => (catPracticeEnabled.value ? startingCat.value : startingPractice.value));
+const practiceStartText = computed(() => (catPracticeEnabled.value ? "开始 CAT 练习" : "开始练习"));
 const activeMenu = ref("action");
 const menuItems = computed(() => {
   const items = [
@@ -967,9 +992,18 @@ async function handleStartPractice(courseNo = "", courseName = "") {
 
 function openPracticeDialog(clazz) {
   practiceCourse.value = clazz || null;
+  catPracticeEnabled.value = false;
   practiceDifficulty.value = "中";
   practiceQuestionCount.value = 10;
   practiceDialogVisible.value = true;
+}
+
+async function handleConfirmPracticeStart() {
+  if (catPracticeEnabled.value) {
+    await confirmCatStart();
+    return;
+  }
+  await confirmPracticeStart();
 }
 
 function practiceLevelCardStyle(level) {
@@ -1896,10 +1930,30 @@ onBeforeUnmount(() => {
   color: #334155;
 }
 
+.practice-mode-switch-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid rgba(42, 92, 255, 0.18);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(42, 92, 255, 0.06), rgba(2, 161, 232, 0.08));
+}
+
+.practice-mode-switch-copy {
+  min-width: 0;
+  flex: 1;
+}
+
 .practice-level-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.practice-level-grid.disabled {
+  opacity: 0.55;
 }
 
 .practice-level-card {
@@ -1927,6 +1981,10 @@ onBeforeUnmount(() => {
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
 }
 
+.practice-level-card.disabled {
+  cursor: not-allowed;
+}
+
 .practice-level-dot {
   width: 12px;
   height: 12px;
@@ -1936,6 +1994,62 @@ onBeforeUnmount(() => {
 
 .practice-level-label {
   letter-spacing: 0.2px;
+}
+
+.practice-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.practice-mode-card {
+  border: 1px solid rgba(42, 92, 255, 0.18);
+  background: #ffffff;
+  border-radius: 14px;
+  min-height: 98px;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.practice-mode-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+
+.practice-mode-card.selected {
+  border-color: rgba(42, 92, 255, 0.6);
+  background: linear-gradient(135deg, rgba(42, 92, 255, 0.08), rgba(2, 161, 232, 0.1));
+}
+
+.practice-mode-card--cat.selected {
+  border-color: rgba(130, 19, 230, 0.7);
+  background: linear-gradient(135deg, rgba(130, 19, 230, 0.14), rgba(2, 161, 232, 0.08));
+}
+
+.practice-mode-title {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.practice-mode-desc {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.practice-cat-tip {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.55;
+  background: rgba(130, 19, 230, 0.08);
+  border: 1px solid rgba(130, 19, 230, 0.2);
+  border-radius: 10px;
+  padding: 8px 10px;
 }
 
 /* 放大表格中某些列的字号 */
