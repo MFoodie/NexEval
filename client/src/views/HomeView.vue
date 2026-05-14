@@ -40,7 +40,10 @@
       </nav>
 
       <div class="side-actions">
-        <el-button text type="danger" @click="handleLogout">{{ sidebarCollapsed ? '退' : '退出登录' }}</el-button>
+        <el-button text type="danger" @click="handleLogout">
+          <img :src="iconExit" alt="退出" class="exit-icon" />
+          <span class="exit-text">{{ sidebarCollapsed ? '退' : '退出登录' }}</span>
+        </el-button>
       </div>
 
       <input
@@ -516,6 +519,7 @@ import { createExamSocket } from "../ws";
 import iconPersonalInfo from "../assets/personal_info.svg";
 import iconExam from "../assets/exam.svg";
 import iconCorrect from "../assets/correct.svg";
+import iconExit from "../assets/exit.svg";
 
 const router = useRouter();
 const loginInfo = getLogin();
@@ -1547,6 +1551,17 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.exit-icon {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+.home-shell.sidebar-collapsed .side-actions .exit-text {
+  display: none;
 }
 
 .home-main {
