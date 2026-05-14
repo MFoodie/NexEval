@@ -66,7 +66,8 @@ docker compose up -d
 ## 接口现状
 
 - 业务 REST 端点已移除。
-- 考试主流程仅使用 WebSocket 请求-响应。
+- 考试、练习、批改、复核主流程仅使用 WebSocket 请求-响应。
+- 练习会话支持按课程、难度和题量生成题目。
 
 ## 角色功能
 
@@ -89,6 +90,15 @@ docker compose up -d
   - 教师权限管理：支持按条件检索教师并切换 VIP 状态（启用后前端开关为金色样式）。
   - 教师权限列表中的职称统一中文展示（教授 / 副教授 / 讲师）。
 
+## 最近更新（2026-05）
+
+- 教师批改从弹窗改为独立页面 `/grading`，界面布局更接近学生答题页。
+- 批改页支持按考试记录切换、逐题批改、AI 批改和 AI 日志查看。
+- 学生练习新增“难度 + 题量”配置，AI 会按课程题库生成练习题。
+- 练习模式下，学生可对主观题触发 AI 评估并查看评价日志。
+- 管理端教师职称已中文化展示，VIP 开关启用后为金色样式。
+- 练习弹窗标题已加入 AI 图标，UI 细节已同步调整。
+
 ## WebSocket 通道
 
 - WS 端点：/ws/exam 或 /ws/exam?sessionId={sessionId}
@@ -97,8 +107,7 @@ docker compose up -d
   - 管理端：REGISTER_USER、CREATE_COURSE、CREATE_CLASS、IMPORT_BATCH、GET_TEACHER_VIPS、UPDATE_TEACHER_VIP
   - 教学班：GET_TEACHER_CLASSES、GET_STUDENT_CLASSES
   - 考试会话：START_SESSION、START_PRACTICE、START_EXAM、GET_EXAM_QUESTIONS、GET_SESSION_STATE、GET_SESSION_ANSWERS、FINISH_SESSION、NEXT_QUESTION、SUBMIT_ANSWER
-  - 记录与批改：GET_EXAM_ATTEMPTS、GET_ATTEMPT_ANSWERS、REVIEW_ANSWER、AI_REVIEW_ANSWER
-    - 学生练习 AI 评估：STUDENT_AI_REVIEW_ANSWER
+  - 记录与批改：GET_EXAM_ATTEMPTS、GET_ATTEMPT_ANSWERS、REVIEW_ANSWER、AI_REVIEW_ANSWER、STUDENT_AI_REVIEW_ANSWER
   - 成绩复核：CREATE_SCORE_APPEAL、GET_SCORE_APPEALS、REVIEW_SCORE_APPEAL
 - 响应格式：RESPONSE（requestId/action/success/payload）
 - 服务端事件：CONNECTED、PONG、ANSWER_UPDATED、ERROR
@@ -138,7 +147,7 @@ docker compose up -d
 
 这些脚本由根目录的 5 个 Excel 直接生成，适合在 Docker 重建数据卷后重新导入。
 
-另外，`docs/database/99_batch_import.sql` 会在 MySQL 首次初始化时自动按顺序执行这 5 个脚本；所以只要你执行了 `docker compose -f infra/docker-compose.yml down -v`，再 `up -d`，数据库会自动重新导入，不需要手工点导入。
+另外，`docs/database/z99_batch_import.sql` 会在 MySQL 首次初始化时自动按顺序执行这 5 个脚本；所以只要你执行了 `docker compose -f infra/docker-compose.yml down -v`，再 `up -d`，数据库会自动重新导入，不需要手工点导入。
 
 若你的旧库中 class.eid 仍关联 teacher.id，可执行修复脚本：infra/sql/20260426_fix_class_fk.sql
 

@@ -38,7 +38,7 @@ docker compose -f infra/docker-compose.yml up -d --build
 
 - 第一次创建数据卷时会自动执行 SQL 脚本
 - 如果你之前已经启动过 MySQL 容器并保留了旧数据卷，脚本不会再次自动执行
-- `docs/database/99_batch_import.sql` 会自动串联执行 `docs/database/batch_import/` 下由 Excel 生成的 5 个导入脚本
+- `docs/database/z99_batch_import.sql` 会自动串联执行 `docs/database/batch_import/` 下由 Excel 生成的 5 个导入脚本
 
 如需重置并重新初始化：
 

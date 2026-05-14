@@ -1,26 +1,47 @@
 <template>
-  <section class="admin-shell">
+  <section class="admin-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
     <aside class="sidebar card">
+      <div class="sidebar-collapse-row">
+        <button
+          type="button"
+          class="sidebar-collapse-btn"
+          :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
+          @click="toggleSidebar"
+        >
+          <span class="sidebar-collapse-icon">{{ sidebarCollapsed ? "»" : "«" }}</span>
+          <span class="sidebar-collapse-text">{{ sidebarCollapsed ? "展开" : "收起" }}</span>
+        </button>
+      </div>
+
       <div class="sidebar-profile">
         <img :src="avatarUrl" alt="管理员头像" class="sidebar-avatar" @click="triggerAvatarPicker" />
-        <div class="sidebar-name">{{ loginInfo?.name || "管理员" }}</div>
-        <div class="sidebar-id">卡号 {{ loginInfo?.cardNo || "-" }}</div>
+        <div class="sidebar-profile-meta">
+          <div class="sidebar-name-row">
+            <div class="sidebar-name">{{ loginInfo?.name || "管理员" }}</div>
+          </div>
+          <div class="sidebar-id">卡号 {{ loginInfo?.cardNo || "-" }}</div>
+        </div>
       </div>
 
       <nav class="sidebar-nav">
         <button
           v-for="item in menuItems"
           :key="item.key"
+          :title="sidebarCollapsed ? item.label : ''"
           :class="['nav-item', { active: activeMenu === item.key }]"
           type="button"
           @click="activeMenu = item.key"
         >
-          {{ item.label }}
+          <img v-if="item.icon" :src="item.icon" :alt="item.label" class="nav-item-icon" />
+          <span v-if="!sidebarCollapsed" class="nav-item-label">{{ item.label }}</span>
         </button>
       </nav>
 
       <div class="sidebar-actions">
-        <el-button text type="danger" @click="handleLogout">退出登录</el-button>
+        <el-button text type="danger" @click="handleLogout">
+          <img :src="iconExit" alt="退出" class="exit-icon" />
+          <span class="exit-text">{{ sidebarCollapsed ? '退' : '退出登录' }}</span>
+        </el-button>
       </div>
 
       <input
@@ -313,6 +334,14 @@ import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { clearLogin, getLogin, saveLogin } from "../auth";
 import { createExamSocket } from "../ws";
+import iconPersonalInfo from "../assets/personal_info.svg";
+import iconRegister from "../assets/register.svg";
+import iconCourse from "../assets/course.svg";
+import iconClass from "../assets/class.svg";
+import iconBatch from "../assets/batch.svg";
+import iconRecheck from "../assets/recheck.svg";
+import iconVIP from "../assets/VIP.svg";
+import iconExit from "../assets/exit.svg";
 
 const router = useRouter();
 const loginInfo = getLogin();
@@ -330,6 +359,8 @@ const avatarSaving = ref(false);
 const avatarInputRef = ref(null);
 const importInputRef = ref(null);
 const avatarUrl = ref(withAvatarVersion(loginInfo?.avatarUrl || "/avatar/admin_male.png"));
+const ADMIN_SIDEBAR_COLLAPSED_KEY = "nexeval.admin.sidebar.collapsed";
+const sidebarCollapsed = ref(readSidebarCollapsed());
 const activeMenu = ref("profile");
 const importingType = ref("");
 const pendingImportType = ref("");
@@ -344,13 +375,13 @@ const vipKeyword = ref("");
 const vipStatus = ref("all");
 
 const menuItems = [
-  { key: "profile", label: "个人信息" },
-  { key: "register", label: "用户信息注册" },
-  { key: "course", label: "课程信息管理" },
-  { key: "class", label: "教学班管理" },
-  { key: "batch", label: "批量导入" },
-  { key: "review", label: "成绩复核审理" },
-  { key: "teacher-vip", label: "教师权限" }
+  { key: "profile", label: "个人信息", icon: iconPersonalInfo },
+  { key: "register", label: "用户信息注册", icon: iconRegister },
+  { key: "course", label: "课程信息管理", icon: iconCourse },
+  { key: "class", label: "教学班管理", icon: iconClass },
+  { key: "batch", label: "批量导入", icon: iconBatch },
+  { key: "review", label: "成绩复核审理", icon: iconRecheck },
+  { key: "teacher-vip", label: "教师权限", icon: iconVIP }
 ];
 
 watch(activeMenu, (value) => {
@@ -410,6 +441,23 @@ const classForm = reactive({
   cno: "",
   eid: ""
 });
+
+function readSidebarCollapsed() {
+  try {
+    return localStorage.getItem(ADMIN_SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value;
+  try {
+    localStorage.setItem(ADMIN_SIDEBAR_COLLAPSED_KEY, sidebarCollapsed.value ? "1" : "0");
+  } catch {
+    // ignore storage write errors
+  }
+}
 
 function resetForm() {
   form.id = "";
@@ -816,9 +864,15 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .admin-shell {
+  --admin-sidebar-width: 240px;
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: var(--admin-sidebar-width) 1fr;
   gap: 16px;
+  transition: grid-template-columns 0.28s ease;
+}
+
+.admin-shell.sidebar-collapsed {
+  --admin-sidebar-width: 112px;
 }
 
 .sidebar {
@@ -826,21 +880,80 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  transition: gap 0.28s ease;
+}
+
+.sidebar-collapse-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sidebar-collapse-btn {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #6b7280;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sidebar-collapse-btn:hover {
+  color: #0059f5;
+  border-color: rgba(0, 89, 245, 0.35);
+}
+
+.sidebar-collapse-icon {
+  font-size: 14px;
+  line-height: 1;
 }
 
 .sidebar-profile {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 8px 8px;
 }
 
 .sidebar-avatar {
-  width: 80px;
-  height: 80px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   object-fit: cover;
   border: 1px solid #dcdfe6;
   cursor: pointer;
 }
 
+.sidebar-profile-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-profile-meta {
+  min-width: 92px;
+}
+
+.sidebar-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-id {
+  white-space: nowrap;
+  font-size: 13px;
+  color: #6b7280;
+}
 .sidebar-name {
   margin-top: 10px;
   font-size: 16px;
@@ -875,11 +988,104 @@ onBeforeUnmount(() => {
   background: #eff5ff;
 }
 
+.nav-item-label {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.nav-item-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+.admin-shell.sidebar-collapsed .sidebar-collapse-row {
+  justify-content: center;
+}
+
+.admin-shell.sidebar-collapsed .sidebar-collapse-btn {
+  padding: 6px;
+}
+
+.admin-shell.sidebar-collapsed .sidebar-collapse-text {
+  display: none;
+}
+
+.admin-shell.sidebar-collapsed .sidebar-name,
+.admin-shell.sidebar-collapsed .sidebar-id {
+  width: 0;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.admin-shell.sidebar-collapsed .sidebar-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+.admin-shell.sidebar-collapsed .sidebar-profile {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.admin-shell.sidebar-collapsed .sidebar {
+  padding-left: 0;
+  padding-right: 0;
+  align-items: center;
+}
+
+.admin-shell.sidebar-collapsed .sidebar-avatar {
+  margin: 0 auto;
+}
+
+.admin-shell.sidebar-collapsed .sidebar-nav {
+  align-items: center;
+}
+
+.admin-shell.sidebar-collapsed .nav-item {
+  width: 64px;
+  padding: 10px 0;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.admin-shell.sidebar-collapsed .nav-item-icon {
+  margin: 0;
+}
+
+.admin-shell.sidebar-collapsed .sidebar-actions {
+  align-items: center;
+}
+
+.admin-shell.sidebar-collapsed .sidebar-actions .el-button {
+  min-width: 64px;
+}
+
 .sidebar-actions {
   margin-top: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.exit-icon {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+.admin-shell.sidebar-collapsed .sidebar-actions .exit-text {
+  display: none;
 }
 
 .main-panel {

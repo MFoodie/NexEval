@@ -1,6 +1,18 @@
 <template>
-  <section class="home-shell">
+  <section class="home-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
     <aside class="home-sidebar card">
+      <div class="side-collapse-row">
+        <button
+          type="button"
+          class="side-collapse-btn"
+          :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
+          @click="toggleSidebar"
+        >
+          <span class="side-collapse-icon">{{ sidebarCollapsed ? "»" : "«" }}</span>
+          <span class="side-collapse-text">{{ sidebarCollapsed ? "展开" : "收起" }}</span>
+        </button>
+      </div>
+
       <div class="side-profile">
         <img :src="avatarUrl" alt="默认头像" class="side-avatar" @click="triggerAvatarPicker" />
         <div class="side-profile-meta">
@@ -18,15 +30,17 @@
           :key="item.key"
           type="button"
           class="side-item"
+          :title="sidebarCollapsed ? item.label : ''"
           :class="{ active: activeMenu === item.key }"
           @click="activeMenu = item.key"
         >
-          {{ item.label }}
+          <img v-if="item.icon" :src="item.icon" :alt="item.label" class="side-item-icon" />
+          <span v-if="!sidebarCollapsed" class="side-item-label">{{ item.label }}</span>
         </button>
       </nav>
 
       <div class="side-actions">
-        <el-button text type="danger" @click="handleLogout">退出登录</el-button>
+        <el-button text type="danger" @click="handleLogout">{{ sidebarCollapsed ? '退' : '退出登录' }}</el-button>
       </div>
 
       <input
@@ -499,6 +513,9 @@ import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { clearLogin, getLogin, saveLogin } from "../auth";
 import { createExamSocket } from "../ws";
+import iconPersonalInfo from "../assets/personal_info.svg";
+import iconExam from "../assets/exam.svg";
+import iconCorrect from "../assets/correct.svg";
 
 const router = useRouter();
 const loginInfo = getLogin();
@@ -522,6 +539,8 @@ const practiceDifficulty = ref("中");
 const practiceQuestionCount = ref(10);
 const avatarSaving = ref(false);
 const wsStatus = ref("connecting");
+const HOME_SIDEBAR_COLLAPSED_KEY = "nexeval.home.sidebar.collapsed";
+const sidebarCollapsed = ref(readSidebarCollapsed());
 const avatarInputRef = ref(null);
 const sexText = computed(() => {
   if (sex.value === true) {
@@ -563,10 +582,17 @@ const practiceCourseLabel = computed(() => {
   return `${practiceCourse.value.cno || "-"} ｜ ${practiceCourse.value.cname || "未命名课程"}`;
 });
 const activeMenu = ref("action");
-const menuItems = computed(() => [
-  { key: "profile", label: "个人信息" },
-  { key: "action", label: actionPanelTitle.value }
-]);
+const menuItems = computed(() => {
+  const items = [
+    { key: "profile", label: "个人信息", icon: iconPersonalInfo },
+    { 
+      key: "action", 
+      label: actionPanelTitle.value,
+      icon: isTeacher.value ? iconCorrect : iconExam
+    }
+  ];
+  return items;
+});
 const teacherClasses = ref([]);
 const studentClasses = ref([]);
 const teacherLoading = ref(false);
@@ -652,6 +678,23 @@ const appealCourseLabel = computed(() => {
 });
 
 let wsClient = null;
+
+function readSidebarCollapsed() {
+  try {
+    return localStorage.getItem(HOME_SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value;
+  try {
+    localStorage.setItem(HOME_SIDEBAR_COLLAPSED_KEY, sidebarCollapsed.value ? "1" : "0");
+  } catch {
+    // ignore storage write errors
+  }
+}
 
 function withAvatarVersion(url) {
   if (!url) {
@@ -1302,9 +1345,15 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .home-shell {
+  --home-sidebar-width: 240px;
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: var(--home-sidebar-width) 1fr;
   gap: 20px;
+  transition: grid-template-columns 0.28s ease;
+}
+
+.home-shell.sidebar-collapsed {
+  --home-sidebar-width: 100px;
 }
 
 .home-sidebar {
@@ -1312,6 +1361,36 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 18px;
   min-height: 520px;
+  transition: gap 0.28s ease;
+}
+
+.side-collapse-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.side-collapse-btn {
+  border: 1px solid var(--ne-border);
+  background: var(--ne-surface);
+  color: var(--ne-text-muted);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.side-collapse-btn:hover {
+  color: var(--ne-primary);
+  border-color: rgba(42, 92, 255, 0.4);
+}
+
+.side-collapse-icon {
+  font-size: 14px;
+  line-height: 1;
 }
 
 .side-profile {
@@ -1363,6 +1442,73 @@ onBeforeUnmount(() => {
 .side-id {
   color: var(--ne-text-muted);
   font-size: 13px;
+}
+
+.side-item-label {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.side-item-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+.home-shell.sidebar-collapsed .side-collapse-row {
+  justify-content: center;
+}
+
+.home-shell.sidebar-collapsed .side-collapse-btn {
+  padding: 6px;
+}
+
+.home-shell.sidebar-collapsed .side-collapse-text {
+  display: none;
+}
+
+.home-shell.sidebar-collapsed .side-profile {
+  justify-content: center;
+  gap: 0;
+}
+
+.home-shell.sidebar-collapsed .side-profile-meta {
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.home-shell.sidebar-collapsed .side-avatar {
+  margin: 0 auto;
+}
+
+.home-shell.sidebar-collapsed .side-nav {
+  align-items: center;
+}
+
+.home-shell.sidebar-collapsed .side-item {
+  width: 64px;
+  padding: 10px 0;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.home-shell.sidebar-collapsed .side-item-icon {
+  margin: 0;
+}
+
+.home-shell.sidebar-collapsed .side-actions {
+  align-items: center;
+}
+
+.home-shell.sidebar-collapsed .side-actions .el-button {
+  min-width: 64px;
 }
 
 .side-nav {
