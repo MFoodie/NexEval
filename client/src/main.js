@@ -7,11 +7,20 @@ import "./styles.css";
 
 const themeKey = "nexeval.theme";
 try {
-	const saved = localStorage.getItem(themeKey);
-	const theme = saved || "beige";
-	document.documentElement.setAttribute("data-theme", theme);
+  const saved = localStorage.getItem(themeKey);
+  const theme = saved || "beige";
+  document.documentElement.setAttribute("data-theme", theme);
 } catch {
-	document.documentElement.setAttribute("data-theme", "beige");
+  document.documentElement.setAttribute("data-theme", "beige");
 }
 
-createApp(App).use(router).use(ElementPlus).mount("#app");
+const app = createApp(App);
+app.use(router);
+app.use(ElementPlus);
+
+router.isReady().finally(() => {
+  app.mount("#app");
+  window.requestAnimationFrame(() => {
+    document.documentElement.classList.add("app-ready");
+  });
+});

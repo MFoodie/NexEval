@@ -10,7 +10,7 @@
       </div>
       <nav class="nav">
         <RouterLink
-          v-if="route.name !== 'login' && route.name !== 'register'"
+          v-if="!isAuthRoute"
           to="/"
           class="nav-link"
           active-class="nav-link--active"
@@ -68,12 +68,17 @@
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { RouterLink } from "vue-router";
 import logoUrl from "./assets/logo.png";
 
 const route = useRoute();
+const isAuthRoute = computed(() => {
+  const path = route.path;
+  const name = route.name;
+  return name === "login" || name === "register" || path === "/login" || path === "/register";
+});
 const themeKey = "nexeval.theme";
 const themeEvent = "nexeval-theme-change";
 const themeOptions = [

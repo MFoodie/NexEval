@@ -304,7 +304,9 @@ onBeforeUnmount(() => {
   inset: 0;
   background: url("../assets/background.jpg") center/cover no-repeat fixed;
   filter: blur(3px);
-  transform: scale(1.04);
+  transform: scale(1);
+  transform-origin: center center;
+  animation: login-bg-breathe 36s ease-in-out infinite alternate;
   z-index: 0;
 }
 
@@ -332,6 +334,29 @@ onBeforeUnmount(() => {
   background: var(--ne-surface);
   box-shadow: var(--ne-shadow);
   align-items: center;
+  animation: login-panel-enter 0.5s ease-out both;
+}
+
+@keyframes login-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes login-bg-breathe {
+  from {
+    transform: scale(1);
+  }
+
+  to {
+    transform: scale(1.2);
+  }
 }
 
 .login-bg-container {
