@@ -162,14 +162,22 @@ a {
 }
 
 .topbar {
-  min-height: 64px;
-  padding: 0 28px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--ne-border);
+  background: var(--ne-surface);
+  backdrop-filter: blur(12px);
+}
+
+.topbar-inner {
+  width: min(1280px, 100%);
+  padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--ne-border);
-  background: var(--ne-topbar-bg);
-  backdrop-filter: blur(12px);
+  gap: 16px;
 }
 
 .brand {
@@ -179,12 +187,12 @@ a {
 }
 
 .brand-logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   object-fit: contain;
   background: #ffffff;
-  box-shadow: var(--ne-shadow-soft);
+  box-shadow: none;
 }
 
 .brand-text {
@@ -196,22 +204,22 @@ a {
 
 .brand-title {
   font-family: "Space Grotesk", "Manrope", sans-serif;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--ne-text-strong);
   letter-spacing: 0.1px;
 }
 
 .brand-subtitle {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--ne-text-muted);
 }
 
 .nav {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--ne-text-muted);
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
 
@@ -309,7 +317,7 @@ a {
 
 
 .nav-link {
-  padding: 8px 14px;
+  padding: 6px 12px;
   border-radius: 999px;
   color: var(--ne-text-muted);
   transition: all 0.2s ease;
@@ -330,8 +338,9 @@ a {
 
 .content {
   flex: 1;
-  width: min(1120px, calc(100% - 40px));
-  margin: 28px auto 36px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 .card {
@@ -369,8 +378,9 @@ a {
   }
 
   .content {
-    width: calc(100% - 16px);
-    margin: 16px auto 24px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
   }
 
   .card {

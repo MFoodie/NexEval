@@ -1,6 +1,7 @@
 <template>
   <section class="exam-shell">
-    <header class="exam-hero card">
+    <div class="exam-container">
+      <header class="exam-hero card">
       <div class="hero-main">
         <div>
           <div class="hero-eyebrow">当前课程</div>
@@ -29,7 +30,7 @@
       </div>
     </header>
 
-    <section class="exam-body">
+      <section class="exam-body">
       <div class="exam-question card">
         <el-skeleton :rows="6" animated v-if="loading" />
 
@@ -253,7 +254,8 @@
           </ul>
         </div>
       </aside>
-    </section>
+      </section>
+    </div>
   </section>
 </template>
 
@@ -1011,6 +1013,15 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .exam-shell {
+  display: grid;
+  gap: 20px;
+  width: 100%;
+}
+
+.exam-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
   display: grid;
   gap: 20px;
 }

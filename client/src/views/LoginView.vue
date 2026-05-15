@@ -263,10 +263,12 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px 0 28px;
+  padding: 16px 24px 28px;
   gap: 40px;
   position: relative;
   overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .login-wrap::before {
@@ -397,8 +399,9 @@ onBeforeUnmount(() => {
 
 @media (min-width: 1200px) {
   .login-wrap {
-    justify-content: flex-start;
-    padding-left: 60px;
+    justify-content: center;
+    padding-left: 24px;
+    padding-right: 24px;
   }
 
   .login-bg-container {

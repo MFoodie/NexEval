@@ -1,18 +1,6 @@
 <template>
-  <section class="home-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
-    <aside class="home-sidebar card">
-      <div class="side-collapse-row">
-        <button
-          type="button"
-          class="side-collapse-btn"
-          :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
-          @click="toggleSidebar"
-        >
-          <span class="side-collapse-icon">{{ sidebarCollapsed ? "»" : "«" }}</span>
-          <span class="side-collapse-text">{{ sidebarCollapsed ? "展开" : "收起" }}</span>
-        </button>
-      </div>
-
+  <div class="min-h-screen w-full flex home-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+    <aside class="w-64 flex-shrink-0 p-4 home-sidebar card">
       <div class="side-profile">
         <img :src="avatarUrl" alt="默认头像" class="side-avatar" @click="triggerAvatarPicker" />
         <div class="side-profile-meta">
@@ -24,7 +12,7 @@
         </div>
       </div>
 
-      <nav class="side-nav">
+      <nav class="side-nav flex flex-col gap-1">
         <button
           v-for="item in menuItems"
           :key="item.key"
@@ -55,18 +43,9 @@
       />
     </aside>
 
-    <main class="home-main">
-      <div class="dashboard-head card">
-        <div class="dashboard-head-main">
-          <h1 class="card-title">在线考试系统</h1>
-          <p class="dashboard-subtitle">考试、练习、批改与复核统一在同一工作台中完成。</p>
-        </div>
-        <div class="dashboard-head-badges">
-          <span class="dashboard-badge">{{ isTeacher ? '教师端' : '学生端' }}</span>
-        </div>
-      </div>
-
-      <section class="card panel-card" v-if="activeMenu === 'profile'">
+    <main class="flex-1 overflow-auto p-8 home-main bg-slate-50">
+      <div class="max-w-7xl mx-auto w-full flex flex-col gap-6">
+        <section class="card panel-card bg-white rounded-xl border border-gray-200 shadow-sm p-6" v-if="activeMenu === 'profile'">
         <div class="profile-head">
           <h2 class="panel-title">简介</h2>
           <div class="profile-head-actions">
@@ -123,16 +102,19 @@
         </table>
       </section>
 
-      <section class="card panel-card exam-panel-card" v-else>
-        <h2 class="panel-title">{{ actionPanelTitle }}</h2>
-        <div class="exam-intro">
-          <div class="exam-intro-item">
-            <div class="exam-intro-title">当前视图</div>
-            <div class="exam-intro-value">{{ actionPanelTitle }}</div>
+        <section class="card panel-card exam-panel-card bg-white rounded-xl border border-gray-200 shadow-sm p-6" v-else>
+        <div class="mb-6">
+          <h2 class="text-2xl font-semibold">{{ actionPanelTitle }}</h2>
+          <p class="text-sm">考试、练习与批改在此统一管理。</p>
+        </div>
+        <div class="exam-intro grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div class="exam-intro-item bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <div class="exam-intro-title text-sm text-gray-500 mb-1">当前视图</div>
+            <div class="exam-intro-value text-2xl font-semibold text-gray-900">{{ actionPanelTitle }}</div>
           </div>
-          <div class="exam-intro-item">
-            <div class="exam-intro-title">教学班/课程</div>
-            <div class="exam-intro-value">{{ isTeacher ? teacherClasses.length : studentClasses.length }}</div>
+          <div class="exam-intro-item bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <div class="exam-intro-title text-sm text-gray-500 mb-1">教学班/课程</div>
+            <div class="exam-intro-value text-2xl font-semibold text-gray-900">{{ isTeacher ? teacherClasses.length : studentClasses.length }}</div>
           </div>
         </div>
 
@@ -196,7 +178,9 @@
 
         <template v-else-if="isStudent">
           <div v-if="studentLoading" class="placeholder">正在加载教学班...</div>
-          <el-table v-else-if="studentClasses.length" :data="studentClasses" size="small" class="student-classes-table">
+          <div v-else-if="studentClasses.length" class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+            <div class="section-title">课程列表</div>
+            <el-table :data="studentClasses" size="small" class="student-classes-table">
             <el-table-column
               prop="cno"
               label="课程号"
@@ -232,25 +216,32 @@
               class-name="col-large col-score-cell"
               header-class-name="col-large col-score-header"
             />
-            <el-table-column label="操作" width="110" align="center" header-align="center">
+            <el-table-column label="操作" width="180" align="center" header-align="center">
               <template #default="scope">
-                <div class="student-action-buttons">
+                <div class="student-action-buttons flex flex-row items-center justify-end gap-2 whitespace-nowrap">
                   <el-button
+                    type="primary"
                     size="small"
-                    @click="handleStartPracticeForClass(scope.row)"
+                    class="action-primary"
+                    :loading="startingExam"
+                    @click="handleStartExamForClass(scope.row)"
                   >
-                    题目练习
-                  </el-button>
-                  <el-button type="primary" size="small" :loading="startingExam" @click="handleStartExamForClass(scope.row)">
                     进入考试
                   </el-button>
-                  <el-button type="warning" plain size="small" @click="openAppealHistory(scope.row)">
-                    成绩复核
-                  </el-button>
+                  <el-dropdown trigger="click" popper-class="absolute right-0 mt-2 rounded-md shadow-lg z-10">
+                    <button type="button" class="action-more">...</button>
+                    <template #dropdown>
+                      <el-dropdown-menu class="flex flex-col">
+                        <el-dropdown-item @click="handleStartPracticeForClass(scope.row)">题目练习</el-dropdown-item>
+                        <el-dropdown-item @click="openAppealHistory(scope.row)">成绩复核</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
                 </div>
               </template>
             </el-table-column>
-          </el-table>
+            </el-table>
+          </div>
           <div v-else class="placeholder">暂无教学班</div>
         </template>
 
@@ -264,7 +255,8 @@
             <el-button type="primary" :loading="startingExam" @click="handleStartExam">进入考试</el-button>
           </div>
         </el-form>
-      </section>
+        </section>
+      </div>
     </main>
 
     <el-dialog v-model="editVisible" title="修改个人信息" width="520px">
@@ -531,7 +523,7 @@
         <el-button @click="aiLogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
-  </section>
+  </div>
 </template>
 
 <script setup>
@@ -1444,23 +1436,196 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .home-shell {
-  --home-sidebar-width: 240px;
+  display: flex;
+  width: 100%;
+  gap: 0;
+}
+
+.min-h-screen {
+  min-height: 100vh;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.w-64 {
+  width: 256px;
+}
+
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.flex-row {
+  flex-direction: row;
+}
+
+.flex-1 {
+  flex: 1 1 auto;
+}
+
+.flex-shrink-0 {
+  flex-shrink: 0;
+}
+
+.overflow-auto {
+  overflow: auto;
+}
+
+.p-8 {
+  padding: 32px;
+}
+
+.p-4 {
+  padding: 16px;
+}
+
+.gap-1 {
+  gap: 4px;
+}
+
+.gap-2 {
+  gap: 8px;
+}
+
+.gap-4 {
+  gap: 16px;
+}
+
+.bg-slate-50 {
+  background: var(--ne-bg);
+}
+
+.bg-white {
+  background: var(--ne-surface);
+}
+
+.bg-transparent {
+  background: transparent;
+}
+
+.border {
+  border-width: 1px;
+  border-style: solid;
+}
+
+.border-gray-200 {
+  border-color: var(--ne-border);
+}
+
+.border-l-4 {
+  border-left-width: 4px;
+  border-left-style: solid;
+}
+
+.border-transparent {
+  border-color: transparent;
+}
+
+.border-blue-600 {
+  border-left-color: var(--ne-primary);
+}
+
+.text-gray-500 {
+  color: var(--ne-text-muted);
+}
+
+.text-gray-900 {
+  color: var(--ne-text-strong);
+}
+
+.text-sm {
+  font-size: 14px;
+}
+
+.text-2xl {
+  font-size: 22px;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.mb-1 {
+  margin-bottom: 4px;
+}
+
+.text-blue-600 {
+  color: var(--ne-primary);
+}
+
+.shadow-sm {
+  box-shadow: var(--ne-shadow-soft);
+}
+
+.rounded-xl {
+  border-radius: var(--ne-radius-lg);
+}
+
+.rounded-md {
+  border-radius: var(--ne-radius-md);
+}
+
+.grid {
   display: grid;
-  grid-template-columns: var(--home-sidebar-width) 1fr;
-  gap: 20px;
-  transition: grid-template-columns 0.28s ease;
+}
+
+.grid-cols-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.p-6 {
+  padding: 24px;
+}
+
+.p-5 {
+  padding: 20px;
+}
+
+.max-w-7xl {
+  max-width: 1280px;
+}
+
+.mx-auto {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.gap-6 {
+  gap: 24px;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-end {
+  justify-content: flex-end;
+}
+
+.whitespace-nowrap {
+  white-space: nowrap;
 }
 
 .home-shell.sidebar-collapsed {
-  --home-sidebar-width: 100px;
+  width: 100%;
 }
 
 .home-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   min-height: 520px;
   transition: gap 0.28s ease;
+  background: var(--ne-surface);
+  border: 1px solid var(--ne-border);
+  border-radius: var(--ne-radius-lg);
+  box-shadow: var(--ne-shadow-soft);
 }
 
 .side-collapse-row {
@@ -1518,18 +1683,18 @@ onBeforeUnmount(() => {
 }
 
 .side-avatar {
-  width: 80px;
-  height: 80px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   object-fit: cover;
   border: 1px solid var(--ne-border);
-  box-shadow: var(--ne-shadow-soft);
+  box-shadow: none;
   cursor: pointer;
 }
 
 .side-name {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--ne-text-strong);
 }
 
@@ -1541,7 +1706,7 @@ onBeforeUnmount(() => {
 
 .side-id {
   color: var(--ne-text-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .side-item-label {
@@ -1618,29 +1783,28 @@ onBeforeUnmount(() => {
 }
 
 .side-item {
-  border: 1px solid var(--ne-border);
-  background: var(--ne-surface);
+  border: 1px solid transparent;
+  background: transparent;
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   text-align: left;
   font-size: 14px;
   cursor: pointer;
   color: var(--ne-text);
   transition: all 0.2s ease;
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-left-color: transparent;
 }
 
 .side-item:hover {
-  border-color: var(--ne-hover-border);
   background: var(--ne-hover-bg);
-  box-shadow: var(--ne-shadow-soft);
-  transform: translateY(-1px);
 }
 
 .side-item.active {
-  border-color: rgba(var(--ne-primary-rgb), 0.6);
   color: var(--ne-primary);
-  background: var(--ne-primary-soft);
-  box-shadow: var(--ne-shadow-soft);
+  border-left-color: var(--ne-primary);
+  background: var(--ne-hover-bg);
 }
 
 .side-actions {
@@ -1661,8 +1825,31 @@ onBeforeUnmount(() => {
   display: none;
 }
 
+.home-shell.sidebar-collapsed .side-profile-meta {
+  width: auto;
+  opacity: 1;
+  overflow: visible;
+  pointer-events: auto;
+}
+
+.home-shell.sidebar-collapsed .side-item {
+  width: auto;
+  padding: 8px 12px;
+  text-align: left;
+  justify-content: flex-start;
+}
+
+.home-shell.sidebar-collapsed .side-item-icon {
+  margin-right: 8px;
+}
+
+.home-shell.sidebar-collapsed .side-actions .exit-text {
+  display: inline;
+}
+
 .home-main {
   min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1719,18 +1906,20 @@ onBeforeUnmount(() => {
   min-height: 0;
   position: relative;
   overflow: hidden;
+  width: 100%;
 }
 
 .exam-panel-card {
   flex: 1;
+  width: 100%;
 }
 
 .panel-card::before {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
-  height: 4px;
-  background: var(--ne-gradient-accent);
+  height: 0;
+  background: transparent;
 }
 
 .panel-title {
@@ -1741,24 +1930,26 @@ onBeforeUnmount(() => {
 
 .exam-intro {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
 }
 .exam-intro-item {
-  padding: 12px 14px;
-  border-radius: 12px;
+  padding: 18px 20px;
+  border-radius: 14px;
   border: 1px solid var(--ne-border);
-  background: linear-gradient(135deg, rgba(var(--ne-primary-rgb), 0.04), rgba(var(--ne-accent-rgb), 0.08));
+  background: var(--ne-surface);
 }
 .exam-intro-title {
   color: var(--ne-text-muted);
-  font-size: 12px;
+  font-size: 13px;
+  margin-bottom: 6px;
 }
 .exam-intro-value {
-  margin-top: 4px;
+  margin-top: 0;
   color: var(--ne-text-strong);
   font-weight: 700;
+  font-size: 20px;
 }
 
 
@@ -1892,16 +2083,39 @@ onBeforeUnmount(() => {
 
 .student-action-buttons {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 8px;
-  align-items: flex-end; 
+  align-items: center;
+  justify-content: flex-end;
   width: auto;
+  white-space: nowrap;
 }
 
 .student-action-buttons .el-button {
-  width: 90px; 
-  max-width: 100%;
+  width: auto;
   box-sizing: border-box;
+}
+
+.action-primary {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.action-more {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--ne-border);
+  background: var(--ne-surface);
+  color: var(--ne-text-muted);
+  cursor: pointer;
+}
+
+.action-more:hover {
+  background: var(--ne-hover-bg);
+  color: var(--ne-text);
 }
 
 .practice-dialog-meta {
