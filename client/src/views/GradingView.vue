@@ -761,15 +761,23 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.72);
+  color: #263238;
 }
 
 .grading-answer-text {
   margin-top: 8px;
-  color: var(--ne-text-strong);
+  color: inherit;
   font-size: 15px;
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.grading-answer-panel .aside-title,
+.grading-score-panel .aside-row,
+.grading-score-panel .aside-row strong,
+.grading-score-panel .score-label {
+  color: inherit;
 }
 
 .grading-answer-image {
@@ -849,7 +857,7 @@ onBeforeUnmount(() => {
   aspect-ratio: 1;
   border-radius: 50%;
   border: 1px solid var(--ne-border);
-  background: var(--ne-primary-soft);
+  background: var(--ne-question-node-unanswered-bg, var(--ne-primary-soft));
   color: var(--ne-text-muted);
   font-size: 12px;
   cursor: pointer;

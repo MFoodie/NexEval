@@ -121,7 +121,7 @@
                   :label="option"
                   class="option-item"
                 >
-                  <span class="option-tag">{{ String.fromCharCode(65 + index) }}</span>
+                  <span class="option-tag">{{ currentQuestion.type === 'judge' ? (index === 0 ? 'T' : 'F') : String.fromCharCode(65 + index) }}</span>
                   <span class="option-text">{{ formatOptionText(option) }}</span>
                 </el-radio>
               </el-radio-group>
@@ -1258,7 +1258,7 @@ onBeforeUnmount(() => {
   height: 32px;
   border-radius: 50%;
   border: 1px solid var(--ne-border);
-  background: var(--ne-primary-soft);
+  background: var(--ne-question-node-unanswered-bg, var(--ne-primary-soft));
   color: var(--ne-text-muted);
   font-size: 12px;
   cursor: pointer;

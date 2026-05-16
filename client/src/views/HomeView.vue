@@ -1,6 +1,18 @@
 <template>
   <div class="min-h-screen w-full flex home-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
     <aside class="w-64 flex-shrink-0 p-4 home-sidebar card">
+      <div class="side-collapse-row">
+        <button
+          type="button"
+          class="side-collapse-btn"
+          :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
+          @click="toggleSidebar"
+        >
+          <span class="side-collapse-icon">{{ sidebarCollapsed ? '»' : '«' }}</span>
+          <span class="side-collapse-text">{{ sidebarCollapsed ? '展开' : '收起' }}</span>
+        </button>
+      </div>
+
       <div class="side-profile">
         <img :src="avatarUrl" alt="默认头像" class="side-avatar" @click="triggerAvatarPicker" />
         <div class="side-profile-meta">
@@ -359,6 +371,7 @@
           </div>
           <el-switch
             v-model="catPracticeEnabled"
+            class="practice-mode-toggle"
             inline-prompt
             active-text="CAT"
             inactive-text="普通"
@@ -593,9 +606,9 @@ const isVipTeacher = computed(() => Boolean(isTeacher.value && teacherInfo.value
 const displayPhone = computed(() => formatPhoneForDisplay(phone.value));
 const actionPanelTitle = computed(() => (isTeacher.value ? "考试批改" : "题目练习与考试"));
 const practiceLevels = [
-  { value: "易", color: "#b59b6a" },
-  { value: "中", color: "#6f6659" },
-  { value: "难", color: "#111111" }
+  { value: "易", color: "#B5E61D" },
+  { value: "中", color: "#00A0E8" },
+  { value: "难", color: "#8448CC" }
 ];
 
 function getPracticeDifficultyColor(value) {
@@ -1008,7 +1021,7 @@ async function handleConfirmPracticeStart() {
 function practiceLevelCardStyle(level) {
   return {
     borderColor: practiceDifficulty.value === level.value ? level.color : "rgba(var(--ne-primary-rgb), 0.16)",
-    background: practiceDifficulty.value === level.value ? `${level.color}18` : "#ffffff"
+    background: practiceDifficulty.value === level.value ? `${level.color}18` : "var(--practice-level-card-bg, var(--ne-surface))"
   };
 }
 
@@ -1436,9 +1449,12 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .home-shell {
-  display: flex;
+  --home-sidebar-width: 240px;
+  display: grid;
+  grid-template-columns: var(--home-sidebar-width) 1fr;
   width: 100%;
-  gap: 0;
+  gap: 16px;
+  transition: grid-template-columns 0.28s ease;
 }
 
 .min-h-screen {
@@ -1613,7 +1629,7 @@ onBeforeUnmount(() => {
 }
 
 .home-shell.sidebar-collapsed {
-  width: 100%;
+  --home-sidebar-width: 112px;
 }
 
 .home-sidebar {
@@ -1626,6 +1642,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--ne-border);
   border-radius: var(--ne-radius-lg);
   box-shadow: var(--ne-shadow-soft);
+  width: var(--home-sidebar-width);
 }
 
 .side-collapse-row {
@@ -1736,12 +1753,16 @@ onBeforeUnmount(() => {
 }
 
 .home-shell.sidebar-collapsed .side-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
   gap: 0;
 }
 
 .home-shell.sidebar-collapsed .side-profile-meta {
   width: 0;
+  height: 0;
   opacity: 0;
   overflow: hidden;
   pointer-events: none;
@@ -1774,6 +1795,12 @@ onBeforeUnmount(() => {
 
 .home-shell.sidebar-collapsed .side-actions .el-button {
   min-width: 64px;
+}
+
+.home-shell.sidebar-collapsed .home-sidebar {
+  padding-left: 0;
+  padding-right: 0;
+  align-items: center;
 }
 
 .side-nav {
@@ -1823,28 +1850,6 @@ onBeforeUnmount(() => {
 
 .home-shell.sidebar-collapsed .side-actions .exit-text {
   display: none;
-}
-
-.home-shell.sidebar-collapsed .side-profile-meta {
-  width: auto;
-  opacity: 1;
-  overflow: visible;
-  pointer-events: auto;
-}
-
-.home-shell.sidebar-collapsed .side-item {
-  width: auto;
-  padding: 8px 12px;
-  text-align: left;
-  justify-content: flex-start;
-}
-
-.home-shell.sidebar-collapsed .side-item-icon {
-  margin-right: 8px;
-}
-
-.home-shell.sidebar-collapsed .side-actions .exit-text {
-  display: inline;
 }
 
 .home-main {
@@ -2177,6 +2182,15 @@ onBeforeUnmount(() => {
   flex: 1;
 }
 
+:deep(.practice-mode-toggle:not(.is-checked) .el-switch__core) {
+  background-color: #A6A6A6;
+  border-color: #A6A6A6;
+}
+
+:deep(.practice-mode-toggle:not(.is-checked) .el-switch__action) {
+  color: #A6A6A6;
+}
+
 .practice-level-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2216,6 +2230,17 @@ onBeforeUnmount(() => {
 
 .practice-level-card.disabled {
   cursor: not-allowed;
+}
+
+[data-theme="dark"] .practice-level-card {
+  --practice-level-card-bg: #0f1115;
+  border-color: #303844;
+  color: #f5f7fa;
+}
+
+[data-theme="dark"] .practice-level-card:hover {
+  background: #171b22;
+  border-color: #3d4756;
 }
 
 .practice-level-dot {
@@ -2583,7 +2608,6 @@ onBeforeUnmount(() => {
   padding-left: 4px !important;
   transform: translateX(-90px) !important;
 }
-
 ::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(1) .cell,
 ::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(2) .cell,
 ::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(3) .cell {
