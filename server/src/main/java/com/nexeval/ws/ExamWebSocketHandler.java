@@ -317,6 +317,17 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
             )
           );
           break;
+        case "GENERATE_CAT_REPORT":
+          responsePayload = catExamService.generateCatReport(
+            requireText(payload, "sessionId"),
+            optionalText(payload, "courseNo"),
+            optionalText(payload, "courseName"),
+            optionalInt(payload, "estimatedScore"),
+            optionalInt(payload, "systemPrecision"),
+            optionalInt(payload, "answeredCount"),
+            optionalInt(payload, "maxQuestions")
+          );
+          break;
         default:
           throw new IllegalArgumentException("Unsupported action: " + action);
       }

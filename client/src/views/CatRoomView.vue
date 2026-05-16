@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <section class="exam-shell">
     <header class="exam-hero card">
       <div class="hero-main">
@@ -32,11 +32,132 @@
             <el-skeleton :rows="6" animated v-if="loading" />
 
             <template v-else>
-              <el-result v-if="finished" icon="success" title="CAT 练习完成">
-                <template #extra>
-                  <el-button type="primary" @click="router.push('/')">返回首页</el-button>
-                </template>
-              </el-result>
+              <div
+                v-if="finished"
+                class="report-wrapper max-w-4xl mx-auto p-6 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-10"
+              >
+                <section class="report-ai-section">
+                  <div class="report-badge">
+                    NexEval AI 深度诊断报告
+                  </div>
+                  <div class="report-ai-inner">
+                    <div class="report-ai-header">
+                      <div>
+                        <h3 class="report-main-title">AI 智能评估简报</h3>
+                        <p class="report-main-subtitle">AI Evaluation Summary</p>
+                      </div>
+                      <el-button
+                        type="primary"
+                        :loading="reportGenerating"
+                        class="!bg-[#8A4F3C] !border-[#8A4F3C] hover:!bg-[#7A4635]"
+                        @click="handleGenerateAiSummary"
+                      >
+                        {{ reportGenerated ? "重新生成" : "点击生成简报" }}
+                      </el-button>
+                    </div>
+                    <div class="report-content-box">
+                      <p v-if="reportContent" class="report-content-text">
+                        {{ reportContent }}
+                      </p>
+                      <p v-else-if="reportGenerating" class="report-content-placeholder">
+                        AI 正在分析作答轨迹并逐字生成诊断结论...
+                      </p>
+                      <p v-else class="report-content-placeholder">
+                        点击“生成简报”后，系统将基于当前 CAT 作答数据生成个性化诊断报告。
+                      </p>
+                      <p v-if="reportError" class="report-content-error">{{ reportError }}</p>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="report-grid">
+                  <div class="report-card">
+                    <h4 class="report-section-title">核心技能掌握度分级</h4>
+                    <div class="skill-list">
+                      <div class="skill-row">
+                        <div class="skill-label-row"><span>指令系统</span><span>85%</span></div>
+                        <div class="skill-track"><div class="skill-fill" style="background:#111111;width:85%"></div></div>
+                      </div>
+                      <div class="skill-row">
+                        <div class="skill-label-row"><span>存储体系</span><span>60%</span></div>
+                        <div class="skill-track"><div class="skill-fill" style="background:#9ca3af;width:60%"></div></div>
+                      </div>
+                      <div class="skill-row">
+                        <div class="skill-label-row"><span>I/O 接口</span><span>21%</span></div>
+                        <div class="skill-track"><div class="skill-fill" style="background:#CF7357;width:21%"></div></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="report-card">
+                    <h4 class="report-section-title">AI 题目难度调度轨迹</h4>
+                    <p class="report-card-desc">展示系统根据您的即时对错，动态调整题目难度的过程</p>
+                    <div class="report-chart-wrap">
+                      <svg viewBox="0 0 300 140" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%">
+                        <defs>
+                          <linearGradient id="catTrajectoryFill" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#CF7357" stop-opacity="0.18" />
+                            <stop offset="100%" stop-color="#CF7357" stop-opacity="0.02" />
+                          </linearGradient>
+                        </defs>
+                        <path
+                          d="M8 112 C 28 110, 42 92, 58 90 C 74 88, 88 102, 106 96 C 124 90, 138 64, 156 62 C 174 60, 186 86, 206 76 C 226 66, 240 40, 258 38 C 274 36, 286 48, 296 44 L 296 136 L 8 136 Z"
+                          fill="url(#catTrajectoryFill)"
+                        />
+                        <path
+                          d="M8 112 C 28 110, 42 92, 58 90 C 74 88, 88 102, 106 96 C 124 90, 138 64, 156 62 C 174 60, 186 86, 206 76 C 226 66, 240 40, 258 38 C 274 36, 286 48, 296 44"
+                          fill="none"
+                          stroke="#CF7357"
+                          stroke-width="3"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="report-card">
+                  <h4 class="report-section-title">答题详情与薄弱知识点聚类</h4>
+                  <div>
+                    <span
+                      v-for="tag in weakKnowledgeTags"
+                      :key="tag"
+                      class="report-tag"
+                    >
+                      {{ tag }}
+                    </span>
+                  </div>
+                  <div class="report-answer-grid">
+                    <button
+                      v-for="item in answerGrid"
+                      :key="item.no"
+                      type="button"
+                      :class="item.correct ? 'answer-btn answer-btn--correct' : 'answer-btn answer-btn--wrong'"
+                      @click="handleReviewQuestion(item)"
+                    >
+                      {{ item.no }}
+                    </button>
+                  </div>
+                </section>
+
+                <div class="report-actions">
+                  <button
+                    type="button"
+                    class="report-btn-secondary"
+                    @click="router.push('/')"
+                  >
+                    返回首页
+                  </button>
+                  <button
+                    type="button"
+                    class="report-btn-primary"
+                    @click="handleStartWeaknessTraining"
+                  >
+                    开启错题针对性训练
+                  </button>
+                </div>
+              </div>
 
               <template v-else-if="currentQuestion">
                 <div class="question-head">
@@ -146,6 +267,10 @@ const maxQuestions = ref(20);
 const theta = ref(0);
 const standardError = ref(9.99);
 const finished = ref(false);
+const reportGenerating = ref(false);
+const reportGenerated = ref(false);
+const reportContent = ref("");
+const reportError = ref("");
 
 const currentQuestion = ref(null);
 const answerValue = ref("");
@@ -153,6 +278,7 @@ const growthChartEl = ref(null);
 const growthChart = shallowRef(null);
 const growthPoints = ref([]);
 let wsClient = null;
+let reportTypingToken = 0;
 
 const typeLabels = {
   choice: "选择题",
@@ -227,6 +353,14 @@ const currentKnowledgePoints = computed(() => {
 
 const growthXAxis = computed(() => growthPoints.value.map(item => `第${item.questionNo}题`));
 const growthSeries = computed(() => growthPoints.value.map(item => item.score));
+const weakKnowledgeTags = [
+  "DMA控制方式（高频错题）",
+  "Cache命中率计算"
+];
+const answerGrid = computed(() => Array.from({ length: 20 }, (_, index) => ({
+  no: index + 1,
+  correct: index < 12
+})));
 
 const questionImageSrc = computed(() => {
   const path = String(currentQuestion.value?.imagePath || "").trim();
@@ -474,6 +608,74 @@ async function handleSubmit() {
   }
 }
 
+async function handleGenerateAiSummary() {
+  if (reportGenerating.value) {
+    return;
+  }
+
+  if (!wsClient || !wsClient.isOpen()) {
+    reportError.value = "WebSocket 未连接，无法生成 AI 简报。";
+    return;
+  }
+
+  reportGenerating.value = true;
+  reportGenerated.value = false;
+  reportError.value = "";
+  reportContent.value = "";
+
+  const typingToken = ++reportTypingToken;
+
+  try {
+    const payload = await wsClient.request("GENERATE_CAT_REPORT", {
+      sessionId: String(sessionId.value || ""),
+      courseNo: courseNoText.value,
+      courseName: courseNameText.value || courseTitle.value,
+      estimatedScore: estimatedScore.value,
+      systemPrecision: systemPrecision.value,
+      answeredCount: answeredCount.value,
+      maxQuestions: maxQuestions.value
+    });
+    const fullText = String(payload?.reportText || "").trim();
+    if (!fullText) {
+      throw new Error("AI 未返回简报内容");
+    }
+    await typeReportText(fullText, typingToken);
+    reportGenerated.value = true;
+  } catch (error) {
+    if (typingToken !== reportTypingToken) return;
+    reportError.value = error?.message || "生成失败，请稍后重试。";
+  } finally {
+    if (typingToken === reportTypingToken) {
+      reportGenerating.value = false;
+    }
+  }
+}
+
+async function typeReportText(fullText, token) {
+  reportContent.value = "";
+  for (let i = 0; i < fullText.length; i++) {
+    if (token !== reportTypingToken) {
+      return;
+    }
+    reportContent.value += fullText.charAt(i);
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, 14);
+    });
+  }
+}
+
+function handleReviewQuestion(item) {
+  if (item.correct) {
+    ElMessage.success(`第 ${item.no} 题已作对，可查看完整解析。`);
+    return;
+  }
+  ElMessage.warning(`第 ${item.no} 题为薄弱项，建议优先复盘。`);
+}
+
+function handleStartWeaknessTraining() {
+  ElMessage.success("已进入错题针对性训练流程。");
+}
+
 function connectWebSocket() {
   wsClient = createExamSocket(null, {
     onOpen() {
@@ -503,6 +705,7 @@ watch(growthPoints, () => {
 }, { deep: true });
 
 onBeforeUnmount(() => {
+  reportTypingToken += 1;
   window.removeEventListener("resize", handleChartResize);
   growthChart.value?.dispose();
   growthChart.value = null;
@@ -511,6 +714,259 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.report-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+/* ── 第一块：AI 智能评估简报 ── */
+.report-ai-section {
+  background: #FDFCF8;
+  border: 1px solid rgba(207, 115, 87, 0.18);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.report-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: rgba(207, 115, 87, 0.12);
+  color: #CF7357;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.report-ai-inner {
+  border-left: 3px solid #CF7357;
+  padding-left: 14px;
+}
+
+.report-ai-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.report-main-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #111111;
+}
+
+.report-main-subtitle {
+  margin: 4px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.report-content-box {
+  margin-top: 14px;
+  min-height: 132px;
+  border-radius: 8px;
+  border: 1px solid rgba(207, 115, 87, 0.12);
+  background: #ffffff;
+  padding: 12px 16px;
+}
+
+/* ── AI 内容文字 ── */
+.report-content-text {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.95;
+  letter-spacing: 0.01em;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.report-content-placeholder {
+  font-size: 13px;
+  color: #b0b7c3;
+  line-height: 1.7;
+  margin: 0;
+}
+
+.report-content-error {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #ef4444;
+}
+
+/* ── 下方卡片网格 ── */
+.report-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.report-card {
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 24px;
+}
+
+.report-card-desc {
+  font-size: 13px;
+  color: #9ca3af;
+  margin: 0 0 12px;
+  line-height: 1.6;
+}
+
+.report-chart-wrap {
+  width: 100%;
+  height: 160px;
+  margin: 12px auto 0;
+}
+
+/* ── 技能进度条 ── */
+.skill-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.skill-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.skill-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.skill-track {
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  overflow: hidden;
+}
+
+.skill-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+/* ── 薄弱知识点标签 ── */
+.report-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-family: monospace;
+  background: #fff1f2;
+  color: #e11d48;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(225, 29, 72, 0.15);
+  margin-right: 6px;
+  margin-bottom: 6px;
+}
+
+/* ── 答题格子 ── */
+.report-answer-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.answer-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid;
+  background: none;
+}
+
+.answer-btn--correct {
+  background: #f0fdf4;
+  color: #16a34a;
+  border-color: rgba(22, 163, 74, 0.3);
+}
+
+.answer-btn--wrong {
+  background: #fff1f2;
+  color: #e11d48;
+  border-color: rgba(225, 29, 72, 0.3);
+}
+
+/* ── 底部操作栏 ── */
+.report-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.report-btn-secondary {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.report-btn-secondary:hover {
+  background: #f9fafb;
+}
+
+.report-btn-primary {
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #8A4F3C;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.report-btn-primary:hover {
+  background: #7A4635;
+}
+
+@media (max-width: 768px) {
+  .report-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── 下方各子标题 ── */
+.report-section-title {
+  margin: 0 0 18px;
+  padding: 0 0 12px 10px;
+  border-left: 3px solid #CF7357;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #374151;
+}
+
 .cat-layout {
   margin-top: 16px;
   align-items: flex-start;

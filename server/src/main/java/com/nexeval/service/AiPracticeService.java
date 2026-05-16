@@ -83,6 +83,54 @@ public class AiPracticeService {
     }
   }
 
+  public String generateCatSummary(
+    String courseNo,
+    String courseName,
+    int estimatedScore,
+    int systemPrecision,
+    int answeredCount,
+    int maxQuestions
+  ) {
+    if (apiKey.isBlank()) {
+      throw new IllegalStateException("DashScope API Key 未配置");
+    }
+
+    String prompt = buildCatSummaryPrompt(
+      courseNo,
+      courseName,
+      estimatedScore,
+      systemPrecision,
+      answeredCount,
+      maxQuestions
+    );
+
+    MultiModalMessage systemMessage = MultiModalMessage.builder()
+      .role(Role.SYSTEM.getValue())
+      .content(List.of(Map.of("text", "你是严谨的学习诊断顾问，输出中文专业诊断文本。")))
+      .build();
+    MultiModalMessage userMessage = MultiModalMessage.builder()
+      .role(Role.USER.getValue())
+      .content(List.of(Map.of("text", prompt)))
+      .build();
+
+    MultiModalConversationParam param = MultiModalConversationParam.builder()
+      .apiKey(apiKey)
+      .model(model)
+      .messages(List.of(systemMessage, userMessage))
+      .modalities(Collections.singletonList("text"))
+      .incrementalOutput(false)
+      .build();
+
+    try {
+      MultiModalConversation conversation = new MultiModalConversation();
+      MultiModalConversationResult result = conversation.call(param);
+      return extractText(result);
+    } catch (ApiException | NoApiKeyException | UploadFileException ex) {
+      log.warn("AI cat summary generation failed: {}", ex.getMessage());
+      throw new IllegalStateException("AI 简报生成失败，请稍后重试");
+    }
+  }
+
   private String buildPrompt(
     String courseNo,
     String difficultyLabel,
@@ -110,6 +158,29 @@ public class AiPracticeService {
     builder.append("2. 题目应符合目标难度。\n");
     builder.append("3. 尽量覆盖单选、判断、填空和大题。\n");
     builder.append("4. 只输出 JSON，不要解释。\n");
+    return builder.toString();
+  }
+
+  private String buildCatSummaryPrompt(
+    String courseNo,
+    String courseName,
+    int estimatedScore,
+    int systemPrecision,
+    int answeredCount,
+    int maxQuestions
+  ) {
+    StringBuilder builder = new StringBuilder();
+    builder.append("请基于以下 CAT 训练数据，生成一段 180~260 字的中文学习诊断报告。\n");
+    builder.append("课程编号：").append(normalize(courseNo)).append('\n');
+    builder.append("课程名称：").append(normalize(courseName)).append('\n');
+    builder.append("已答题数：").append(answeredCount).append('/').append(maxQuestions).append('\n');
+    builder.append("AI 预估掌握度：").append(estimatedScore).append("%\n");
+    builder.append("系统精准度：").append(systemPrecision).append("%\n");
+    builder.append("写作要求：\n");
+    builder.append("1) 语言专业、克制，避免空话。\n");
+    builder.append("2) 必须指出 2 个优势维度和 1~2 个薄弱维度。\n");
+    builder.append("3) 给出可执行的下一步训练建议。\n");
+    builder.append("4) 只输出纯文本，不要 Markdown，不要项目符号。\n");
     return builder.toString();
   }
 

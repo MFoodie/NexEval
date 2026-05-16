@@ -555,6 +555,46 @@ public class CatExamService {
     return toAnswerDetailView(saved);
   }
 
+  public Map<String, Object> generateCatReport(
+    String sessionId,
+    String courseNo,
+    String courseName,
+    Integer estimatedScore,
+    Integer systemPrecision,
+    Integer answeredCount,
+    Integer maxQuestions
+  ) {
+    String normalizedSessionId = sessionId == null ? "" : sessionId.trim();
+    if (normalizedSessionId.isBlank()) {
+      throw new IllegalArgumentException("sessionId is required");
+    }
+
+    int safeEstimated = clampPercent(estimatedScore);
+    int safePrecision = clampPercent(systemPrecision);
+    int safeAnswered = Math.max(0, answeredCount == null ? 0 : answeredCount);
+    int safeMax = Math.max(1, maxQuestions == null ? 20 : maxQuestions);
+    String safeCourseNo = normalizeSourceId(courseNo);
+    String safeCourseName = courseName == null ? "" : courseName.trim();
+
+    String summary = aiPracticeService.generateCatSummary(
+      safeCourseNo,
+      safeCourseName,
+      safeEstimated,
+      safePrecision,
+      safeAnswered,
+      safeMax
+    );
+
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("sessionId", normalizedSessionId);
+    payload.put("reportText", summary);
+    payload.put("estimatedScore", safeEstimated);
+    payload.put("systemPrecision", safePrecision);
+    payload.put("answeredCount", safeAnswered);
+    payload.put("maxQuestions", safeMax);
+    return payload;
+  }
+
   private Integer capReviewScore(Integer score, ExamAnswer answer) {
     if (score == null) {
       return null;
@@ -991,6 +1031,11 @@ public class CatExamService {
       requested = 1;
     }
     return Math.min(requested, Math.max(1, maxAvailable));
+  }
+
+  private int clampPercent(Integer value) {
+    int raw = value == null ? 0 : value;
+    return Math.max(0, Math.min(100, raw));
   }
 
   private String trimStem(String stem) {
