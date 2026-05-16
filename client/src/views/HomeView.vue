@@ -2583,4 +2583,10 @@ onBeforeUnmount(() => {
   padding-left: 4px !important;
   transform: translateX(-90px) !important;
 }
+
+::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(1) .cell,
+::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(2) .cell,
+::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(3) .cell {
+  font-weight: 400 !important;
+}
 </style>

@@ -152,3 +152,164 @@ INSERT IGNORE INTO judge_exam_paper_question (paper_id, question_id, display_ord
 ('PAPER_BASIC', 'J034', 12),
 ('PAPER_BASIC', 'J037', 13),
 ('PAPER_BASIC', 'J040', 14);
+
+-- IRT parameters migration (run after all question banks exist)
+SET @col_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+        AND table_name = 'question_bank'
+        AND column_name = 'difficulty_b'
+);
+SET @sql := IF(
+    @col_exists = 0,
+    'ALTER TABLE question_bank ADD COLUMN difficulty_b decimal(4,2) NOT NULL DEFAULT 0.00 AFTER difficulty',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+        AND table_name = 'question_bank'
+        AND column_name = 'discrimination_a'
+);
+SET @sql := IF(
+    @col_exists = 0,
+    'ALTER TABLE question_bank ADD COLUMN discrimination_a decimal(4,2) NOT NULL DEFAULT 1.00 AFTER difficulty_b',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+        AND table_name = 'judge_question_bank'
+        AND column_name = 'difficulty_b'
+);
+SET @sql := IF(
+    @col_exists = 0,
+    'ALTER TABLE judge_question_bank ADD COLUMN difficulty_b decimal(4,2) NOT NULL DEFAULT 0.00 AFTER difficulty',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+        AND table_name = 'judge_question_bank'
+        AND column_name = 'discrimination_a'
+);
+SET @sql := IF(
+    @col_exists = 0,
+    'ALTER TABLE judge_question_bank ADD COLUMN discrimination_a decimal(4,2) NOT NULL DEFAULT 1.00 AFTER difficulty_b',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+        AND table_name = 'blank_question_bank'
+        AND column_name = 'difficulty_b'
+);
+SET @sql := IF(
+    @col_exists = 0,
+    'ALTER TABLE blank_question_bank ADD COLUMN difficulty_b decimal(4,2) NOT NULL DEFAULT 0.00 AFTER difficulty',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+        AND table_name = 'blank_question_bank'
+        AND column_name = 'discrimination_a'
+);
+SET @sql := IF(
+    @col_exists = 0,
+    'ALTER TABLE blank_question_bank ADD COLUMN discrimination_a decimal(4,2) NOT NULL DEFAULT 1.00 AFTER difficulty_b',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+        AND table_name = 'essay_question_bank'
+        AND column_name = 'difficulty_b'
+);
+SET @sql := IF(
+    @col_exists = 0,
+    'ALTER TABLE essay_question_bank ADD COLUMN difficulty_b decimal(4,2) NOT NULL DEFAULT 0.00 AFTER difficulty',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+        AND table_name = 'essay_question_bank'
+        AND column_name = 'discrimination_a'
+);
+SET @sql := IF(
+    @col_exists = 0,
+    'ALTER TABLE essay_question_bank ADD COLUMN discrimination_a decimal(4,2) NOT NULL DEFAULT 1.00 AFTER difficulty_b',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+UPDATE question_bank
+SET difficulty_b = CASE
+    WHEN difficulty <= 2.0 THEN -1.0
+    WHEN difficulty <= 3.5 THEN 0.0
+    ELSE 1.0
+END,
+    discrimination_a = 1.0;
+
+UPDATE judge_question_bank
+SET difficulty_b = CASE
+    WHEN difficulty <= 2.0 THEN -1.0
+    WHEN difficulty <= 3.5 THEN 0.0
+    ELSE 1.0
+END,
+    discrimination_a = 1.0;
+
+UPDATE blank_question_bank
+SET difficulty_b = CASE
+    WHEN difficulty <= 2.0 THEN -1.0
+    WHEN difficulty <= 3.5 THEN 0.0
+    ELSE 1.0
+END,
+    discrimination_a = 1.0;
+
+UPDATE essay_question_bank
+SET difficulty_b = CASE
+    WHEN difficulty <= 2.0 THEN -1.0
+    WHEN difficulty <= 3.5 THEN 0.0
+    ELSE 1.0
+END,
+    discrimination_a = 1.0;
