@@ -154,7 +154,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { createExamSocket } from "../ws";
-import logoUrl from "../assets/logo.png";
+import logoUrl from "../assets/nexeval.svg";
 import bgUrl from "../assets/bg.png";
 import bg1Url from "../assets/bg1.png";
 import bg2Url from "../assets/bg2.png";
@@ -681,7 +681,7 @@ onBeforeUnmount(() => {
 .login-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 2px;
   margin-bottom: 16px;
 }
 
@@ -700,19 +700,30 @@ onBeforeUnmount(() => {
 }
 
 .login-logo {
-  width: 44px;
+  width: 84px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: 10px;
   object-fit: contain;
-  background: #ffffff;
-  box-shadow: 0 8px 20px rgba(16, 24, 39, 0.12);
+  object-position: left center;
+  background: transparent;
+  box-shadow: none;
+  margin-right: 0px;
+}
+
+@media (max-width: 599px) {
+  .login-logo {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
 }
 
 .login-brand-text {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 8px;
   white-space: nowrap;
+  margin-left: -30px;
 }
 
 .login-brand-title {

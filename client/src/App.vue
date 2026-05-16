@@ -73,7 +73,7 @@
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { RouterLink } from "vue-router";
-import logoUrl from "./assets/logo.png";
+import logoUrl from "./assets/nexeval.svg";
 
 const route = useRoute();
 const isAuthRoute = computed(() => {

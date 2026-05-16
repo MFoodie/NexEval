@@ -54,7 +54,7 @@
     </aside>
 
     <main class="main-panel">
-      <section class="card panel-card" v-if="activeMenu === 'profile'">
+      <section class="card panel-card profile-panel-card" v-if="activeMenu === 'profile'">
         <div class="profile-head">
           <h2 class="panel-title">简介</h2>
           <div class="profile-head-actions">
@@ -1266,6 +1266,10 @@ onBeforeUnmount(() => {
 
 .panel-card {
   min-height: 400px;
+}
+
+.profile-panel-card {
+  min-height: 260px;
 }
 
 [data-theme="dark"] .sidebar-name,

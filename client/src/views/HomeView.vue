@@ -275,7 +275,7 @@
           v-else-if="activeMenu === 'cat' && isStudent"
         >
           <div class="mb-6">
-            <h2 class="text-2xl font-semibold">CAT 智能自适应</h2>
+            <h2 class="text-2xl font-semibold">CAT 智能自适应练习</h2>
             <p class="text-sm">基于实时作答表现自动调整难度，提供个性化练习路径。</p>
           </div>
 
@@ -587,6 +587,7 @@ import { createExamSocket } from "../ws";
 import iconPersonalInfo from "../assets/personal_info.svg";
 import iconExam from "../assets/exam.svg";
 import iconCorrect from "../assets/correct.svg";
+import iconCat from "../assets/CAT.svg";
 import iconExit from "../assets/exit.svg";
 
 const router = useRouter();
@@ -668,8 +669,8 @@ const menuItems = computed(() => {
   if (isStudent.value) {
     items.push({
       key: "cat",
-      label: "CAT 智能自适应",
-      symbol: "⚡"
+      label: "CAT 智能自适应练习",
+      icon: iconCat
     });
   }
   return items;
@@ -1764,6 +1765,13 @@ onBeforeUnmount(() => {
   font-size: 13px !important;
   font-weight: 600 !important;
   letter-spacing: 0;
+}
+
+.side-item--cat .side-item-icon {
+  width: 24px;
+  height: 24px;
+  margin-left: -2px;
+  margin-right: 4px;
 }
 
 .side-item-icon {
