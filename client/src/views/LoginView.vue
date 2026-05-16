@@ -8,13 +8,15 @@
     >
       <div class="boot-meta boot-meta--tl">SYS.INIT // V2.0.4</div>
       <div class="boot-meta boot-meta--br">SECURE_NODE: ACTIVE</div>
-      <div class="boot-center">
-        <div class="boot-text">
-          <span class="boot-line">Empowering assessments with AI precision_</span>
+      <div class="boot-center flex flex-col items-center justify-center">
+        <div class="boot-text text-3xl md:text-5xl font-medium tracking-wide text-gray-900">
+          <span class="boot-line">Assess. Smarter._</span>
           <span class="boot-cursor">_</span>
         </div>
-        <div class="boot-subtext">Delivering fair, fast, and data-driven insights.</div>
-        <div class="boot-progress"></div>
+        <div class="boot-subtext mt-5 text-sm md:text-base text-gray-500 font-mono tracking-wider opacity-0">
+          Delivering fair, fast, and data-driven insights.
+        </div>
+        <div class="boot-progress mt-6 h-2px bg-terracotta origin-center"></div>
       </div>
     </div>
     <div class="card login-panel">
@@ -133,6 +135,7 @@ const wsStatus = ref("connecting");
 const themeKey = "nexeval.theme";
 const themeEvent = "nexeval-theme-change";
 const bootSeenKey = "nexeval.boot.seen";
+const lastAccountKey = "nexeval.last.account";
 const themeOptions = [
   { value: "beige", label: "米白" },
   { value: "classic", label: "经典" },
@@ -263,6 +266,15 @@ onMounted(() => {
     // ignore storage read errors
   }
 
+  try {
+    const lastAccount = localStorage.getItem(lastAccountKey);
+    if (lastAccount && !account.value) {
+      account.value = lastAccount;
+    }
+  } catch {
+    // ignore storage read errors
+  }
+
   applyTheme(theme.value);
   window.addEventListener(themeEvent, handleThemeEvent);
   bgTimer = window.setInterval(() => {
@@ -277,6 +289,18 @@ watch(theme, (value) => {
   }
   try {
     localStorage.setItem(themeKey, value);
+  } catch {
+    // ignore storage write errors
+  }
+});
+
+watch(account, (value) => {
+  const text = String(value || "").trim();
+  if (!text) {
+    return;
+  }
+  try {
+    localStorage.setItem(lastAccountKey, text);
   } catch {
     // ignore storage write errors
   }
@@ -317,10 +341,10 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 6px;
   font-family: "JetBrains Mono", "Space Grotesk", "Manrope", monospace;
-  font-size: clamp(24px, 3.6vw, 38px);
-  font-weight: 300;
-  letter-spacing: 0.12em;
-  color: #2d2d2d;
+  font-size: clamp(30px, 4.6vw, 48px);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: #111111;
 }
 
 .boot-center {
@@ -348,20 +372,22 @@ onBeforeUnmount(() => {
 }
 
 .boot-subtext {
-  margin-top: 16px;
-  font-size: 12px;
+  margin-top: 20px;
+  font-size: clamp(13px, 2vw, 16px);
   font-family: "JetBrains Mono", "Space Grotesk", "Manrope", monospace;
-  color: rgba(45, 45, 45, 0.6);
-  animation: boot-pulse 1.6s ease-in-out infinite;
+  color: #6b6b6b;
+  opacity: 0;
+  animation: boot-fade-in 0.7s ease forwards 0.3s, boot-pulse 1.6s ease-in-out infinite 1.1s;
 }
 
 .boot-progress {
-  height: 1px;
+  height: 2px;
   background: #cf7357;
   margin-top: 24px;
-  width: 0;
-  transform-origin: left;
-  animation: boot-expand 2s ease-out forwards;
+  width: 160px;
+  transform: scaleX(0);
+  transform-origin: center;
+  animation: boot-expand 1.6s ease-out forwards;
 }
 
 .boot-line {
@@ -369,7 +395,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   white-space: nowrap;
   border-right: 3px solid #cf7357;
-  animation: boot-type 1.8s steps(28, end) forwards;
+  animation: boot-type 1.6s steps(18, end) forwards;
 }
 
 .boot-cursor {
@@ -383,7 +409,7 @@ onBeforeUnmount(() => {
     width: 0;
   }
   to {
-    width: 28ch;
+    width: 18ch;
   }
 }
 
@@ -408,13 +434,93 @@ onBeforeUnmount(() => {
     transform: scale(1.04);
     opacity: 0;
     filter: blur(10px);
+    visibility: hidden;
+    pointer-events: none;
   }
 }
 
 @keyframes boot-expand {
   to {
-    width: 140px;
+    transform: scaleX(1);
   }
+}
+
+@keyframes boot-fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+.text-3xl {
+  font-size: clamp(30px, 4.6vw, 48px);
+}
+
+.md\:text-5xl {
+  font-size: clamp(36px, 5.6vw, 56px);
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.tracking-wide {
+  letter-spacing: 0.08em;
+}
+
+.text-gray-900 {
+  color: #111111;
+}
+
+.mt-5 {
+  margin-top: 20px;
+}
+
+.text-sm {
+  font-size: 14px;
+}
+
+.md\:text-base {
+  font-size: 16px;
+}
+
+.text-gray-500 {
+  color: #6b6b6b;
+}
+
+.font-mono {
+  font-family: "JetBrains Mono", "Space Grotesk", "Manrope", monospace;
+}
+
+.tracking-wider {
+  letter-spacing: 0.12em;
+}
+
+.opacity-0 {
+  opacity: 0;
+}
+
+.mt-6 {
+  margin-top: 24px;
+}
+
+.h-2px {
+  height: 2px;
+}
+
+.bg-terracotta {
+  background: #cf7357;
+}
+
+.origin-center {
+  transform-origin: center;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
 }
 
 @keyframes boot-pulse {
