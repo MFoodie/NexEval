@@ -31,10 +31,11 @@
           type="button"
           class="side-item"
           :title="sidebarCollapsed ? item.label : ''"
-          :class="{ active: activeMenu === item.key }"
+          :class="{ active: activeMenu === item.key, 'side-item--cat': item.key === 'cat' }"
           @click="activeMenu = item.key"
         >
           <img v-if="item.icon" :src="item.icon" :alt="item.label" class="side-item-icon" />
+          <span v-else-if="item.symbol" class="side-item-symbol" aria-hidden="true">{{ item.symbol }}</span>
           <span v-if="!sidebarCollapsed" class="side-item-label">{{ item.label }}</span>
         </button>
       </nav>
@@ -114,7 +115,7 @@
         </table>
       </section>
 
-        <section class="card panel-card exam-panel-card bg-white rounded-xl border border-gray-200 shadow-sm p-6" v-else>
+        <section class="card panel-card exam-panel-card bg-white rounded-xl border border-gray-200 shadow-sm p-6" v-else-if="activeMenu === 'action'">
         <div class="mb-6">
           <h2 class="text-2xl font-semibold">{{ actionPanelTitle }}</h2>
           <p class="text-sm">考试、练习与批改在此统一管理。</p>
@@ -268,6 +269,69 @@
           </div>
         </el-form>
         </section>
+
+        <section
+          class="card panel-card exam-panel-card bg-white rounded-xl border border-gray-200 shadow-sm p-6"
+          v-else-if="activeMenu === 'cat' && isStudent"
+        >
+          <div class="mb-6">
+            <h2 class="text-2xl font-semibold">CAT 智能自适应</h2>
+            <p class="text-sm">基于实时作答表现自动调整难度，提供个性化练习路径。</p>
+          </div>
+
+          <div v-if="studentLoading" class="placeholder">正在加载教学班...</div>
+          <div v-else-if="studentClasses.length" class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+            <div class="section-title">课程列表</div>
+            <el-table :data="studentClasses" size="small" class="student-classes-table">
+              <el-table-column
+                prop="cno"
+                label="课程号"
+                width="140"
+                align="left"
+                header-align="left"
+                class-name="col-large"
+                header-class-name="col-large-header"
+              />
+              <el-table-column
+                prop="cname"
+                label="课程名"
+                align="left"
+                header-align="left"
+                class-name="col-large"
+                header-class-name="col-large-header"
+              />
+              <el-table-column
+                prop="teacherName"
+                label="教师姓名"
+                width="100"
+                align="center"
+                header-align="center"
+                class-name="col-large col-teacher-cell"
+                header-class-name="col-large col-teacher-header"
+              />
+              <el-table-column
+                label="操作"
+                width="180"
+                align="center"
+                header-align="center"
+                class-name="col-large"
+                header-class-name="col-large-header"
+              >
+                <template #default="scope">
+                  <el-button
+                    type="primary"
+                    size="small"
+                    :loading="startingCat"
+                    @click="handleStartCatForClass(scope.row)"
+                  >
+                    开始 CAT 练习
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+          <div v-else class="placeholder">暂无教学班</div>
+        </section>
       </div>
     </main>
 
@@ -357,60 +421,35 @@
       </template>
       <div class="practice-dialog-meta">
         <div class="practice-dialog-course">{{ practiceCourseLabel }}</div>
-        <div class="practice-dialog-tip">{{ catPracticeEnabled ? "CAT 模式已启用，系统将自动调度题目难度。" : "可选择普通练习或 CAT 自适应练习。" }}</div>
-      </div>
-
-      <div class="practice-section">
-        <div class="practice-section-label">CAT 自适应模式</div>
-        <div class="practice-mode-switch-card">
-          <div class="practice-mode-switch-copy">
-            <div class="practice-mode-title">{{ catPracticeEnabled ? "CAT 自适应练习" : "普通练习" }}</div>
-            <div class="practice-mode-desc">
-              {{ catPracticeEnabled ? "已启用 AI 动态难度调度，系统将按作答实时调整题目。" : "关闭后将按你选择的难度级别与题量出题。" }}
-            </div>
-          </div>
-          <el-switch
-            v-model="catPracticeEnabled"
-            class="practice-mode-toggle"
-            inline-prompt
-            active-text="CAT"
-            inactive-text="普通"
-            size="large"
-          />
-        </div>
+        <div class="practice-dialog-tip">当前入口仅支持普通练习。</div>
       </div>
 
       <div class="practice-section">
         <div class="practice-section-label">难度级别</div>
-        <div class="practice-level-grid" :class="{ disabled: catPracticeEnabled }">
+        <div class="practice-level-grid">
           <button
             v-for="level in practiceLevels"
             :key="level.value"
             type="button"
             class="practice-level-card"
-            :class="{ selected: practiceDifficulty === level.value, disabled: catPracticeEnabled }"
+            :class="{ selected: practiceDifficulty === level.value }"
             :style="practiceLevelCardStyle(level)"
-            :disabled="catPracticeEnabled"
             @click="practiceDifficulty = level.value"
           >
             <span class="practice-level-dot" :style="{ backgroundColor: level.color }"></span>
             <span class="practice-level-label">{{ level.value }}</span>
           </button>
         </div>
-        <div v-if="catPracticeEnabled" class="practice-cat-tip" :style="practiceTipCardStyle()">
-          <img :src="bulbIcon" alt="提示" class="practice-tip-icon" />
-          CAT 模式下，AI 将根据您的作答情况动态调整题目难度
-        </div>
       </div>
 
-      <div v-if="!catPracticeEnabled" class="practice-section">
+      <div class="practice-section">
         <div class="practice-section-label">练习题数量</div>
         <el-input-number v-model="practiceQuestionCount" :min="1" :max="50" :step="1" />
       </div>
 
       <template #footer>
         <el-button @click="practiceDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="practiceStartLoading" @click="handleConfirmPracticeStart">{{ practiceStartText }}</el-button>
+        <el-button type="primary" :loading="startingPractice" @click="confirmPracticeStart">开始练习</el-button>
       </template>
     </el-dialog>
 
@@ -549,7 +588,6 @@ import iconPersonalInfo from "../assets/personal_info.svg";
 import iconExam from "../assets/exam.svg";
 import iconCorrect from "../assets/correct.svg";
 import iconExit from "../assets/exit.svg";
-import bulbIcon from "../assets/bulb.svg";
 
 const router = useRouter();
 const loginInfo = getLogin();
@@ -570,7 +608,6 @@ const startingCat = ref(false);
 const startingExam = ref(false);
 const practiceDialogVisible = ref(false);
 const practiceCourse = ref(null);
-const catPracticeEnabled = ref(false);
 const practiceDifficulty = ref("中");
 const practiceQuestionCount = ref(10);
 const avatarSaving = ref(false);
@@ -611,10 +648,6 @@ const practiceLevels = [
   { value: "难", color: "#8448CC" }
 ];
 
-function getPracticeDifficultyColor(value) {
-  return practiceLevels.find((level) => level.value === value)?.color || "#6f6659";
-}
-
 const practiceCourseLabel = computed(() => {
   if (!practiceCourse.value) {
     return "请选择教学班后再开始练习";
@@ -622,8 +655,6 @@ const practiceCourseLabel = computed(() => {
 
   return `${practiceCourse.value.cno || "-"} ｜ ${practiceCourse.value.cname || "未命名课程"}`;
 });
-const practiceStartLoading = computed(() => (catPracticeEnabled.value ? startingCat.value : startingPractice.value));
-const practiceStartText = computed(() => (catPracticeEnabled.value ? "开始 CAT 练习" : "开始练习"));
 const activeMenu = ref("action");
 const menuItems = computed(() => {
   const items = [
@@ -634,6 +665,13 @@ const menuItems = computed(() => {
       icon: isTeacher.value ? iconCorrect : iconExam
     }
   ];
+  if (isStudent.value) {
+    items.push({
+      key: "cat",
+      label: "CAT 智能自适应",
+      symbol: "⚡"
+    });
+  }
   return items;
 });
 const teacherClasses = ref([]);
@@ -1004,32 +1042,15 @@ async function handleStartPractice(courseNo = "", courseName = "") {
 
 function openPracticeDialog(clazz) {
   practiceCourse.value = clazz || null;
-  catPracticeEnabled.value = false;
   practiceDifficulty.value = "中";
   practiceQuestionCount.value = 10;
   practiceDialogVisible.value = true;
-}
-
-async function handleConfirmPracticeStart() {
-  if (catPracticeEnabled.value) {
-    await confirmCatStart();
-    return;
-  }
-  await confirmPracticeStart();
 }
 
 function practiceLevelCardStyle(level) {
   return {
     borderColor: practiceDifficulty.value === level.value ? level.color : "rgba(var(--ne-primary-rgb), 0.16)",
     background: practiceDifficulty.value === level.value ? `${level.color}18` : "var(--practice-level-card-bg, var(--ne-surface))"
-  };
-}
-
-function practiceTipCardStyle() {
-  const color = getPracticeDifficultyColor(practiceDifficulty.value);
-  return {
-    background: `linear-gradient(135deg, ${color}18, ${color}08)`,
-    borderColor: `${color}40`
   };
 }
 
@@ -1162,6 +1183,11 @@ async function handleStartExam(courseNo = "", courseName = "") {
 
 function handleStartPracticeForClass(clazz) {
   openPracticeDialog(clazz || null);
+}
+
+function handleStartCatForClass(clazz) {
+  practiceCourse.value = clazz || null;
+  confirmCatStart();
 }
 
 function handleStartExamForClass(clazz) {
@@ -1729,6 +1755,15 @@ onBeforeUnmount(() => {
 .side-item-label {
   display: inline-block;
   white-space: nowrap;
+  font-size: 14px !important;
+  line-height: 20px;
+  font-weight: 600 !important;
+}
+
+.side-item--cat .side-item-label {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0;
 }
 
 .side-item-icon {
@@ -1738,6 +1773,17 @@ onBeforeUnmount(() => {
   display: inline-block;
   vertical-align: middle;
   margin-right: 8px;
+}
+
+.side-item-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  font-size: 13px;
+  line-height: 1;
 }
 
 .home-shell.sidebar-collapsed .side-collapse-row {
@@ -1786,6 +1832,10 @@ onBeforeUnmount(() => {
 }
 
 .home-shell.sidebar-collapsed .side-item-icon {
+  margin: 0;
+}
+
+.home-shell.sidebar-collapsed .side-item-symbol {
   margin: 0;
 }
 
