@@ -92,7 +92,7 @@
                 <th>邮箱</th>
                 <td>{{ loginInfo?.email || '-' }}</td>
                 <th>角色</th>
-                <td>{{ loginInfo?.type || 'admin' }}</td>
+                <td>{{ loginInfo?.type === 'admin' ? '管理员' : (loginInfo?.type || '-') }}</td>
               </tr>
             </tbody>
           </table>
@@ -259,6 +259,7 @@
                   v-if="scope.row.status === 'pending'"
                   size="small"
                   type="danger"
+                  class="reject-button"
                   plain
                   :loading="appealActionLoading === scope.row.id"
                   @click="handleReviewAppeal(scope.row, false)"
@@ -879,8 +880,13 @@ onBeforeUnmount(() => {
   min-height: 520px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   transition: gap 0.28s ease;
+  background: var(--ne-surface);
+  border: 1px solid var(--ne-border);
+  border-radius: var(--ne-radius-lg);
+  box-shadow: var(--ne-shadow-soft);
+  width: var(--admin-sidebar-width);
 }
 
 .sidebar-collapse-row {
@@ -916,35 +922,41 @@ onBeforeUnmount(() => {
 .sidebar-profile {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px 8px 8px;
+  gap: 12px;
+  text-align: left;
 }
 
 .sidebar-avatar {
-  width: 72px;
-  height: 72px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   object-fit: cover;
   border: 1px solid var(--ne-border);
+  box-shadow: none;
   cursor: pointer;
 }
 
 .sidebar-profile-meta {
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  gap: 4px;
 }
 
 .sidebar-name-row {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-}
-
-.sidebar-profile-meta {
-  min-width: 92px;
+  justify-content: flex-start;
+  gap: 6px;
+  flex-wrap: nowrap;
+  max-width: 100%;
 }
 
 .sidebar-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ne-text-strong);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -952,19 +964,8 @@ onBeforeUnmount(() => {
 
 .sidebar-id {
   white-space: nowrap;
-  font-size: 13px;
   color: var(--ne-text-muted);
-}
-.sidebar-name {
-  margin-top: 10px;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.sidebar-id {
-  margin-top: 2px;
-  color: var(--ne-text-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .sidebar-nav {
@@ -974,19 +975,28 @@ onBeforeUnmount(() => {
 }
 
 .nav-item {
-  border: 1px solid var(--ne-border);
-  background: var(--ne-surface);
+  border: 1px solid transparent;
+  background: transparent;
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   text-align: left;
   font-size: 14px;
   cursor: pointer;
+  color: var(--ne-text);
+  transition: all 0.2s ease;
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-left-color: transparent;
+}
+
+.nav-item:hover {
+  background: var(--ne-hover-bg);
 }
 
 .nav-item.active {
-  border-color: var(--ne-primary);
   color: var(--ne-primary);
-  background: var(--ne-primary-soft);
+  border-left-color: var(--ne-primary);
+  background: var(--ne-hover-bg);
 }
 
 .nav-item-label {
@@ -1021,6 +1031,7 @@ onBeforeUnmount(() => {
   height: 0;
   opacity: 0;
   overflow: hidden;
+  pointer-events: none;
 }
 
 .admin-shell.sidebar-collapsed .sidebar-profile {
@@ -1029,11 +1040,6 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 0;
-}
-
-.admin-shell.sidebar-collapsed .sidebar-profile {
-  padding-left: 0 !important;
-  padding-right: 0 !important;
 }
 
 .admin-shell.sidebar-collapsed .sidebar {
@@ -1091,6 +1097,9 @@ onBeforeUnmount(() => {
 
 .main-panel {
   min-width: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .profile-head {
@@ -1229,21 +1238,21 @@ onBeforeUnmount(() => {
 }
 
 :deep(.male-radio .el-radio__input.is-checked .el-radio__inner) {
-  border-color: var(--ne-primary);
-  background-color: var(--ne-primary);
+  border-color: #2A5CFF;
+  background-color: #2A5CFF;
 }
 
 :deep(.male-radio .el-radio__input.is-checked + .el-radio__label) {
-  color: var(--ne-primary);
+  color: #2A5CFF;
 }
 
 :deep(.female-radio .el-radio__input.is-checked .el-radio__inner) {
-  border-color: var(--ne-accent);
-  background-color: var(--ne-accent);
+  border-color: #FF00FF;
+  background-color: #FF00FF;
 }
 
 :deep(.female-radio .el-radio__input.is-checked + .el-radio__label) {
-  color: var(--ne-accent);
+  color: #FF00FF;
 }
 
 :deep(.vip-switch.is-checked .el-switch__core) {
@@ -1257,6 +1266,19 @@ onBeforeUnmount(() => {
 
 .panel-card {
   min-height: 400px;
+}
+
+[data-theme="dark"] .sidebar-name,
+[data-theme="dark"] .sidebar-id,
+[data-theme="dark"] .nav-item,
+[data-theme="dark"] .nav-item-label,
+[data-theme="dark"] .sidebar-collapse-btn,
+[data-theme="dark"] .sidebar-collapse-text {
+  color: #ffffff;
+}
+
+[data-theme="dark"] .nav-item.active {
+  color: #ffffff;
 }
 
 .panel-title {
@@ -1305,6 +1327,21 @@ onBeforeUnmount(() => {
 .approve-button.el-button.is-plain:active {
   background-color: #51AD13 !important;
   border-color: #51AD13 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .reject-button.el-button.is-plain {
+  background-color: rgba(80, 24, 24, 0.92) !important;
+}
+
+[data-theme="dark"] .reject-button.el-button.is-plain:hover,
+[data-theme="dark"] .reject-button.el-button.is-plain:focus {
+  background-color: #F56C6C !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .reject-button.el-button.is-plain:active {
+  background-color: #F56C6C !important;
   color: #ffffff !important;
 }
 

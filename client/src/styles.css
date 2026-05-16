@@ -26,6 +26,7 @@
   --ne-hover-border: rgba(var(--ne-primary-rgb), 0.2);
   --ne-primary-rgb: 17, 17, 17;
   --ne-accent-rgb: 176, 138, 90;
+  --ne-question-node-unanswered-bg: var(--ne-primary-soft);
   --el-color-primary: #111111;
   --el-color-primary-dark-2: #0a0a0a;
   --el-color-primary-light-3: #3a332b;
@@ -69,6 +70,7 @@
   --ne-hover-border: rgba(42, 92, 255, 0.2);
   --ne-primary-rgb: 42, 92, 255;
   --ne-accent-rgb: 0, 194, 255;
+  --ne-question-node-unanswered-bg: #eef2f7;
   --el-color-primary: #2a5cff;
   --el-color-primary-dark-2: #1b46cf;
   --el-color-primary-light-3: #5b7cff;
@@ -107,6 +109,7 @@
   --ne-hover-border: rgba(255, 255, 255, 0.12);
   --ne-primary-rgb: 240, 179, 91;
   --ne-accent-rgb: 125, 211, 199;
+  --ne-question-node-unanswered-bg: var(--ne-primary-soft);
   --el-color-primary: #f0b35b;
   --el-color-primary-dark-2: #d99c49;
   --el-color-primary-light-3: #f3c37a;
@@ -136,9 +139,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(1200px 600px at 10% -10%, var(--ne-bg-radial-1), transparent),
-    radial-gradient(800px 600px at 90% 10%, var(--ne-bg-radial-2), transparent),
-    var(--ne-bg);
+  background: var(--ne-bg);
 }
 
 #app,
@@ -387,3 +388,22 @@ a {
     padding: 16px;
   }
 }
+
+/* 深色模式：覆盖 Element Plus 下拉菜单背景为深色，保留字体颜色不变 */
+[data-theme="dark"] .el-dropdown-menu {
+  background: var(--el-fill-color) !important;
+  border: 1px solid var(--el-border-color-light) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6) !important;
+  color: inherit !important;
+  border-radius: 8px;
+  padding: 6px 0;
+}
+
+[data-theme="dark"] .el-dropdown-menu .el-dropdown-item {
+  background: transparent !important;
+}
+
+[data-theme="dark"] .el-dropdown-menu .el-dropdown-item:hover {
+  background: rgba(255,255,255,0.02) !important;
+}
+
