@@ -1,5 +1,22 @@
 <template>
   <section class="login-wrap">
+    <div
+      v-if="showBoot"
+      class="boot-overlay fixed top-0 left-0 w-screen h-screen z-9999"
+      aria-hidden="true"
+      @animationend="handleBootAnimationEnd"
+    >
+      <div class="boot-meta boot-meta--tl">SYS.INIT // V2.0.4</div>
+      <div class="boot-meta boot-meta--br">SECURE_NODE: ACTIVE</div>
+      <div class="boot-center">
+        <div class="boot-text">
+          <span class="boot-line">Empowering assessments with AI precision_</span>
+          <span class="boot-cursor">_</span>
+        </div>
+        <div class="boot-subtext">Delivering fair, fast, and data-driven insights.</div>
+        <div class="boot-progress"></div>
+      </div>
+    </div>
     <div class="card login-panel">
       <div class="login-bg-container">
         <Transition name="bg-fade">
@@ -115,6 +132,7 @@ let bgTimer = null;
 const wsStatus = ref("connecting");
 const themeKey = "nexeval.theme";
 const themeEvent = "nexeval-theme-change";
+const bootSeenKey = "nexeval.boot.seen";
 const themeOptions = [
   { value: "beige", label: "米白" },
   { value: "classic", label: "经典" },
@@ -122,6 +140,7 @@ const themeOptions = [
 ];
 const theme = ref("beige");
 const suppressEmit = ref(false);
+const showBoot = ref(false);
 const wsTagType = computed(() => {
   if (wsStatus.value === "connected") {
     return "success";
@@ -175,6 +194,12 @@ function handleThemeEvent(event) {
   }, 0);
 }
 
+function handleBootAnimationEnd(event) {
+  if (event?.animationName === "boot-depth-fade") {
+    showBoot.value = false;
+  }
+}
+
 function switchBg(index) {
   currentBgIndex.value = index;
   if (bgTimer) {
@@ -220,6 +245,16 @@ async function handleLogin() {
 onMounted(connectWebSocket);
 onMounted(() => {
   try {
+    const seen = sessionStorage.getItem(bootSeenKey);
+    showBoot.value = !seen;
+    if (!seen) {
+      sessionStorage.setItem(bootSeenKey, "1");
+    }
+  } catch {
+    showBoot.value = true;
+  }
+
+  try {
     const saved = localStorage.getItem(themeKey);
     if (saved && themeOptions.some((item) => item.value === saved)) {
       theme.value = saved;
@@ -258,6 +293,141 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.boot-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(1200px 600px at 50% 40%, rgba(255, 255, 255, 0.7), rgba(253, 252, 248, 0.98)),
+    #fdfcf8;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  animation: boot-depth-fade 1.2s ease forwards;
+  animation-delay: 2.4s;
+}
+
+.boot-text {
+  width: 100%;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  font-family: "JetBrains Mono", "Space Grotesk", "Manrope", monospace;
+  font-size: clamp(24px, 3.6vw, 38px);
+  font-weight: 300;
+  letter-spacing: 0.12em;
+  color: #2d2d2d;
+}
+
+.boot-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.boot-meta {
+  position: absolute;
+  font-family: "JetBrains Mono", "Space Grotesk", "Manrope", monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: rgba(45, 45, 45, 0.5);
+}
+
+.boot-meta--tl {
+  top: 32px;
+  left: 32px;
+}
+
+.boot-meta--br {
+  bottom: 32px;
+  right: 32px;
+}
+
+.boot-subtext {
+  margin-top: 16px;
+  font-size: 12px;
+  font-family: "JetBrains Mono", "Space Grotesk", "Manrope", monospace;
+  color: rgba(45, 45, 45, 0.6);
+  animation: boot-pulse 1.6s ease-in-out infinite;
+}
+
+.boot-progress {
+  height: 1px;
+  background: #cf7357;
+  margin-top: 24px;
+  width: 0;
+  transform-origin: left;
+  animation: boot-expand 2s ease-out forwards;
+}
+
+.boot-line {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 3px solid #cf7357;
+  animation: boot-type 1.8s steps(28, end) forwards;
+}
+
+.boot-cursor {
+  display: inline-block;
+  color: #cf7357;
+  animation: boot-blink 0.8s steps(1, end) infinite;
+}
+
+@keyframes boot-type {
+  from {
+    width: 0;
+  }
+  to {
+    width: 28ch;
+  }
+}
+
+@keyframes boot-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes boot-depth-fade {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    transform: scale(1.04);
+    opacity: 0;
+    filter: blur(10px);
+  }
+}
+
+@keyframes boot-expand {
+  to {
+    width: 140px;
+  }
+}
+
+@keyframes boot-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+
 .login-wrap {
   min-height: calc(100vh - 120px);
   display: flex;
@@ -291,7 +461,7 @@ onBeforeUnmount(() => {
   z-index: 0;
 }
 
-.login-wrap > * {
+.login-wrap > *:not(.boot-overlay) {
   position: relative;
   z-index: 1;
 }
