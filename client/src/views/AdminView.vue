@@ -99,9 +99,10 @@
         </div>
       </section>
 
-      <section class="card panel-card" v-if="activeMenu === 'register'">
+      <section class="card panel-card register-panel-card" v-if="activeMenu === 'register'">
         <h2 class="panel-title">用户信息注册</h2>
         <el-form label-position="top" @submit.prevent>
+          <div class="register-grid">
           <el-form-item label="卡号">
             <el-input v-model="form.id" maxlength="9" placeholder="请输入 9 位卡号" />
           </el-form-item>
@@ -118,51 +119,59 @@
           </el-form-item>
 
           <el-form-item label="用户类型">
-            <el-select v-model="form.type" style="width: 100%" placeholder="请选择类型">
-              <el-option label="学生" value="student" />
-              <el-option label="教师" value="teacher" />
-            </el-select>
+            <el-radio-group v-model="form.type" class="same-radio-group">
+              <el-radio class="same-radio" value="student">学生</el-radio>
+              <el-radio class="same-radio" value="teacher">教师</el-radio>
+            </el-radio-group>
           </el-form-item>
 
+          </div>
+
           <template v-if="form.type === 'student'">
-            <el-divider content-position="left">学生信息</el-divider>
-            <el-form-item label="学号">
-              <el-input v-model="form.sno" maxlength="8" placeholder="请输入学号" />
-            </el-form-item>
-            <el-form-item label="入学年份">
-              <el-input v-model="form.studentEnterYear" placeholder="例如 2023" />
-            </el-form-item>
-            <el-form-item label="专业">
-              <el-input v-model="form.major" maxlength="20" placeholder="请输入专业" />
-            </el-form-item>
-            <el-form-item label="学院">
-              <el-input v-model="form.studentDepartment" maxlength="30" placeholder="请输入学院" />
-            </el-form-item>
+            <div class="register-grid section-offset">
+              <el-divider content-position="left">学生信息</el-divider>
+              <el-form-item label="学号">
+                <el-input v-model="form.sno" maxlength="8" placeholder="请输入学号" />
+              </el-form-item>
+              <el-form-item label="入学年份">
+                <el-input v-model="form.studentEnterYear" placeholder="例如 2023" />
+              </el-form-item>
+              <el-form-item label="专业">
+                <el-input v-model="form.major" maxlength="20" placeholder="请输入专业" />
+              </el-form-item>
+              <el-form-item label="学院">
+                <el-input v-model="form.studentDepartment" maxlength="30" placeholder="请输入学院" />
+              </el-form-item>
+            </div>
           </template>
 
           <template v-else>
-            <el-divider content-position="left">教师信息</el-divider>
-            <el-form-item label="工号">
-              <el-input v-model="form.eid" maxlength="8" placeholder="请输入工号" />
-            </el-form-item>
-            <el-form-item label="入职年份">
-              <el-input v-model="form.teacherEnterYear" placeholder="例如 2015" />
-            </el-form-item>
-            <el-form-item label="职称">
-              <el-select v-model="form.title" style="width: 100%" placeholder="请选择职称">
-                <el-option label="教授" value="professor" />
-                <el-option label="副教授" value="associate_professor" />
-                <el-option label="讲师" value="lecture" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="学院">
-              <el-input v-model="form.teacherDepartment" maxlength="30" placeholder="请输入学院" />
-            </el-form-item>
+            <div class="register-grid section-offset">
+              <el-divider content-position="left">教师信息</el-divider>
+              <el-form-item label="工号">
+                <el-input v-model="form.eid" maxlength="8" placeholder="请输入工号" />
+              </el-form-item>
+              <el-form-item label="入职年份">
+                <el-input v-model="form.teacherEnterYear" placeholder="例如 2015" />
+              </el-form-item>
+              <el-form-item label="职称">
+                <el-select v-model="form.title" style="width: 100%" placeholder="请选择职称">
+                  <el-option label="教授" value="professor" />
+                  <el-option label="副教授" value="associate_professor" />
+                  <el-option label="讲师" value="lecture" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="学院">
+                <el-input v-model="form.teacherDepartment" maxlength="30" placeholder="请输入学院" />
+              </el-form-item>
+            </div>
           </template>
 
-          <div class="action-row">
+          <div class="register-footer-actions">
             <el-button type="primary" :loading="saving" @click="handleRegister">注册用户</el-button>
             <el-button @click="resetForm">重置</el-button>
+            <el-button :loading="importingType === 'STUDENTS'" @click="triggerImport('STUDENTS')">批量导入学生</el-button>
+            <el-button :loading="importingType === 'TEACHERS'" @click="triggerImport('TEACHERS')">批量导入教师</el-button>
           </div>
         </el-form>
       </section>
@@ -354,7 +363,6 @@ import iconPersonalInfo from "../assets/personal_info.svg";
 import iconRegister from "../assets/register.svg";
 import iconCourse from "../assets/course.svg";
 import iconClass from "../assets/class.svg";
-import iconBatch from "../assets/batch.svg";
 import iconRecheck from "../assets/recheck.svg";
 import iconVIP from "../assets/VIP.svg";
 import iconExit from "../assets/exit.svg";
@@ -395,7 +403,6 @@ const menuItems = [
   { key: "register", label: "用户信息注册", icon: iconRegister },
   { key: "course", label: "课程信息管理", icon: iconCourse },
   { key: "class", label: "教学班管理", icon: iconClass },
-  { key: "batch", label: "批量导入", icon: iconBatch },
   { key: "review", label: "成绩复核审理", icon: iconRecheck },
   { key: "teacher-vip", label: "教师权限", icon: iconVIP }
 ];
@@ -1142,6 +1149,54 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
+.register-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.section-offset {
+  margin-top: 16px;
+}
+
+.same-radio-group {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+:deep(.same-radio .el-radio__input.is-checked .el-radio__inner) {
+  border-color: var(--ne-primary);
+  background-color: var(--ne-primary);
+}
+
+:deep(.same-radio .el-radio__input.is-checked + .el-radio__label) {
+  color: var(--ne-primary);
+}
+
+.register-grid :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.register-grid :deep(.el-divider) {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.register-footer-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-start;
+  margin-top: 24px;
+  flex-wrap: nowrap;
+}
+
+.register-footer-actions > .el-button {
+  white-space: nowrap;
+}
+
 .panel-head {
   display: flex;
   align-items: center;
@@ -1257,12 +1312,12 @@ onBeforeUnmount(() => {
 }
 
 :deep(.male-radio .el-radio__input.is-checked .el-radio__inner) {
-  border-color: #2A5CFF;
-  background-color: #2A5CFF;
+  border-color: #06A7FF;
+  background-color: #06A7FF;
 }
 
 :deep(.male-radio .el-radio__input.is-checked + .el-radio__label) {
-  color: #2A5CFF;
+  color: #06A7FF;
 }
 
 :deep(.female-radio .el-radio__input.is-checked .el-radio__inner) {
@@ -1291,6 +1346,22 @@ onBeforeUnmount(() => {
   min-height: 260px;
 }
 
+.register-panel-card {
+  min-height: 0;
+}
+
+@media (max-width: 1200px) {
+  .register-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .register-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 [data-theme="dark"] .sidebar-name,
 [data-theme="dark"] .sidebar-id,
 [data-theme="dark"] .nav-item,
@@ -1309,8 +1380,25 @@ onBeforeUnmount(() => {
   font-size: 20px;
 }
 
-.action-row {
+.register-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 14px;
+  align-items: start;
   margin-top: 12px;
+}
+
+.register-grid .el-divider {
+  grid-column: 1 / -1;
+  margin: 12px 0 4px;
+}
+
+.register-grid :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.action-row {
+  margin-top: 20px;
   display: flex;
   gap: 10px;
   align-items: center;
@@ -1390,6 +1478,14 @@ onBeforeUnmount(() => {
 @media (max-width: 900px) {
   .admin-shell {
     grid-template-columns: 1fr;
+  }
+
+  .register-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .register-grid .el-divider {
+    grid-column: auto;
   }
 
   .profile-info-table th,

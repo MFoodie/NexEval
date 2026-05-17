@@ -1676,6 +1676,7 @@ onBeforeUnmount(() => {
 }
 
 .home-sidebar {
+  align-self: start;
   display: flex;
   flex-direction: column;
   gap: 16px;
