@@ -326,6 +326,19 @@
         @change="handleImportFileChange"
       />
     </main>
+
+    <div class="water-wave-container">
+      <div class="water-wave">
+        <div class="wave-layer wave-layer-1"></div>
+        <div class="wave-layer wave-layer-2"></div>
+        <div class="wave-layer wave-layer-3"></div>
+      </div>
+    </div>
+
+    <div v-if="activeMenu === 'profile'" class="profile-ship-container" aria-hidden="true">
+      <img :src="shipGifUrl" alt="" class="profile-ship" />
+      <img :src="doveGifUrl" alt="" class="profile-dove" />
+    </div>
   </section>
 </template>
 
@@ -335,6 +348,8 @@ import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { clearLogin, getLogin, saveLogin } from "../auth";
 import { createExamSocket } from "../ws";
+import doveGifUrl from "../assets/dove.gif";
+import shipGifUrl from "../assets/ship.gif";
 import iconPersonalInfo from "../assets/personal_info.svg";
 import iconRegister from "../assets/register.svg";
 import iconCourse from "../assets/course.svg";
@@ -877,6 +892,8 @@ onBeforeUnmount(() => {
 }
 
 .sidebar {
+  position: relative;
+  z-index: 10;
   min-height: 520px;
   display: flex;
   flex-direction: column;
@@ -1096,6 +1113,8 @@ onBeforeUnmount(() => {
 }
 
 .main-panel {
+  position: relative;
+  z-index: 10;
   min-width: 0;
   width: 100%;
   display: flex;

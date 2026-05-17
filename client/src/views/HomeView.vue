@@ -335,6 +335,20 @@
       </div>
     </main>
 
+    <!-- 个人信息页面下方的水波纹流动效果 -->
+    <div class="water-wave-container">
+      <div class="water-wave">
+        <div class="wave-layer wave-layer-1"></div>
+        <div class="wave-layer wave-layer-2"></div>
+        <div class="wave-layer wave-layer-3"></div>
+      </div>
+    </div>
+
+    <div v-if="activeMenu === 'profile'" class="profile-ship-container" aria-hidden="true">
+      <img :src="shipGifUrl" alt="" class="profile-ship" />
+      <img :src="doveGifUrl" alt="" class="profile-dove" />
+    </div>
+
     <el-dialog v-model="editVisible" title="修改个人信息" width="520px">
       <el-form label-position="top">
         <el-form-item label="姓名">
@@ -584,6 +598,8 @@ import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { clearLogin, getLogin, saveLogin } from "../auth";
 import { createExamSocket } from "../ws";
+import doveGifUrl from "../assets/dove.gif";
+import shipGifUrl from "../assets/ship.gif";
 import iconPersonalInfo from "../assets/personal_info.svg";
 import iconExam from "../assets/exam.svg";
 import iconCorrect from "../assets/correct.svg";
@@ -1911,6 +1927,8 @@ onBeforeUnmount(() => {
 }
 
 .home-main {
+  position: relative;
+  z-index: 10;
   min-width: 0;
   width: 100%;
   display: flex;
@@ -1918,6 +1936,7 @@ onBeforeUnmount(() => {
   gap: 12px;
   align-content: start;
   align-self: stretch;
+  background: transparent;
 }
 
 .dashboard-head {
