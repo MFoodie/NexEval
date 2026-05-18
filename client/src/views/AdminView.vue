@@ -176,40 +176,42 @@
         </el-form>
       </section>
 
-      <section class="card panel-card" v-if="activeMenu === 'course'">
-        <h2 class="panel-title">课程信息管理</h2>
-        <el-form label-position="top" @submit.prevent>
-          <el-form-item label="课程编号">
-            <el-input v-model="courseForm.cno" maxlength="8" placeholder="例如 BJSL0001" />
-          </el-form-item>
-          <el-form-item label="课程名称">
-            <el-input v-model="courseForm.cname" maxlength="20" placeholder="请输入课程名称" />
-          </el-form-item>
-          <el-form-item label="学分">
-            <el-input v-model="courseForm.credit" placeholder="例如 3 或 4" />
-          </el-form-item>
-          <div class="action-row">
-            <el-button type="primary" :loading="courseSaving" @click="handleCreateCourse">新增课程</el-button>
-            <el-button :loading="importingType === 'COURSES'" @click="triggerImport('COURSES')">批量导入课程</el-button>
+      <section class="card panel-card" v-if="activeMenu === 'curriculum'">
+        <h2 class="panel-title">课程及教学班管理</h2>
+        <div class="curriculum-wrapper">
+          <div class="curriculum-section">
+            <h3 class="curriculum-subtitle">课程信息管理</h3>
+            <el-form label-position="top" @submit.prevent>
+              <el-form-item label="课程编号">
+                <el-input v-model="courseForm.cno" maxlength="8" placeholder="例如 BJSL0001" />
+              </el-form-item>
+              <el-form-item label="课程名称">
+                <el-input v-model="courseForm.cname" maxlength="20" placeholder="请输入课程名称" />
+              </el-form-item>
+              <el-form-item label="学分">
+                <el-input v-model="courseForm.credit" placeholder="例如 3 或 4" />
+              </el-form-item>
+            </el-form>
           </div>
-        </el-form>
-      </section>
-
-      <section class="card panel-card" v-if="activeMenu === 'class'">
-        <h2 class="panel-title">教学班管理</h2>
-        <el-form label-position="top" @submit.prevent>
-          <el-form-item label="课程编号">
-            <el-input v-model="classForm.cno" maxlength="8" placeholder="例如 BJSL0001" />
-          </el-form-item>
-          <el-form-item label="教师工号">
-            <el-input v-model="classForm.eid" maxlength="8" placeholder="例如 09T09011" />
-          </el-form-item>
-          <div class="action-row">
-            <el-button type="primary" :loading="classSaving" @click="handleCreateClass">新增教学班</el-button>
-            <el-button :loading="importingType === 'CLASSES'" @click="triggerImport('CLASSES')">批量导入教学班</el-button>
-            <el-button :loading="importingType === 'SC'" @click="triggerImport('SC')">批量导入选课记录</el-button>
+          <div class="curriculum-section">
+            <h3 class="curriculum-subtitle">教学班管理</h3>
+            <el-form label-position="top" @submit.prevent>
+              <el-form-item label="课程编号">
+                <el-input v-model="classForm.cno" maxlength="8" placeholder="例如 BJSL0001" />
+              </el-form-item>
+              <el-form-item label="教师工号">
+                <el-input v-model="classForm.eid" maxlength="8" placeholder="例如 09T09011" />
+              </el-form-item>
+            </el-form>
           </div>
-        </el-form>
+        </div>
+        <div class="action-row">
+          <el-button type="primary" :loading="courseSaving" @click="handleCreateCourse">新增课程</el-button>
+          <el-button :loading="importingType === 'COURSES'" @click="triggerImport('COURSES')">批量导入课程</el-button>
+          <el-button type="primary" :loading="classSaving" @click="handleCreateClass">新增教学班</el-button>
+          <el-button :loading="importingType === 'CLASSES'" @click="triggerImport('CLASSES')">批量导入教学班</el-button>
+          <el-button :loading="importingType === 'SC'" @click="triggerImport('SC')">批量导入选课记录</el-button>
+        </div>
       </section>
 
       <section class="card panel-card" v-if="activeMenu === 'batch'">
@@ -238,12 +240,20 @@
         <div v-if="appealLoading" class="placeholder">正在加载复核申请...</div>
         <div v-else-if="scoreAppeals.length === 0" class="placeholder">暂无成绩复核申请</div>
         <el-table v-else :data="scoreAppeals" size="small">
-          <el-table-column prop="userId" label="卡号" width="120" />
-          <el-table-column prop="courseNo" label="课程号" width="120" />
-          <el-table-column prop="reason" label="申请说明" min-width="240" />
-          <el-table-column prop="status" label="状态" width="100" />
-          <el-table-column prop="createdAt" label="提交时间" width="180" />
-          <el-table-column label="处理结果" min-width="160">
+          <el-table-column prop="userId" label="卡号" width="90" />
+          <el-table-column prop="courseNo" label="课程号" width="90" />
+          <el-table-column prop="reason" label="申请说明" width="240" show-overflow-tooltip />
+          <el-table-column prop="status" label="状态" width="90">
+            <template #default="scope">
+              {{ formatAppealStatus(scope.row.status) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="createdAt" label="提交时间" width="150">
+            <template #default="scope">
+              {{ formatDateTime(scope.row.createdAt) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="处理结果" min-width="90">
             <template #default="scope">
               <div>
                 <div>{{ scope.row.handledBy || '-' }}</div>
@@ -251,7 +261,7 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="180">
+          <el-table-column label="操作" width="150">
             <template #default="scope">
               <div class="action-buttons">
                 <el-button
@@ -361,7 +371,6 @@ import doveGifUrl from "../assets/dove.gif";
 import shipGifUrl from "../assets/ship.gif";
 import iconPersonalInfo from "../assets/personal_info.svg";
 import iconRegister from "../assets/register.svg";
-import iconCourse from "../assets/course.svg";
 import iconClass from "../assets/class.svg";
 import iconRecheck from "../assets/recheck.svg";
 import iconVIP from "../assets/VIP.svg";
@@ -401,8 +410,7 @@ const vipStatus = ref("all");
 const menuItems = [
   { key: "profile", label: "个人信息", icon: iconPersonalInfo },
   { key: "register", label: "用户信息注册", icon: iconRegister },
-  { key: "course", label: "课程信息管理", icon: iconCourse },
-  { key: "class", label: "教学班管理", icon: iconClass },
+  { key: "curriculum", label: "课程及教学班管理", icon: iconClass },
   { key: "review", label: "成绩复核审理", icon: iconRecheck },
   { key: "teacher-vip", label: "教师权限", icon: iconVIP }
 ];
@@ -509,6 +517,28 @@ function formatTeacherTitle(title) {
     return "讲师";
   }
   return title || "-";
+}
+
+function formatAppealStatus(status) {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "pending") {
+    return "待处理";
+  }
+  if (normalized === "approved") {
+    return "已批准";
+  }
+  if (normalized === "rejected") {
+    return "已拒绝";
+  }
+  return status || "-";
+}
+
+function formatDateTime(dateTimeStr) {
+  if (!dateTimeStr) {
+    return "-";
+  }
+  const str = String(dateTimeStr).trim();
+  return str.replace("T", "  ").replace("Z", "");
 }
 
 function withAvatarVersion(url) {
@@ -1475,6 +1505,36 @@ onBeforeUnmount(() => {
   color: #c0392b;
 }
 
+.curriculum-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.curriculum-section {
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background-color: #f9fafb;
+}
+
+.curriculum-subtitle {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #374151;
+}
+
+[data-theme="dark"] .curriculum-section {
+  background-color: #1f2430;
+  border-color: #2f3744;
+}
+
+[data-theme="dark"] .curriculum-subtitle {
+  color: #e5e7eb;
+}
+
 @media (max-width: 900px) {
   .admin-shell {
     grid-template-columns: 1fr;
@@ -1486,6 +1546,10 @@ onBeforeUnmount(() => {
 
   .register-grid .el-divider {
     grid-column: auto;
+  }
+
+  .curriculum-wrapper {
+    grid-template-columns: 1fr;
   }
 
   .profile-info-table th,

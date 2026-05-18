@@ -630,7 +630,7 @@ onBeforeUnmount(() => {
 
 .bg-fade-enter-active,
 .bg-fade-leave-active {
-  transition: opacity 0.5s ease;
+  transition: opacity 0.5s ease-in-out;
 }
 
 .bg-fade-enter-from,
