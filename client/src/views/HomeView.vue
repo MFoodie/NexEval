@@ -174,7 +174,7 @@
                     {{ scope.row.sex ? '男' : '女' }}
                   </template>
                 </el-table-column>
-                <el-table-column prop="grade" label="成绩" width="80">
+                <el-table-column prop="grade" label="成绩" width="20">
                   <template #default="scope">
                     {{ scope.row.grade ?? '-' }}
                   </template>
@@ -207,75 +207,79 @@
             </div>
             <div class="section-title">课程列表</div>
             <el-table :data="studentClasses" size="small" class="student-classes-table">
-            <el-table-column
-              prop="cno"
-              label="课程号"
-              width="140"
-              align="left"
-              header-align="left"
-              class-name="col-large"
-              header-class-name="col-large-header"
-            />
-            <el-table-column
-              prop="cname"
-              label="课程名"
-              align="left"
-              header-align="left"
-              class-name="col-large"
-              header-class-name="col-large-header"
-            />
-            <el-table-column
-              prop="teacherName"
-              label="教师姓名"
-              width="100"
-              align="center"
-              header-align="center"
-              class-name="col-large col-teacher-cell"
-              header-class-name="col-large col-teacher-header"
-            />
-            <el-table-column
-              prop="grade"
-              label="成绩"
-              width="100"
-              align="center"
-              header-align="center"
-              class-name="col-large col-score-cell"
-              header-class-name="col-large col-score-header"
-            />
-            <el-table-column prop="classMax" label="班级最高" width="110" align="center" header-align="center">
-              <template #default="{ row }">{{ row.classMax ?? '-' }}</template>
-            </el-table-column>
-            <el-table-column prop="classMin" label="班级最低" width="110" align="center" header-align="center">
-              <template #default="{ row }">{{ row.classMin ?? '-' }}</template>
-            </el-table-column>
-            <el-table-column prop="classAvg" label="班级均分" width="110" align="center" header-align="center">
-              <template #default="{ row }">{{ row.classAvg != null ? formatAvg(row.classAvg) : '-' }}</template>
-            </el-table-column>
-            <el-table-column label="操作" width="180" align="center" header-align="center">
-              <template #default="scope">
-                  <div class="student-action-buttons student-action-buttons--wrap flex flex-row items-center gap-2">
-                  <el-button
-                    type="primary"
-                    size="small"
-                    class="action-primary"
-                    :loading="startingExam"
-                    @click="handleStartExamForClass(scope.row)"
-                  >
-                    进入考试
-                  </el-button>
-                        <el-dropdown trigger="click" popper-class="absolute right-0 mt-2 rounded-md shadow-lg z-10">
-                    <button type="button" class="action-more">...</button>
-                    <template #dropdown>
-                      <el-dropdown-menu class="flex flex-col">
-                        <el-dropdown-item @click="handleStartPracticeForClass(scope.row)">题目练习</el-dropdown-item>
-                        <el-dropdown-item @click="handleViewWrongQuestions(scope.row, 'PRACTICE')">查看错题</el-dropdown-item>
-                        <el-dropdown-item @click="openAppealHistory(scope.row)">成绩复核</el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
-                </div>
-              </template>
-            </el-table-column>
+              <el-table-column
+                prop="cno"
+                label="课程号"
+                width="120"
+                align="left"
+                header-align="left"
+                class-name="col-large"
+                header-class-name="col-large-header"
+              />
+
+              <el-table-column
+                prop="cname"
+                label="课程名"
+                width="130"
+                align="left"
+                header-align="left"
+                class-name="col-cname col-large"
+                header-class-name="col-cname-header col-large-header"
+              />
+
+              <el-table-column
+                prop="teacherName"
+                label="教师姓名"
+                width="160"
+                align="center"
+                header-align="center"
+                class-name="col-large col-teacher-cell"
+                header-class-name="col-large col-teacher-header"
+              />
+
+              <el-table-column
+                prop="grade"
+                label="成绩"
+                width="60"
+                align="center"
+                header-align="center"
+                class-name="col-large col-score-cell"
+                header-class-name="col-large col-score-header"
+              />
+
+              <el-table-column prop="classMax" label="班级最高" width="80" align="center" header-align="center"
+                class-name="col-stat" header-class-name="col-stat-header">
+                <template #default="{ row }">{{ row.classMax ?? '-' }}</template>
+              </el-table-column>
+              
+              <el-table-column prop="classMin" label="班级最低" width="80" align="center" header-align="center"
+                class-name="col-stat" header-class-name="col-stat-header">
+                <template #default="{ row }">{{ row.classMin ?? '-' }}</template>
+              </el-table-column>
+              
+              <el-table-column prop="classAvg" label="班级均分" width="80" align="center" header-align="center"
+                class-name="col-stat" header-class-name="col-stat-header">
+                <template #default="{ row }">{{ row.classAvg != null ? formatAvg(row.classAvg) : '-' }}</template>
+              </el-table-column>
+
+              <el-table-column label="操作" width="240" align="center" header-align="center">
+                <template #default="scope">
+                  <div class="student-action-grid">
+                    <el-button
+                      type="primary"
+                      size="small"
+                      class="action-primary"
+                      :loading="startingExam"
+                      @click="handleStartExamForClass(scope.row)"
+                    >
+                      进入考试
+                    </el-button>
+                    <el-button size="mini" class="action-rect" @click="handleStartPracticeForClass(scope.row)">题目练习</el-button>
+                    <el-button size="mini" class="action-rect" @click="handleViewWrongQuestions(scope.row, 'PRACTICE')">查看错题</el-button>
+                    <el-button size="mini" class="action-rect" @click="openAppealHistory(scope.row)">成绩复核</el-button>
+                  </div>
+                </template>
+              </el-table-column>
             </el-table>
           </div>
         </template>
@@ -333,7 +337,7 @@
               />
               <el-table-column
                 label="操作"
-                width="180"
+                width="260"
                 align="center"
                 header-align="center"
                 class-name="col-large"
@@ -350,14 +354,20 @@
                     >
                       开始 CAT 练习
                     </el-button>
-                    <el-dropdown trigger="click" popper-class="absolute right-0 mt-2 rounded-md shadow-lg z-10">
-                      <button type="button" class="action-more">...</button>
-                      <template #dropdown>
-                        <el-dropdown-menu class="flex flex-col">
-                          <el-dropdown-item @click="handleViewWrongQuestions(scope.row, 'CAT')">查看错题</el-dropdown-item>
-                        </el-dropdown-menu>
-                      </template>
-                    </el-dropdown>
+                    <div class="student-action-grid">
+                      <el-button
+                        type="primary"
+                        size="small"
+                        class="action-primary action-primary--cat"
+                        :loading="startingCat"
+                        @click="handleStartCatForClass(scope.row)"
+                      >
+                        开始 CAT 练习
+                      </el-button>
+                      <el-button size="mini" class="action-rect" @click="handleStartPracticeForClass(scope.row)">题目练习</el-button>
+                      <el-button size="mini" class="action-rect" @click="handleViewWrongQuestions(scope.row, 'CAT')">查看错题</el-button>
+                      <el-button size="mini" class="action-rect" @click="openAppealHistory(scope.row)">成绩复核</el-button>
+                    </div>
                   </div>
                 </template>
               </el-table-column>
@@ -3162,18 +3172,6 @@ onBeforeUnmount(() => {
   }
 }
 
-::v-deep(.student-classes-table) .el-table__header-wrapper th:nth-child(3) .cell,
-::v-deep(.student-classes-table) .el-table__header-wrapper th:nth-child(3) .cell,
-::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(3) .cell {
-  padding-left: 4px !important;
-  transform: translateX(-150px) !important;
-}
-
-::v-deep(.student-classes-table) .el-table__header-wrapper th:nth-child(4) .cell,
-::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(4) .cell {
-  padding-left: 4px !important;
-  transform: translateX(-90px) !important;
-}
 ::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(1) .cell,
 ::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(2) .cell,
 ::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(3) .cell {

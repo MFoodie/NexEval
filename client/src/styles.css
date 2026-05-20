@@ -608,3 +608,254 @@ a {
     animation-duration: 18s;
   }
 }
+
+/* Student course list visual tweaks */
+.exam-panel-card .student-classes-table {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.exam-panel-card .student-classes-table .el-table__header th {
+  background: transparent;
+  border-bottom: 1px solid rgba(15,23,42,0.06);
+  color: #334155;
+  font-weight: 600;
+  padding: 4px 6px;
+}
+
+.exam-panel-card .student-classes-table .el-table__body td {
+  padding: 4px 6px;
+  color: #0f172a;
+  vertical-align: middle;
+}
+
+.exam-panel-card .student-classes-table .el-table__row:hover td {
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.exam-panel-card .student-classes-table .col-score-cell .cell {
+  font-weight: 700;
+  color: var(--ne-primary);
+}
+
+/* Explicitly constrain score column to avoid占用过多宽度 */
+.exam-panel-card .col-score-cell,
+.exam-panel-card .col-score-header {
+  width: 48px !important;
+  max-width: 48px !important;
+  min-width: 36px !important;
+}
+
+/* Course name column: allow it to be longer and wrap nicely */
+.exam-panel-card .col-cname .cell,
+.exam-panel-card .col-cname-header {
+  white-space: normal !important;
+  word-break: break-word;
+  max-width: 360px;
+}
+
+/* Make action buttons inline (one row) and right-aligned */
+.exam-panel-card .student-action-column {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Make statistic columns tighter without changing their widths */
+.exam-panel-card .col-stat .cell,
+.exam-panel-card .col-stat-header {
+  padding: 1px 2px !important;
+  min-height: 5px;
+}
+
+/* tighten score cell slightly (half previous horizontal padding) */
+.exam-panel-card .col-score-cell .cell {
+  padding: 0 1px !important;
+}
+
+@media (max-width: 640px) {
+  .exam-panel-card .col-score-cell,
+  .exam-panel-card .col-score-header {
+    width: 40px !important;
+    max-width: 40px !important;
+    min-width: 32px !important;
+  }
+  .exam-panel-card .col-cname .cell,
+  .exam-panel-card .col-cname-header {
+    max-width: 220px;
+  }
+}
+
+.exam-panel-card .student-action-buttons .action-primary {
+  min-width: 110px;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.exam-panel-card .student-action-buttons .action-more {
+  background: transparent;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #475569;
+}
+
+/* Vertical visible action buttons replacing ellipsis dropdown */
+.exam-panel-card .action-more-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 6px 8px;
+  justify-items: end;
+  align-items: center;
+}
+.exam-panel-card .action-more-buttons .el-button {
+  min-width: 64px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(15,23,42,0.06);
+  background: white;
+  color: #475569;
+  box-shadow: none;
+}
+.exam-panel-card .action-more-buttons .el-button:hover {
+  background: rgba(15,23,42,0.03);
+}
+
+/* Grid layout for actions: 2 columns x 2 rows, right aligned */
+.exam-panel-card .student-action-grid {
+  display: grid;
+  grid-template-columns: max-content max-content; /* shrink to content */
+  gap: 4px 6px; /* tighter grid spacing */
+  row-gap: 4px;
+  justify-items: end;
+  align-items: center;
+}
+
+/* White rounded rectangle style for secondary action buttons */
+.exam-panel-card .student-action-grid .action-rect {
+  background: #ffffff;
+  border: 1px solid rgba(15,23,42,0.06);
+  color: #475569;
+  border-radius: 10px;
+  padding: 4px 8px; /* slightly smaller */
+  min-width: 78px; /* slightly narrower */
+  box-shadow: none;
+}
+.exam-panel-card .student-action-grid .action-rect:hover {
+  background: rgba(15,23,42,0.03);
+}
+
+/* Ensure primary action (进入考试) remains visually prominent */
+.exam-panel-card .student-action-grid .action-primary {
+  min-width: 78px;
+  align-self: center;
+  padding: 4px 8px;
+}
+
+/* Force all action buttons in grid to same height and center content */
+.exam-panel-card .student-action-grid .el-button {
+  height: 32px; /* slightly shorter */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 13px; /*统一字体大小*/
+  font-weight: 500; /*统一字重*/
+}
+
+/* Reduce horizontal padding inside the action table cell to tighten gap shown */
+.exam-panel-card .student-classes-table .el-table__body-wrapper td:last-child,
+.exam-panel-card .student-classes-table .el-table__header-wrapper th:last-child {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+/* Stronger, targeted shift for the score column: use position:left with high specificity */
+.exam-panel-card .student-classes-table .el-table__body-wrapper td.col-score-cell > .cell,
+.exam-panel-card .student-classes-table .el-table__header-wrapper th.col-score-header > .cell {
+  position: relative !important;
+  left: -12px !important;
+}
+
+/* Reduce spacing between course name and teacher name at cell level */
+.exam-panel-card .student-classes-table .el-table__body-wrapper td.col-cname > .cell {
+  padding-right: 5px !important;
+}
+.exam-panel-card .student-classes-table .el-table__body-wrapper td.col-teacher-cell > .cell {
+  padding-left: 5px !important;
+}
+
+/* Ensure header and body of the '成绩' column are shifted by nth-child selector (higher priority) */
+.exam-panel-card .student-classes-table .el-table__header-wrapper th:nth-child(4) .cell,
+.exam-panel-card .student-classes-table .el-table__body-wrapper td:nth-child(4) .cell {
+  position: relative !important;
+  left: -14px !important;
+}
+
+@media (max-width: 640px) {
+  .exam-panel-card .student-action-buttons {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .exam-panel-card .student-classes-table .el-table__header th,
+  .exam-panel-card .student-classes-table .el-table__body td {
+    padding: 6px 6px;
+  }
+}
+
+/* 深色主题：提高对比度，改善表格与控件可读性 */
+[data-theme="dark"] .exam-panel-card,
+[data-theme="dark"] .card {
+  background: #0f1418 !important;
+  border-color: #23282d !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6) !important;
+}
+
+[data-theme="dark"] .exam-panel-card .section-title,
+[data-theme="dark"] .panel-title {
+  color: #e6eef8 !important;
+}
+
+[data-theme="dark"] .exam-panel-card .student-classes-table .el-table__header th {
+  color: #dceafc !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="dark"] .exam-panel-card .student-classes-table .el-table__body td {
+  color: #cfe6ff !important;
+}
+
+[data-theme="dark"] .exam-panel-card .student-classes-table .el-table__body td .cell {
+  color: inherit !important;
+}
+
+[data-theme="dark"] .exam-panel-card .student-classes-table .el-table__body td .el-button.action-primary {
+  color: #0c1220 !important;
+}
+
+[data-theme="dark"] .exam-panel-card .student-action-grid .action-rect {
+  background: #13171b !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  color: #e6eef8 !important;
+}
+
+[data-theme="dark"] .exam-panel-card .student-action-grid .action-rect:hover {
+  background: rgba(255,255,255,0.02) !important;
+}
+
+[data-theme="dark"] .exam-panel-card .student-action-grid .action-primary {
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .exam-panel-card .student-classes-table .el-input__inner,
+[data-theme="dark"] .exam-panel-card .student-classes-table .el-input__inner::placeholder {
+  background: #0b0f12 !important;
+  color: #cfe6ff !important;
+  border-color: #23282d !important;
+}
+
+[data-theme="dark"] .el-table__row:hover td {
+  background: rgba(255,255,255,0.02) !important;
+}
