@@ -327,22 +327,30 @@ public class CatExamService {
     );
   }
 
-  public List<ExamAttemptView> getExamAttempts(String courseNo, String userId) {
+  public List<ExamAttemptView> getExamAttempts(String mode, String courseNo, String userId) {
     try {
       List<ExamAttempt> attempts;
+      String normalizedMode = normalizeSourceId(mode).toUpperCase();
+      SessionMode sessionMode;
+      try {
+        sessionMode = normalizedMode.isBlank() ? SessionMode.EXAM : SessionMode.valueOf(normalizedMode);
+      } catch (IllegalArgumentException ex) {
+        sessionMode = SessionMode.EXAM;
+      }
+
       String normalizedCourseNo = normalizeSourceId(courseNo);
       if (!normalizedCourseNo.isBlank()) {
         attempts = examAttemptRepository
-          .findAllByCourseNoAndUserIdAndModeOrderByStartedAtDesc(normalizedCourseNo, userId, SessionMode.EXAM);
+          .findAllByCourseNoAndUserIdAndModeOrderByStartedAtDesc(normalizedCourseNo, userId, sessionMode);
       } else {
-        attempts = examAttemptRepository.findAllByUserIdAndModeOrderByStartedAtDesc(userId, SessionMode.EXAM);
+        attempts = examAttemptRepository.findAllByUserIdAndModeOrderByStartedAtDesc(userId, sessionMode);
       }
 
       return attempts.stream()
         .map(this::toAttemptView)
         .toList();
     } catch (DataAccessException ex) {
-      log.warn("Failed to load exam attempts for userId={}, courseNo={}: {}", userId, courseNo, ex.getMessage());
+      log.warn("Failed to load exam attempts for userId={}, courseNo={}, mode={}: {}", userId, courseNo, mode, ex.getMessage());
       return List.of();
     }
   }
@@ -1480,6 +1488,9 @@ public class CatExamService {
       answer.getQuestionType().name().toLowerCase(),
       answer.getAnswerText(),
       answer.getAnswerImagePath(),
+      resolveQuestionImagePath(answer),
+      resolveQuestionOptions(answer),
+      resolveQuestionCorrectAnswer(answer),
       answer.getCorrect(),
       answer.getScore(),
       answer.isReviewed(),
@@ -1568,6 +1579,63 @@ public class CatExamService {
       case ESSAY -> essayQuestionBankRepository.findById(answer.getQuestionId())
         .map(EssayQuestionBank::getStem)
         .orElse("");
+    };
+  }
+
+  private String resolveQuestionImagePath(ExamAnswer answer) {
+    if (answer.getQuestionType() == null) {
+      return "";
+    }
+
+    return switch (answer.getQuestionType()) {
+      case CHOICE -> questionBankRepository.findById(answer.getQuestionId())
+        .map(QuestionBank::getImagePath)
+        .orElse("");
+      case JUDGE -> judgeQuestionBankRepository.findById(answer.getQuestionId())
+        .map(q -> "")
+        .orElse("");
+      case BLANK -> blankQuestionBankRepository.findById(answer.getQuestionId())
+        .map(BlankQuestionBank::getImagePath)
+        .orElse("");
+      case ESSAY -> essayQuestionBankRepository.findById(answer.getQuestionId())
+        .map(EssayQuestionBank::getImagePath)
+        .orElse("");
+    };
+  }
+
+  private String resolveQuestionCorrectAnswer(ExamAnswer answer) {
+    if (answer.getQuestionType() == null) {
+      return "";
+    }
+
+    return switch (answer.getQuestionType()) {
+      case CHOICE -> questionBankRepository.findById(answer.getQuestionId())
+        .map(QuestionBank::getAnswerKey)
+        .orElse("");
+      case JUDGE -> judgeQuestionBankRepository.findById(answer.getQuestionId())
+        .map(q -> q.isAnswerKey() ? "正确" : "错误")
+        .orElse("");
+      case BLANK -> blankQuestionBankRepository.findById(answer.getQuestionId())
+        .map(BlankQuestionBank::getAnswerKey)
+        .orElse("");
+      case ESSAY -> essayQuestionBankRepository.findById(answer.getQuestionId())
+        .map(EssayQuestionBank::getStandardAnswer)
+        .orElse("");
+    };
+  }
+
+  private List<String> resolveQuestionOptions(ExamAnswer answer) {
+    if (answer.getQuestionType() == null) {
+      return List.of();
+    }
+
+    return switch (answer.getQuestionType()) {
+      case CHOICE -> questionBankRepository.findById(answer.getQuestionId())
+        .map(question -> question.getOptions().stream()
+          .map(QuestionOption::getOptionText)
+          .toList())
+        .orElse(List.of());
+      default -> List.of();
     };
   }
 

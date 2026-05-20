@@ -1,5 +1,7 @@
 package com.nexeval.dto;
 
+import java.util.List;
+
 public record ExamAnswerDetailView(
   Long answerId,
   String questionId,
@@ -7,6 +9,9 @@ public record ExamAnswerDetailView(
   String type,
   String answerText,
   String answerImagePath,
+  String questionImagePath,
+  List<String> options,
+  String correctAnswer,
   Boolean correct,
   Integer score,
   Boolean reviewed,

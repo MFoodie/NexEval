@@ -191,7 +191,20 @@
 
         <template v-else-if="isStudent">
           <div v-if="studentLoading" class="placeholder">正在加载教学班...</div>
-          <div v-else-if="studentClasses.length" class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <div v-else class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+            <div class="mb-4 flex items-center student-search-bar">
+              <el-input
+                class="search-input"
+                style="width:260px;"
+                v-model="searchKeyword"
+                placeholder="按课程号或课程名检索"
+                size="small"
+                clearable
+                @clear="fetchStudentClasses"
+                @keyup.enter="handleSearchCourses"
+              />
+              <el-button class="search-button action-primary" size="small" type="primary" @click="handleSearchCourses">检索</el-button>
+            </div>
             <div class="section-title">课程列表</div>
             <el-table :data="studentClasses" size="small" class="student-classes-table">
             <el-table-column
@@ -229,6 +242,15 @@
               class-name="col-large col-score-cell"
               header-class-name="col-large col-score-header"
             />
+            <el-table-column prop="classMax" label="班级最高" width="110" align="center" header-align="center">
+              <template #default="{ row }">{{ row.classMax ?? '-' }}</template>
+            </el-table-column>
+            <el-table-column prop="classMin" label="班级最低" width="110" align="center" header-align="center">
+              <template #default="{ row }">{{ row.classMin ?? '-' }}</template>
+            </el-table-column>
+            <el-table-column prop="classAvg" label="班级均分" width="110" align="center" header-align="center">
+              <template #default="{ row }">{{ row.classAvg != null ? formatAvg(row.classAvg) : '-' }}</template>
+            </el-table-column>
             <el-table-column label="操作" width="180" align="center" header-align="center">
               <template #default="scope">
                 <div class="student-action-buttons flex flex-row items-center justify-end gap-2 whitespace-nowrap">
@@ -241,11 +263,12 @@
                   >
                     进入考试
                   </el-button>
-                  <el-dropdown trigger="click" popper-class="absolute right-0 mt-2 rounded-md shadow-lg z-10">
+                        <el-dropdown trigger="click" popper-class="absolute right-0 mt-2 rounded-md shadow-lg z-10">
                     <button type="button" class="action-more">...</button>
                     <template #dropdown>
                       <el-dropdown-menu class="flex flex-col">
                         <el-dropdown-item @click="handleStartPracticeForClass(scope.row)">题目练习</el-dropdown-item>
+                        <el-dropdown-item @click="handleViewWrongQuestions(scope.row, 'PRACTICE')">查看错题</el-dropdown-item>
                         <el-dropdown-item @click="openAppealHistory(scope.row)">成绩复核</el-dropdown-item>
                       </el-dropdown-menu>
                     </template>
@@ -255,7 +278,6 @@
             </el-table-column>
             </el-table>
           </div>
-          <div v-else class="placeholder">暂无教学班</div>
         </template>
 
         <el-form v-else @submit.prevent>
@@ -282,7 +304,7 @@
           <div v-if="studentLoading" class="placeholder">正在加载教学班...</div>
           <div v-else-if="studentClasses.length" class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
             <div class="section-title">课程列表</div>
-            <el-table :data="studentClasses" size="small" class="student-classes-table">
+              <el-table :data="studentClasses" size="small" class="student-classes-table">
               <el-table-column
                 prop="cno"
                 label="课程号"
@@ -311,21 +333,24 @@
               />
               <el-table-column
                 label="操作"
-                width="180"
-                align="center"
-                header-align="center"
+                width="240"
+                align="left"
+                header-align="left"
                 class-name="col-large"
                 header-class-name="col-large-header"
               >
                 <template #default="scope">
-                  <el-button
-                    type="primary"
-                    size="small"
-                    :loading="startingCat"
-                    @click="handleStartCatForClass(scope.row)"
-                  >
-                    开始 CAT 练习
-                  </el-button>
+                  <div class="cat-operation-buttons flex flex-wrap items-center gap-2 justify-start">
+                    <el-button
+                      type="primary"
+                      size="small"
+                      :loading="startingCat"
+                      @click="handleStartCatForClass(scope.row)"
+                    >
+                      开始 CAT 练习
+                    </el-button>
+                    <el-button size="small" plain @click="handleViewWrongQuestions(scope.row, 'CAT')">查看错题</el-button>
+                  </div>
                 </template>
               </el-table-column>
             </el-table>
@@ -589,6 +614,88 @@
         <el-button @click="aiLogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="wrongDialogVisible" title="查看错题" width="760px" :close-on-click-modal="false">
+      <div v-if="wrongAnswers.length === 0" class="placeholder">暂无错题</div>
+      <div v-else class="wrong-answers-dialog">
+        <div class="wrong-card-toolbar flex items-center justify-between mb-4">
+          <div class="wrong-card-title text-lg font-semibold">第 {{ wrongQuestionIndex + 1 }} / {{ totalWrong }} 题</div>
+          <div class="wrong-card-buttons flex items-center gap-2">
+            <el-button size="small" @click="showPrevWrong" :disabled="wrongQuestionIndex === 0">上一题</el-button>
+            <el-button size="small" @click="showNextWrong" :disabled="wrongQuestionIndex >= totalWrong - 1">下一题</el-button>
+          </div>
+        </div>
+
+        <el-card class="wrong-question-card">
+          <div class="wrong-question-section">
+            <div class="wrong-question-label">题目</div>
+            <div class="wrong-question-content">
+              <div class="wrong-question-meta">
+                <span class="wrong-question-type">{{ formatQuestionType(currentWrong?.type) }}</span>
+              </div>
+              <div class="wrong-question-text">{{ currentWrong?.stem || '-' }}</div>
+              <img
+                v-if="currentWrong?.questionImagePath"
+                :src="normalizeAnswerImageSrc(currentWrong.questionImagePath)"
+                alt="题目图片"
+                class="wrong-question-image"
+              />
+            </div>
+          </div>
+
+          <div v-if="currentWrong?.options?.length" class="wrong-question-section">
+            <div class="wrong-question-label">选项</div>
+            <div class="wrong-question-content wrong-option-list">
+              <div
+                v-for="(option, index) in currentWrong.options"
+                :key="index"
+                class="wrong-option-item"
+                :class="{
+                  selected: isOptionSelected(option, index),
+                  correct: showCorrectAnswer && isOptionCorrect(option, index)
+                }"
+              >
+                <span class="wrong-option-label">{{ optionLabel(index) }}</span>
+                <span>{{ option }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="wrong-question-section">
+            <div class="wrong-question-label">你的答案</div>
+            <div class="wrong-question-content">
+              <div class="wrong-question-text">{{ currentWrong?.answerText || '-' }}</div>
+              <img
+                v-if="currentWrong?.answerImagePath"
+                :src="normalizeAnswerImageSrc(currentWrong.answerImagePath)"
+                alt="你的答案图片"
+                class="wrong-question-image"
+              />
+            </div>
+          </div>
+
+          <div class="wrong-question-section">
+            <div class="wrong-question-label">参考答案</div>
+            <div class="wrong-question-content">
+              <el-button type="text" @click="toggleShowCorrectAnswer">
+                {{ showCorrectAnswer ? '隐藏答案' : '显示答案' }}
+              </el-button>
+              <div v-if="currentWrong?.type === 'choice'">
+                <div v-if="showCorrectAnswer" class="wrong-answer-box">
+                  正确选项已标注
+                </div>
+              </div>
+              <div v-else-if="showCorrectAnswer" class="wrong-answer-box">
+                {{ currentWrong?.correctAnswer || '标准答案暂无' }}
+              </div>
+            </div>
+          </div>
+        </el-card>
+      </div>
+      <template #footer>
+        <el-button @click="wrongDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -696,6 +803,14 @@ const studentClasses = ref([]);
 const teacherLoading = ref(false);
 const studentLoading = ref(false);
 const selectedClass = ref(null);
+const searchKeyword = ref("");
+const wrongDialogVisible = ref(false);
+const wrongAnswers = ref([]);
+const wrongQuestionIndex = ref(0);
+const showCorrectAnswer = ref(false);
+const currentWrong = computed(() => wrongAnswers.value[wrongQuestionIndex.value] || null);
+const totalWrong = computed(() => wrongAnswers.value.length);
+const searching = ref(false);
 const gradingVisible = ref(false);
 const gradingLoading = ref(false);
 const gradingStudent = ref(null);
@@ -858,16 +973,45 @@ async function fetchTeacherClasses() {
 }
 
 async function fetchStudentClasses() {
-  const sno = studentInfo.value?.sno;
-  if (!sno) {
+  const sno = String(studentInfo.value?.sno || "").trim();
+  const userIdParam = String(cardNo.value || "").trim();
+  if (!sno && !userIdParam) {
     studentClasses.value = [];
     return;
   }
 
   studentLoading.value = true;
   try {
-    const data = await wsClient.request("GET_STUDENT_CLASSES", { sno }, 20000);
-    studentClasses.value = Array.isArray(data) ? data : [];
+    // 获取常规课程信息（包含 teacherName, grade 等）
+    const data = await wsClient.request("GET_STUDENT_CLASSES", { sno, userId: userIdParam }, 20000);
+    const base = Array.isArray(data) ? data : [];
+
+    // 同时请求带有班级统计的视图，keyword 为空表示全部
+    let stats = [];
+    try {
+      const s = await wsClient.request("SEARCH_COURSE_SCORES", { userId: cardNo.value, keyword: "" }, 20000);
+      stats = Array.isArray(s) ? s : [];
+    } catch (e) {
+      // 如果统计失败，继续使用基础数据
+      stats = [];
+    }
+
+    // 按课程号合并统计字段到基础列表，保持 teacherName 和 grade 为主
+    const statsMap = new Map();
+    for (const item of stats) {
+      if (item && item.cno) statsMap.set(String(item.cno), item);
+    }
+
+    studentClasses.value = base.map(row => {
+      const key = String(row.cno);
+      const stat = statsMap.get(key);
+      return {
+        ...row,
+        classMax: stat?.classMax ?? null,
+        classMin: stat?.classMin ?? null,
+        classAvg: stat?.classAvg ?? null
+      };
+    });
   } catch (error) {
     ElMessage.error(error.message || "教学班获取失败");
   } finally {
@@ -877,6 +1021,144 @@ async function fetchStudentClasses() {
 
 function triggerAvatarPicker() {
   avatarInputRef.value?.click();
+}
+
+function formatAvg(value) {
+  if (value == null) return "-";
+  return Number(value).toFixed(1);
+}
+
+async function handleSearchCourses() {
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket 未连接，无法检索");
+    return;
+  }
+
+  // 空关键字时视为重置，直接重新获取学生课程列表
+  if (!searchKeyword.value || !String(searchKeyword.value).trim()) {
+    await fetchStudentClasses();
+    return;
+  }
+
+  searching.value = true;
+  try {
+    const data = await wsClient.request("SEARCH_COURSE_SCORES", { userId: cardNo.value, keyword: searchKeyword.value }, 20000);
+    studentClasses.value = Array.isArray(data) ? data : [];
+  } catch (err) {
+    ElMessage.error(err.message || "检索失败");
+  } finally {
+    searching.value = false;
+  }
+}
+
+async function handleViewWrongQuestions(clazz, mode = "PRACTICE") {
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket 未连接，请稍后再试");
+    return;
+  }
+
+  if (!clazz?.cno) {
+    ElMessage.error("课程信息不完整，无法查看错题");
+    return;
+  }
+
+  try {
+    const attempts = await wsClient.request("GET_EXAM_ATTEMPTS", { courseNo: clazz.cno, userId: cardNo.value, mode }, 20000);
+    if (!Array.isArray(attempts) || attempts.length === 0) {
+      ElMessage.info("暂无对应练习记录");
+      return;
+    }
+
+    const latest = attempts[0];
+    const sessionId = latest.sessionId || latest.sessionIdString || latest.sessionId;
+    if (!sessionId) {
+      ElMessage.error("无法解析练习会话");
+      return;
+    }
+
+    const answers = await wsClient.request("GET_ATTEMPT_ANSWERS", { sessionId }, 20000);
+    if (!Array.isArray(answers)) {
+      ElMessage.error("获取答题记录失败");
+      return;
+    }
+
+    const wrongs = answers.filter(a => {
+      const type = String(a.type || "").toLowerCase();
+      const isIncorrect = a.correct === false || a.correct === 0 || a.correct === 'false';
+      const isEssayWithContent = type === "essay" && (String(a.answerText || "").trim() || String(a.answerImagePath || "").trim());
+      return isIncorrect || (type === "essay" && a.correct !== true && isEssayWithContent);
+    });
+    if (wrongs.length === 0) {
+      ElMessage.info("没有答错的题目");
+      return;
+    }
+
+    wrongAnswers.value = wrongs;
+    wrongQuestionIndex.value = 0;
+    showCorrectAnswer.value = false;
+    wrongDialogVisible.value = true;
+  } catch (err) {
+    ElMessage.error(err.message || "获取错题失败");
+  }
+}
+
+function showPrevWrong() {
+  if (wrongQuestionIndex.value > 0) {
+    wrongQuestionIndex.value -= 1;
+    showCorrectAnswer.value = false;
+  }
+}
+
+function showNextWrong() {
+  if (wrongQuestionIndex.value < totalWrong.value - 1) {
+    wrongQuestionIndex.value += 1;
+    showCorrectAnswer.value = false;
+  }
+}
+
+function optionLabel(index) {
+  return String.fromCharCode(65 + index);
+}
+
+function normalizeListValue(value) {
+  return String(value || "").trim();
+}
+
+function isOptionSelected(option, index) {
+  if (!currentWrong.value) {
+    return false;
+  }
+  const answer = normalizeListValue(currentWrong.value.answerText);
+  const label = optionLabel(index);
+  return answer.toUpperCase() === label || normalizeListValue(option) === answer;
+}
+
+function isOptionCorrect(option, index) {
+  if (!currentWrong.value) {
+    return false;
+  }
+  const correct = normalizeListValue(currentWrong.value.correctAnswer);
+  const label = optionLabel(index);
+  return correct.toUpperCase() === label || normalizeListValue(option) === correct;
+}
+
+function formatQuestionType(type) {
+  switch (String(type || "").toLowerCase()) {
+    case "choice":
+      return "单选题";
+    case "judge":
+      return "判断题";
+    case "blank":
+      return "填空题";
+    case "essay":
+      return "简答题";
+    default:
+      return "题目";
+  }
+}
+
+function toggleShowCorrectAnswer() {
+  showCorrectAnswer.value = !showCorrectAnswer.value;
 }
 
 async function handleAvatarFileChange(event) {
@@ -1671,6 +1953,139 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
+.student-search-bar {
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.student-search-bar .el-input__inner {
+  border-radius: 24px !important;
+  min-height: 50px;
+  padding: 0 14px;
+}
+
+.student-search-bar .search-input {
+  min-width: 220px;
+  flex: 0 0 auto;
+}
+
+.student-search-bar .search-button {
+  min-width: 82px;
+  border-radius: 8px !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+  min-height: auto !important;
+}
+
+.wrong-answers-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.wrong-card-toolbar {
+  gap: 12px;
+}
+
+.wrong-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wrong-option-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f5f7fb;
+  color: #333;
+}
+
+.wrong-option-item.selected {
+  background: #d9ecff;
+  border: 1px solid #69b1ff;
+}
+
+.wrong-option-item.correct {
+  background: #e6f9ed;
+  border: 1px solid #67c23a;
+}
+
+.wrong-option-label {
+  font-weight: 600;
+  width: 24px;
+}
+
+.wrong-question-meta {
+  margin-bottom: 8px;
+}
+
+.wrong-question-type {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  background: #f0f6ff;
+  color: #606f8b;
+  font-size: 12px;
+}
+
+.wrong-question-card {
+  border-radius: 20px;
+  padding: 20px;
+  background: var(--ne-surface);
+  border: 1px solid var(--ne-border);
+}
+
+.wrong-question-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.wrong-question-section:last-child {
+  margin-bottom: 0;
+}
+
+.wrong-question-label {
+  font-weight: 600;
+  color: var(--ne-text-strong);
+}
+
+.wrong-question-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wrong-question-text {
+  min-height: 48px;
+  padding: 14px 16px;
+  border: 1px solid var(--ne-border);
+  border-radius: 16px;
+  background: var(--ne-surface-2, #f9fafb);
+  color: var(--ne-text-strong);
+  white-space: pre-wrap;
+}
+
+.wrong-question-image {
+  max-width: 100%;
+  max-height: 280px;
+  border-radius: 14px;
+  border: 1px solid var(--ne-border);
+  object-fit: contain;
+}
+
+.wrong-answer-box {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--ne-border);
+  background: var(--ne-surface-2, #f7fafc);
+  min-height: 72px;
+  white-space: pre-wrap;
+}
+
 .home-shell.sidebar-collapsed {
   --home-sidebar-width: 112px;
 }
@@ -2171,6 +2586,16 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: flex-end;
   width: auto;
+  white-space: nowrap;
+}
+
+.cat-operation-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
   white-space: nowrap;
 }
 

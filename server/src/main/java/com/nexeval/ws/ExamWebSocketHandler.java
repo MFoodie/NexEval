@@ -207,7 +207,8 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
           break;
         case "GET_STUDENT_CLASSES":
           responsePayload = classQueryService.getStudentClasses(
-            requireText(payload, "sno")
+            optionalText(payload, "sno"),
+            optionalText(payload, "userId")
           );
           break;
         case "START_SESSION":
@@ -255,8 +256,15 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
           break;
         case "GET_EXAM_ATTEMPTS":
           responsePayload = catExamService.getExamAttempts(
+            optionalText(payload, "mode"),
             optionalText(payload, "courseNo"),
             requireText(payload, "userId")
+          );
+          break;
+        case "SEARCH_COURSE_SCORES":
+          responsePayload = classQueryService.searchCourseScoresForStudent(
+            requireText(payload, "userId"),
+            optionalText(payload, "keyword")
           );
           break;
         case "GET_ATTEMPT_ANSWERS":
