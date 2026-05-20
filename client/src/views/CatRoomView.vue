@@ -1,41 +1,40 @@
 ﻿<template>
   <section class="exam-shell">
-    <header class="exam-hero card">
-      <div class="hero-main">
-        <div class="hero-copy">
-          <div class="hero-eyebrow">CAT 自适应练习</div>
-          <h1 class="hero-title">{{ courseTitle }}</h1>
-          <p class="hero-subtitle">
-            课程编号：{{ courseNoText }}
-            <span v-if="courseNameText">｜课程名称：{{ courseNameText }}</span>
-          </p>
+    <div class="exam-container">
+      <header class="exam-hero card">
+        <div class="hero-main">
+          <div>
+            <div class="hero-eyebrow">CAT 自适应练习</div>
+            <h1 class="hero-title">{{ courseTitle }}</h1>
+            <p class="hero-subtitle">
+              课程编号：{{ courseNoText }}
+              <span v-if="courseNameText">｜课程名称：{{ courseNameText }}</span>
+            </p>
+          </div>
         </div>
 
         <div class="hero-status">
           <div class="status-item">
-            <div class="status-topline">
-              <span class="status-label">进度</span>
+            <span class="status-label">进度</span>
+            <div class="progress-inline">
+              <div class="progress-track">
+                <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+              </div>
               <span class="progress-text">{{ answeredCount }}/{{ maxQuestions }}</span>
-            </div>
-            <div class="progress-track progress-track--hero">
-              <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
             </div>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
 
-    <section class="exam-body">
-      <el-row :gutter="16" class="cat-layout">
-        <el-col :span="17" :xs="24" :md="17">
-          <div class="exam-question card">
-            <el-skeleton :rows="6" animated v-if="loading" />
+      <section class="exam-body">
+        <div class="exam-question card">
+          <el-skeleton :rows="6" animated v-if="loading" />
 
-            <template v-else>
-              <div
-                v-if="finished"
-                class="report-wrapper max-w-4xl mx-auto p-6 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-10"
-              >
+          <template v-else>
+            <div
+              v-if="finished"
+              class="report-wrapper max-w-4xl mx-auto p-6 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-10"
+            >
                 <section class="report-ai-section">
                   <div class="report-badge">
                     NexEval AI 深度诊断报告
@@ -145,7 +144,7 @@
                   <button
                     type="button"
                     class="report-btn-secondary"
-                    @click="router.push('/')"
+                    @click="router.push({ name: 'home', query: { menu: 'cat' } })"
                   >
                     返回首页
                   </button>
@@ -159,24 +158,24 @@
                 </div>
               </div>
 
-              <template v-else-if="currentQuestion">
-                <div class="question-head">
-                  <div class="question-index">第 {{ answeredCount + 1 }} 题</div>
-                  <div class="question-meta">
-                    <el-tag class="question-type-tag" type="primary" effect="light">{{ currentTypeLabel }}</el-tag>
-                  </div>
-                </div>
+            <template v-else-if="currentQuestion">
+              <div v-if="currentKnowledgePoints.length" class="question-kp">
+                <el-breadcrumb separator="/">
+                  <el-breadcrumb-item>知识点</el-breadcrumb-item>
+                  <el-breadcrumb-item v-for="point in currentKnowledgePoints" :key="point">
+                    {{ point }}
+                  </el-breadcrumb-item>
+                </el-breadcrumb>
+              </div>
 
-                <div class="question-kp">
-                  <el-breadcrumb separator="/">
-                    <el-breadcrumb-item>知识点</el-breadcrumb-item>
-                    <el-breadcrumb-item v-for="point in currentKnowledgePoints" :key="point">
-                      {{ point }}
-                    </el-breadcrumb-item>
-                  </el-breadcrumb>
+              <div class="question-head">
+                <div class="question-index">第 {{ answeredCount + 1 }} 题</div>
+                <div class="question-meta">
+                  <span class="question-type">{{ currentTypeLabel }}</span>
                 </div>
+              </div>
 
-                <h2 class="question-title question-title--large">{{ currentQuestion.stem }}</h2>
+              <h2 class="question-title">{{ currentQuestion.stem }}</h2>
 
                 <div v-if="questionImageSrc" class="question-image-wrap" :style="questionImageWrapStyle">
                   <img :src="questionImageSrc" alt="题目图片" class="question-image" :style="questionImageStyle" />
@@ -200,18 +199,17 @@
                   <el-input v-model="answerValue" class="answer-input" placeholder="请输入答案" clearable />
                 </template>
 
-                <div class="question-actions">
-                  <el-button type="primary" size="large" class="submit-btn" :loading="submitting" @click="handleSubmit">
-                    提交并进入下一题
-                  </el-button>
-                </div>
-              </template>
+              <div class="question-actions">
+                <el-button type="primary" size="large" class="submit-btn" :loading="submitting" @click="handleSubmit">
+                  提交并进入下一题
+                </el-button>
+              </div>
             </template>
-          </div>
-        </el-col>
+          </template>
+        </div>
 
-        <el-col :span="7" :xs="24" :md="7">
-          <aside class="card ai-panel">
+        <aside class="exam-aside">
+          <div class="card ai-panel">
             <div class="ai-panel-title">CAT 动态调度舱</div>
             <div class="ai-panel-subtitle">AI 预估掌握度</div>
             <div class="dashboard-row">
@@ -238,10 +236,10 @@
               </div>
             </div>
             <div ref="growthChartEl" class="cat-growth-chart"></div>
-          </aside>
-        </el-col>
-      </el-row>
-    </section>
+          </div>
+        </aside>
+      </section>
+    </div>
   </section>
 </template>
 
@@ -342,10 +340,6 @@ const currentKnowledgePoints = computed(() => {
         points.push(...chunks);
       }
     }
-  }
-
-  if (points.length === 0) {
-    return ["未标注知识点"];
   }
 
   return [...new Set(points)];
@@ -714,6 +708,234 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.exam-shell {
+  display: grid;
+  gap: 20px;
+  width: 100%;
+}
+
+.exam-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  gap: 20px;
+}
+
+.exam-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.exam-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--ne-gradient-accent);
+}
+
+.hero-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.hero-eyebrow {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--ne-text-muted);
+}
+
+.hero-title {
+  margin: 6px 0 8px;
+  font-size: 28px;
+  font-family: "Space Grotesk", "Manrope", sans-serif;
+  color: var(--ne-text-strong);
+}
+
+.hero-subtitle {
+  margin: 0;
+  color: var(--ne-text-muted);
+}
+
+.hero-status {
+  margin-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  align-items: center;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ne-text-muted);
+  font-size: 14px;
+}
+
+.status-label {
+  color: var(--ne-text-subtle);
+}
+
+.progress-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress-track {
+  width: 160px;
+  height: 6px;
+  background: rgba(var(--ne-primary-rgb), 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--ne-gradient-primary);
+  border-radius: inherit;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: var(--ne-text-muted);
+}
+
+.exam-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 20px;
+  align-items: start;
+}
+
+.exam-question {
+  min-height: 420px;
+}
+
+.question-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  color: var(--ne-text-muted);
+  font-size: 13px;
+}
+
+.question-meta {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.question-type {
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--ne-border);
+  background: var(--ne-primary-soft);
+  color: var(--ne-primary);
+  font-size: 12px;
+}
+
+.question-title {
+  margin: 0 0 18px;
+  font-size: 20px;
+  color: var(--ne-text-strong);
+}
+
+.question-image-wrap {
+  margin: 0 0 18px;
+  padding: 12px;
+  border: 1px solid rgba(var(--ne-primary-rgb), 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  overflow: auto;
+}
+
+.question-image {
+  border-radius: 10px;
+}
+
+.option-group {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.answer-input {
+  margin-bottom: 24px;
+}
+
+.option-item {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--ne-radius-md);
+  border: 1px solid var(--ne-border);
+  background: var(--ne-surface);
+  transition: all 0.2s ease;
+}
+
+.option-item:hover {
+  border-color: var(--ne-hover-border);
+  background: var(--ne-hover-bg);
+  box-shadow: var(--ne-shadow-soft);
+  transform: translateY(-1px);
+}
+
+.option-item.is-checked {
+  border-color: rgba(var(--ne-primary-rgb), 0.6);
+  background: var(--ne-primary-soft);
+}
+
+.option-item :deep(.el-radio__label) {
+  white-space: normal;
+  line-height: 1.6;
+}
+
+.option-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(var(--ne-primary-rgb), 0.12);
+  color: var(--ne-primary);
+  font-weight: 600;
+  font-size: 12px;
+  margin-right: 10px;
+}
+
+.option-text {
+  font-size: 14px;
+  color: var(--ne-text);
+}
+
+.question-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.exam-aside {
+  display: grid;
+  gap: 16px;
+}
+
+.submit-btn {
+  min-height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.question-kp {
+  margin-top: 12px;
+}
+
 .report-wrapper {
   display: flex;
   flex-direction: column;
@@ -967,119 +1189,6 @@ onBeforeUnmount(() => {
   color: #374151;
 }
 
-.cat-layout {
-  margin-top: 16px;
-  align-items: flex-start;
-}
-
-.hero-main {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-}
-
-.hero-copy {
-  flex: 1;
-  min-width: 0;
-}
-
-.hero-status {
-  flex: 0 0 300px;
-  max-width: 100%;
-  align-self: flex-end;
-  margin-bottom: 2px;
-}
-
-.status-item {
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.02), rgba(15, 23, 42, 0.01));
-  border: 1px solid rgba(148, 163, 184, 0.18);
-}
-
-.status-topline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.status-label {
-  font-size: 13px;
-  color: var(--ne-text-muted);
-}
-
-.progress-text {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ne-text-strong);
-}
-
-.progress-track--hero {
-  width: 100%;
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(var(--ne-primary-rgb), 0.14);
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--ne-primary), var(--ne-accent));
-}
-
-.question-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.question-kp {
-  margin-top: 12px;
-}
-
-.question-title--large {
-  margin: 14px 0 18px;
-  font-size: 22px;
-  line-height: 1.6;
-}
-
-.option-group {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-}
-
-.option-item {
-  width: 100%;
-  margin-right: 0;
-  padding: 2px 0;
-}
-
-.option-tag {
-  display: inline-block;
-  margin-right: 0.5em;
-}
-
-.option-item :deep(.el-radio__label) {
-  white-space: normal;
-  line-height: 1.6;
-}
-
-.question-actions {
-  margin-top: 20px;
-}
-
-.submit-btn {
-  width: 100%;
-  min-height: 48px;
-  font-size: 16px;
-  font-weight: 600;
-}
 
 .ai-panel {
   display: flex;
@@ -1210,6 +1319,10 @@ onBeforeUnmount(() => {
 @media (max-width: 980px) {
   .hero-main {
     flex-direction: column;
+  }
+
+  .exam-body {
+    grid-template-columns: 1fr;
   }
 
   .hero-status {

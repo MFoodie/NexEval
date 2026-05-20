@@ -32,7 +32,7 @@
           class="side-item"
           :title="sidebarCollapsed ? item.label : ''"
           :class="{ active: activeMenu === item.key, 'side-item--cat': item.key === 'cat' }"
-          @click="activeMenu = item.key"
+          @click="setActiveMenu(item.key)"
         >
           <img v-if="item.icon" :src="item.icon" :alt="item.label" class="side-item-icon" />
           <span v-else-if="item.symbol" class="side-item-symbol" aria-hidden="true">{{ item.symbol }}</span>
@@ -253,7 +253,7 @@
             </el-table-column>
             <el-table-column label="操作" width="180" align="center" header-align="center">
               <template #default="scope">
-                <div class="student-action-buttons flex flex-row items-center justify-end gap-2 whitespace-nowrap">
+                  <div class="student-action-buttons student-action-buttons--wrap flex flex-row items-center gap-2">
                   <el-button
                     type="primary"
                     size="small"
@@ -333,23 +333,31 @@
               />
               <el-table-column
                 label="操作"
-                width="240"
-                align="left"
-                header-align="left"
+                width="180"
+                align="center"
+                header-align="center"
                 class-name="col-large"
                 header-class-name="col-large-header"
               >
                 <template #default="scope">
-                  <div class="cat-operation-buttons flex flex-wrap items-center gap-2 justify-start">
+                  <div class="student-action-buttons flex flex-row items-center justify-end gap-2 whitespace-nowrap">
                     <el-button
                       type="primary"
                       size="small"
+                      class="action-primary action-primary--cat"
                       :loading="startingCat"
                       @click="handleStartCatForClass(scope.row)"
                     >
                       开始 CAT 练习
                     </el-button>
-                    <el-button size="small" plain @click="handleViewWrongQuestions(scope.row, 'CAT')">查看错题</el-button>
+                    <el-dropdown trigger="click" popper-class="absolute right-0 mt-2 rounded-md shadow-lg z-10">
+                      <button type="button" class="action-more">...</button>
+                      <template #dropdown>
+                        <el-dropdown-menu class="flex flex-col">
+                          <el-dropdown-item @click="handleViewWrongQuestions(scope.row, 'CAT')">查看错题</el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
                   </div>
                 </template>
               </el-table-column>
@@ -700,8 +708,8 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { clearLogin, getLogin, saveLogin } from "../auth";
 import { createExamSocket } from "../ws";
@@ -713,6 +721,7 @@ import iconCorrect from "../assets/correct.svg";
 import iconCat from "../assets/CAT.svg";
 import iconExit from "../assets/exit.svg";
 
+const route = useRoute();
 const router = useRouter();
 const loginInfo = getLogin();
 
@@ -736,6 +745,7 @@ const practiceDifficulty = ref("中");
 const practiceQuestionCount = ref(10);
 const avatarSaving = ref(false);
 const wsStatus = ref("connecting");
+const HOME_ACTIVE_MENU_KEY = "nexeval.home.activeMenu";
 const HOME_SIDEBAR_COLLAPSED_KEY = "nexeval.home.sidebar.collapsed";
 const sidebarCollapsed = ref(readSidebarCollapsed());
 const avatarInputRef = ref(null);
@@ -898,6 +908,43 @@ function readSidebarCollapsed() {
   } catch {
     return false;
   }
+}
+
+function normalizeActiveMenu(value) {
+  const text = String(value || "").trim();
+  if (text === "profile" || text === "action" || text === "cat") {
+    if (text === "cat" && !isStudent.value) {
+      return "action";
+    }
+    return text;
+  }
+  return "action";
+}
+
+function readActiveMenu() {
+  try {
+    return localStorage.getItem(HOME_ACTIVE_MENU_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function setActiveMenu(value) {
+  const next = normalizeActiveMenu(value);
+  activeMenu.value = next;
+  try {
+    localStorage.setItem(HOME_ACTIVE_MENU_KEY, next);
+  } catch {
+    // ignore storage write errors
+  }
+}
+
+function resolveInitialMenu() {
+  const fromQuery = String(route.query.menu || "").trim();
+  if (fromQuery) {
+    return fromQuery;
+  }
+  return readActiveMenu();
 }
 
 function toggleSidebar() {
@@ -1427,6 +1474,7 @@ async function confirmCatStart() {
       courseNo
     });
     practiceDialogVisible.value = false;
+    setActiveMenu("cat");
     router.push({
       name: "cat",
       params: {
@@ -1766,6 +1814,17 @@ async function handleAiReviewAnswer(answer) {
 }
 
 onMounted(connectWebSocket);
+
+setActiveMenu(resolveInitialMenu());
+
+watch(
+  () => route.query.menu,
+  (value) => {
+    if (value != null && String(value).trim() !== "") {
+      setActiveMenu(value);
+    }
+  }
+);
 
 onBeforeUnmount(() => {
   wsClient?.close();
@@ -2589,14 +2648,10 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.cat-operation-buttons {
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-  align-items: center;
+.student-action-buttons--wrap {
+  flex-wrap: wrap;
   justify-content: flex-start;
-  width: 100%;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .student-action-buttons .el-button {
@@ -2609,6 +2664,14 @@ onBeforeUnmount(() => {
   font-size: 12px;
   font-weight: 600;
   border-radius: 8px;
+  line-height: 1.2;
+}
+
+.action-primary--cat {
+  padding: 7px 14px;
+  font-size: 12px;
+  min-width: 120px;
+  line-height: 1.2;
 }
 
 .action-more {
