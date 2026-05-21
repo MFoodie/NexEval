@@ -202,11 +202,12 @@
                 clearable
                 @clear="fetchStudentClasses"
                 @keyup.enter="handleSearchCourses"
-              />
-              <el-button class="search-button action-primary search-button-with-icon" size="small" type="primary" @click="handleSearchCourses">
-                <img :src="iconQuery" alt="" aria-hidden="true" class="search-button-icon" />
-                <span>搜索</span>
-              </el-button>
+              >
+                <template #prefix>
+                  <img :src="iconQuery" alt="" aria-hidden="true" class="search-prefix-icon" />
+                </template>
+              </el-input>
+              <el-button class="search-button action-primary" size="small" type="primary" @click="handleSearchCourses">搜索</el-button>
             </div>
             <div class="section-title">课程列表</div>
             <el-table :data="studentClasses" size="small" class="student-classes-table">
@@ -2034,6 +2035,14 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
 }
 
+.student-search-bar .search-prefix-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex: 0 0 auto;
+  margin-left: 6px;
+}
+
 .student-search-bar .el-input__inner {
   border-radius: 24px !important;
   min-height: 50px;
@@ -2046,24 +2055,11 @@ onBeforeUnmount(() => {
 }
 
 .student-search-bar .search-button {
-  min-width: 82px;
+  min-width: 52px;
   border-radius: 8px !important;
-  padding: 4px 10px !important;
+  padding: 4px 6px !important;
   font-size: 12px !important;
   min-height: auto !important;
-}
-
-.student-search-bar .search-button-with-icon {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.student-search-bar .search-button-icon {
-  width: 16px;
-  height: 16px;
-  display: block;
-  flex: 0 0 auto;
 }
 
 .wrong-answers-dialog {
