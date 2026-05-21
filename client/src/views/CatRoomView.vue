@@ -1140,6 +1140,7 @@ onBeforeUnmount(() => {
   gap: 12px;
   padding-top: 24px;
   border-top: 1px solid #e5e7eb;
+  flex-wrap: wrap;
 }
 
 .report-btn-secondary {
@@ -1174,6 +1175,16 @@ onBeforeUnmount(() => {
 @media (max-width: 768px) {
   .report-grid {
     grid-template-columns: 1fr;
+  }
+
+  .report-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .report-btn-secondary,
+  .report-btn-primary {
+    width: 100%;
   }
 }
 
@@ -1314,6 +1325,11 @@ onBeforeUnmount(() => {
 .chart-placeholder-sub {
   margin-top: 6px;
   font-size: 12px;
+}
+
+.cat-growth-chart {
+  width: 100%;
+  height: 220px;
 }
 
 @media (max-width: 980px) {

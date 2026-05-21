@@ -174,12 +174,12 @@
                     {{ scope.row.sex ? '男' : '女' }}
                   </template>
                 </el-table-column>
-                <el-table-column prop="grade" label="成绩" width="20">
+                <el-table-column prop="grade" label="成绩" width="80" align="center" header-align="center">
                   <template #default="scope">
                     {{ scope.row.grade ?? '-' }}
                   </template>
                 </el-table-column>
-                <el-table-column label="操作">
+                <el-table-column label="操作" width="140" align="center" header-align="center">
                   <template #default="scope">
                     <el-button size="small" @click="handleGradeStudent(scope.row)">成绩批改</el-button>
                   </template>
@@ -268,15 +268,22 @@
                     <el-button
                       type="primary"
                       size="small"
-                      class="action-primary"
+                      class="action-primary action-primary--exam"
                       :loading="startingExam"
                       @click="handleStartExamForClass(scope.row)"
                     >
                       进入考试
                     </el-button>
-                    <el-button size="mini" class="action-rect" @click="handleStartPracticeForClass(scope.row)">题目练习</el-button>
-                    <el-button size="mini" class="action-rect" @click="handleViewWrongQuestions(scope.row, 'PRACTICE')">查看错题</el-button>
-                    <el-button size="mini" class="action-rect" @click="openAppealHistory(scope.row)">成绩复核</el-button>
+                    <el-dropdown trigger="hover" placement="bottom-start">
+                      <el-button size="small" class="action-more action-ellipsis" aria-label="更多操作">...</el-button>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item @click="handleStartPracticeForClass(scope.row)">题目练习</el-dropdown-item>
+                          <el-dropdown-item @click="handleViewWrongQuestions(scope.row, 'PRACTICE')">查看错题</el-dropdown-item>
+                          <el-dropdown-item @click="openAppealHistory(scope.row)">成绩复核</el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
                   </div>
                 </template>
               </el-table-column>
@@ -345,15 +352,6 @@
               >
                 <template #default="scope">
                   <div class="student-action-buttons flex flex-row items-center justify-end gap-2 whitespace-nowrap">
-                    <el-button
-                      type="primary"
-                      size="small"
-                      class="action-primary action-primary--cat"
-                      :loading="startingCat"
-                      @click="handleStartCatForClass(scope.row)"
-                    >
-                      开始 CAT 练习
-                    </el-button>
                     <div class="student-action-grid">
                       <el-button
                         type="primary"
@@ -362,11 +360,16 @@
                         :loading="startingCat"
                         @click="handleStartCatForClass(scope.row)"
                       >
-                        开始 CAT 练习
+                        CAT 练习
                       </el-button>
-                      <el-button size="mini" class="action-rect" @click="handleStartPracticeForClass(scope.row)">题目练习</el-button>
-                      <el-button size="mini" class="action-rect" @click="handleViewWrongQuestions(scope.row, 'CAT')">查看错题</el-button>
-                      <el-button size="mini" class="action-rect" @click="openAppealHistory(scope.row)">成绩复核</el-button>
+                      <el-dropdown trigger="hover" placement="bottom-start">
+                        <el-button size="small" class="action-more action-ellipsis" aria-label="更多操作">...</el-button>
+                        <template #dropdown>
+                          <el-dropdown-menu>
+                            <el-dropdown-item @click="handleViewWrongQuestions(scope.row, 'CAT')">查看错题</el-dropdown-item>
+                          </el-dropdown-menu>
+                        </template>
+                      </el-dropdown>
                     </div>
                   </div>
                 </template>
@@ -2653,9 +2656,18 @@ onBeforeUnmount(() => {
   flex-direction: row;
   gap: 8px;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   width: auto;
   white-space: nowrap;
+}
+
+.student-action-grid {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  min-height: 60px;
+  margin-left: 50px;
 }
 
 .student-action-buttons--wrap {
@@ -2677,21 +2689,34 @@ onBeforeUnmount(() => {
   line-height: 1.2;
 }
 
+.action-primary--exam {
+  padding: 5px 10px;
+  font-size: 11px;
+}
+
 .action-primary--cat {
-  padding: 7px 14px;
-  font-size: 12px;
-  min-width: 120px;
-  line-height: 1.2;
+  padding: 6px 12px;
+  font-size: 11px;
+  min-width: 108px;
+  line-height: 1;
 }
 
 .action-more {
-  padding: 4px 8px;
-  font-size: 12px;
+  padding: 0 8px;
+  font-size: 11px;
   border-radius: 8px;
   border: 1px solid var(--ne-border);
   background: var(--ne-surface);
   color: var(--ne-text-muted);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-ellipsis {
+  min-width: 30px;
+  line-height: 1;
 }
 
 .action-more:hover {
