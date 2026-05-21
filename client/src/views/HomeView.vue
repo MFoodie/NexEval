@@ -197,13 +197,16 @@
                 class="search-input"
                 style="width:260px;"
                 v-model="searchKeyword"
-                placeholder="按课程号或课程名检索"
+                placeholder="按课程号或课程名搜索"
                 size="small"
                 clearable
                 @clear="fetchStudentClasses"
                 @keyup.enter="handleSearchCourses"
               />
-              <el-button class="search-button action-primary" size="small" type="primary" @click="handleSearchCourses">检索</el-button>
+              <el-button class="search-button action-primary search-button-with-icon" size="small" type="primary" @click="handleSearchCourses">
+                <img :src="iconQuery" alt="" aria-hidden="true" class="search-button-icon" />
+                <span>搜索</span>
+              </el-button>
             </div>
             <div class="section-title">课程列表</div>
             <el-table :data="studentClasses" size="small" class="student-classes-table">
@@ -733,6 +736,7 @@ import iconExam from "../assets/exam.svg";
 import iconCorrect from "../assets/correct.svg";
 import iconCat from "../assets/CAT.svg";
 import iconExit from "../assets/exit.svg";
+import iconQuery from "../assets/query.svg";
 
 const route = useRoute();
 const router = useRouter();
@@ -2047,6 +2051,19 @@ onBeforeUnmount(() => {
   padding: 4px 10px !important;
   font-size: 12px !important;
   min-height: auto !important;
+}
+
+.student-search-bar .search-button-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.student-search-bar .search-button-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex: 0 0 auto;
 }
 
 .wrong-answers-dialog {
