@@ -106,6 +106,10 @@
         <p class="switch-line">
           没有账号？<RouterLink to="/register">去注册</RouterLink>
         </p>
+
+        <p class="switch-line">
+          <RouterLink to="/forgot-password">忘记密码？</RouterLink>
+        </p>
       </div>
     </div>
   </section>
