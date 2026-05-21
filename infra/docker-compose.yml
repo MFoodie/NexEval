@@ -42,6 +42,13 @@ services:
       SERVER_PORT: 8080
       SSL_ENABLED: "false"
       ALLOWED_ORIGINS: http://localhost,http://127.0.0.1
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RESET_PAGE_URL: http://localhost/reset-password
+      SMTP_HOST: smtp.qq.com
+      SMTP_PORT: 587
+      SMTP_USERNAME: 382178825@qq.com
+      SMTP_PASSWORD: wklooaxidtezbhja
     ports:
       - "8080:8080"
     volumes:

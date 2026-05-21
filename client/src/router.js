@@ -7,6 +7,8 @@ import ExamRoomView from "./views/ExamRoomView.vue";
 import CatRoomView from "./views/CatRoomView.vue";
 import AdminView from "./views/AdminView.vue";
 import GradingView from "./views/GradingView.vue";
+import ForgotPasswordView from "./views/ForgotPasswordView.vue";
+import ResetPasswordView from "./views/ResetPasswordView.vue";
 
 const routes = [
   {
@@ -57,6 +59,18 @@ const routes = [
     meta: {
       requiresAuth: true
     }
+  },
+  {
+    path: "/forgot-password",
+    name: "forgot-password",
+    component: ForgotPasswordView,
+    meta: { guestOnly: true }
+  },
+  {
+    path: "/reset-password",
+    name: "reset-password",
+    component: ResetPasswordView,
+    meta: { guestOnly: true }
   },
   {
     path: "/grading",
