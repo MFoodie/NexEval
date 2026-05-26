@@ -1,6 +1,19 @@
 spring:
   application:
     name: nexeval-api
+
+  mail:
+    host: ${SMTP_HOST:smtp.qq.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:382178825@qq.com}
+    password: ${SMTP_PASSWORD:wklooaxidtezbhja}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/sedb?useUnicode=true&characterEncoding=utf8&connectionCollation=utf8mb4_0900_ai_ci&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
     username: ${DB_USERNAME:root}
@@ -34,6 +47,12 @@ management:
 nexeval:
   security:
     allowed-origins: ${ALLOWED_ORIGINS:https://localhost:5173}
+  avatar:
+    dir: ${AVATAR_DIR:./avatar}
+  password-reset:
+    token-ttl-minutes: 15
+    rate-limit-seconds: 60
+    reset-page-url: ${RESET_PAGE_URL:https://localhost:5173/reset-password}
 
 dashscope:
   api-key: "sk-f5396c4057cb49a4a3ffb16117d0e37e"
