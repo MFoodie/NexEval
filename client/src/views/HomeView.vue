@@ -150,6 +150,10 @@
                     <span class="class-code">{{ clazz.cno }}</span>
                     <span class="class-name">{{ clazz.cname }}</span>
                   </div>
+                  <div class="class-stats" v-if="clazz.avgScore != null">
+                    <span class="class-avg">均分 {{ clazz.avgScore }}%</span>
+                    <span class="class-pass">及格率 {{ clazz.passRate }}%</span>
+                  </div>
                 </button>
               </div>
             </div>
@@ -174,17 +178,36 @@
                     {{ scope.row.sex ? '男' : '女' }}
                   </template>
                 </el-table-column>
-                <el-table-column prop="grade" label="成绩" width="20">
+                <el-table-column prop="grade" label="成绩" width="80" align="center" header-align="center">
                   <template #default="scope">
                     {{ scope.row.grade ?? '-' }}
                   </template>
                 </el-table-column>
-                <el-table-column label="操作">
+                <el-table-column label="操作" width="140" align="center" header-align="center">
                   <template #default="scope">
                     <el-button size="small" @click="handleGradeStudent(scope.row)">成绩批改</el-button>
                   </template>
                 </el-table-column>
               </el-table>
+
+              <div v-if="selectedClass" class="score-distribution-section">
+                <div class="section-title">五档分数分布</div>
+                <div v-if="distributionLoading" class="placeholder">正在加载...</div>
+                <div v-else-if="!scoreDistribution || scoreDistribution.totalStudents === 0" class="placeholder">暂无考试分数数据</div>
+                <div v-else class="tier-cards">
+                  <button
+                    v-for="tier in scoreDistribution.tiers"
+                    :key="tier.label"
+                    type="button"
+                    class="tier-card"
+                    :style="{ borderLeftColor: tier.color }"
+                    @click="openTierDialog(tier)"
+                  >
+                    <div class="tier-label" :style="{ color: tier.color }">{{ tier.label }}</div>
+                    <div class="tier-count">{{ tier.count }} 人</div>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </template>
@@ -197,13 +220,17 @@
                 class="search-input"
                 style="width:260px;"
                 v-model="searchKeyword"
-                placeholder="按课程号或课程名检索"
+                placeholder="按课程号或课程名搜索"
                 size="small"
                 clearable
                 @clear="fetchStudentClasses"
                 @keyup.enter="handleSearchCourses"
-              />
-              <el-button class="search-button action-primary" size="small" type="primary" @click="handleSearchCourses">检索</el-button>
+              >
+                <template #prefix>
+                  <img :src="iconQuery" alt="" aria-hidden="true" class="search-prefix-icon" />
+                </template>
+              </el-input>
+              <el-button class="search-button action-primary" size="small" type="primary" @click="handleSearchCourses">搜索</el-button>
             </div>
             <div class="section-title">课程列表</div>
             <el-table :data="studentClasses" size="small" class="student-classes-table">
@@ -268,15 +295,22 @@
                     <el-button
                       type="primary"
                       size="small"
-                      class="action-primary"
+                      class="action-primary action-primary--exam"
                       :loading="startingExam"
                       @click="handleStartExamForClass(scope.row)"
                     >
                       进入考试
                     </el-button>
-                    <el-button size="mini" class="action-rect" @click="handleStartPracticeForClass(scope.row)">题目练习</el-button>
-                    <el-button size="mini" class="action-rect" @click="handleViewWrongQuestions(scope.row, 'PRACTICE')">查看错题</el-button>
-                    <el-button size="mini" class="action-rect" @click="openAppealHistory(scope.row)">成绩复核</el-button>
+                    <el-dropdown trigger="hover" placement="bottom-start">
+                      <el-button size="small" class="action-more action-ellipsis" aria-label="更多操作">...</el-button>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item @click="handleStartPracticeForClass(scope.row)">题目练习</el-dropdown-item>
+                          <el-dropdown-item @click="handleViewWrongQuestions(scope.row, 'PRACTICE')">查看错题</el-dropdown-item>
+                          <el-dropdown-item @click="openAppealHistory(scope.row)">成绩复核</el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
                   </div>
                 </template>
               </el-table-column>
@@ -506,15 +540,6 @@
               >
                 <template #default="scope">
                   <div class="student-action-buttons flex flex-row items-center justify-end gap-2 whitespace-nowrap">
-                    <el-button
-                      type="primary"
-                      size="small"
-                      class="action-primary action-primary--cat"
-                      :loading="startingCat"
-                      @click="handleStartCatForClass(scope.row)"
-                    >
-                      开始 CAT 练习
-                    </el-button>
                     <div class="student-action-grid">
                       <el-button
                         type="primary"
@@ -523,11 +548,16 @@
                         :loading="startingCat"
                         @click="handleStartCatForClass(scope.row)"
                       >
-                        开始 CAT 练习
+                        CAT 练习
                       </el-button>
-                      <el-button size="mini" class="action-rect" @click="handleStartPracticeForClass(scope.row)">题目练习</el-button>
-                      <el-button size="mini" class="action-rect" @click="handleViewWrongQuestions(scope.row, 'CAT')">查看错题</el-button>
-                      <el-button size="mini" class="action-rect" @click="openAppealHistory(scope.row)">成绩复核</el-button>
+                      <el-dropdown trigger="hover" placement="bottom-start">
+                        <el-button size="small" class="action-more action-ellipsis" aria-label="更多操作">...</el-button>
+                        <template #dropdown>
+                          <el-dropdown-menu>
+                            <el-dropdown-item @click="handleViewWrongQuestions(scope.row, 'CAT')">查看错题</el-dropdown-item>
+                          </el-dropdown-menu>
+                        </template>
+                      </el-dropdown>
                     </div>
                   </div>
                 </template>
@@ -898,6 +928,58 @@
         <el-button @click="wrongDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="tierDialogVisible" :title="tierDialogTitle" width="720px">
+      <div style="margin-bottom:12px;">
+        <el-input
+          v-model="tierKeyword"
+          placeholder="搜索学号或姓名"
+          size="small"
+          clearable
+          style="width:240px;"
+          @input="handleTierSearch"
+        />
+      </div>
+      <el-table :data="tierStudents" v-loading="tierLoading" size="small">
+        <el-table-column prop="sno" label="学号" width="120">
+          <template #default="scope">
+            <span v-html="highlightText(scope.row.sno)"></span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="name" label="姓名" width="120">
+          <template #default="scope">
+            <span v-html="highlightText(scope.row.name)"></span>
+          </template>
+        </el-table-column>
+        <el-table-column label="性别" width="80">
+          <template #default="scope">
+            {{ scope.row.sex ? '男' : '女' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="score" label="得分" width="80" />
+        <el-table-column prop="maxScore" label="满分" width="80" />
+        <el-table-column label="百分比" width="100">
+          <template #default="scope">
+            {{ scope.row.percent }}%
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <el-button type="primary" size="small" @click="exportTierCsv">导出 CSV</el-button>
+          <el-pagination
+            v-if="tierTotal > tierPageSize"
+            background
+            layout="prev, pager, next"
+            :total="tierTotal"
+            :page-size="tierPageSize"
+            :current-page="tierPage"
+            @current-change="handleTierPageChange"
+          />
+          <span v-else></span>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -915,6 +997,7 @@ import iconCorrect from "../assets/correct.svg";
 import iconCat from "../assets/CAT.svg";
 import iconCreateExam from "../assets/exam.svg";
 import iconExit from "../assets/exit.svg";
+import iconQuery from "../assets/query.svg";
 
 const route = useRoute();
 const router = useRouter();
@@ -1016,6 +1099,17 @@ const studentClasses = ref([]);
 const teacherLoading = ref(false);
 const studentLoading = ref(false);
 const selectedClass = ref(null);
+const scoreDistribution = ref(null);
+const distributionLoading = ref(false);
+const tierDialogVisible = ref(false);
+const tierDialogTitle = ref("");
+const selectedTier = ref(null);
+const tierStudents = ref([]);
+const tierTotal = ref(0);
+const tierPage = ref(1);
+const tierPageSize = ref(10);
+const tierLoading = ref(false);
+const tierKeyword = ref("");
 const searchKeyword = ref("");
 const wrongDialogVisible = ref(false);
 const wrongAnswers = ref([]);
@@ -1254,7 +1348,7 @@ async function fetchTeacherClasses() {
   try {
     const data = await wsClient.request("GET_TEACHER_CLASSES", { eid }, 20000);
     teacherClasses.value = Array.isArray(data) ? data : [];
-    selectedClass.value = teacherClasses.value[0] || null;
+    selectClass(teacherClasses.value[0] || null);
   } catch (error) {
     ElMessage.error(error.message || "教学班获取失败");
   } finally {
@@ -1829,6 +1923,125 @@ function handleStartDefaultExam() {
 
 function selectClass(clazz) {
   selectedClass.value = clazz;
+  fetchScoreDistribution();
+}
+
+async function fetchScoreDistribution() {
+  const clazz = selectedClass.value;
+  if (!clazz || !wsClient || !wsClient.isOpen()) {
+    scoreDistribution.value = null;
+    return;
+  }
+
+  distributionLoading.value = true;
+  try {
+    const data = await wsClient.request("GET_SCORE_DISTRIBUTION", {
+      cno: clazz.cno,
+      eid: clazz.eid
+    }, 20000);
+    scoreDistribution.value = data || null;
+  } catch (error) {
+    scoreDistribution.value = null;
+  } finally {
+    distributionLoading.value = false;
+  }
+}
+
+function openTierDialog(tier) {
+  selectedTier.value = tier;
+  tierDialogTitle.value = `${tier.label} (${tier.minPercent}%-${tier.maxPercent}%)`;
+  tierKeyword.value = "";
+  tierPage.value = 1;
+  tierDialogVisible.value = true;
+  fetchTierStudents();
+}
+
+async function fetchTierStudents() {
+  const clazz = selectedClass.value;
+  const tier = selectedTier.value;
+  if (!clazz || !tier || !wsClient || !wsClient.isOpen()) {
+    return;
+  }
+
+  tierLoading.value = true;
+  try {
+    const data = await wsClient.request("GET_SCORE_TIER_STUDENTS", {
+      cno: clazz.cno,
+      eid: clazz.eid,
+      minPercent: tier.minPercent,
+      maxPercent: tier.maxPercent,
+      page: tierPage.value,
+      pageSize: tierPageSize.value,
+      keyword: tierKeyword.value
+    }, 20000);
+    if (data) {
+      tierStudents.value = data.students || [];
+      tierTotal.value = data.totalCount || 0;
+    } else {
+      tierStudents.value = [];
+      tierTotal.value = 0;
+    }
+  } catch (error) {
+    tierStudents.value = [];
+    tierTotal.value = 0;
+  } finally {
+    tierLoading.value = false;
+  }
+}
+
+function handleTierPageChange(page) {
+  tierPage.value = page;
+  fetchTierStudents();
+}
+
+let tierSearchTimer = null;
+function handleTierSearch() {
+  clearTimeout(tierSearchTimer);
+  tierSearchTimer = setTimeout(() => {
+    tierPage.value = 1;
+    fetchTierStudents();
+  }, 300);
+}
+
+function highlightText(text) {
+  const kw = tierKeyword.value.trim();
+  if (!kw || !text) return text;
+  const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(${escaped})`, "gi");
+  return String(text).replace(regex, "<mark>$1</mark>");
+}
+
+function exportTierCsv() {
+  const rows = tierStudents.value;
+  if (!rows || rows.length === 0) {
+    ElMessage.warning("没有数据可导出");
+    return;
+  }
+
+  const header = ["学号", "姓名", "性别", "得分", "满分", "百分比"];
+  const lines = [header.join(",")];
+
+  for (const r of rows) {
+    const row = [
+      r.sno || "",
+      r.name || "",
+      r.sex ? "男" : "女",
+      r.score ?? "",
+      r.maxScore ?? "",
+      (r.percent ?? "") + "%"
+    ];
+    lines.push(row.map(cell => /[,"\n]/.test(String(cell)) ? '"' + String(cell).replace(/"/g, '""') + '"' : String(cell)).join(","));
+  }
+
+  const bom = "﻿";
+  const blob = new Blob([bom + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `score_export_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  ElMessage.success("导出成功");
 }
 
 function openScoreAppealDialog(clazz) {
@@ -2382,6 +2595,14 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
 }
 
+.student-search-bar .search-prefix-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex: 0 0 auto;
+  margin-left: 6px;
+}
+
 .student-search-bar .el-input__inner {
   border-radius: 24px !important;
   min-height: 50px;
@@ -2394,9 +2615,9 @@ onBeforeUnmount(() => {
 }
 
 .student-search-bar .search-button {
-  min-width: 82px;
+  min-width: 52px;
   border-radius: 8px !important;
-  padding: 4px 10px !important;
+  padding: 4px 6px !important;
   font-size: 12px !important;
   min-height: auto !important;
 }
@@ -3008,9 +3229,18 @@ onBeforeUnmount(() => {
   flex-direction: row;
   gap: 8px;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   width: auto;
   white-space: nowrap;
+}
+
+.student-action-grid {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  min-height: 60px;
+  margin-left: 50px;
 }
 
 .student-action-buttons--wrap {
@@ -3032,21 +3262,34 @@ onBeforeUnmount(() => {
   line-height: 1.2;
 }
 
+.action-primary--exam {
+  padding: 5px 10px;
+  font-size: 11px;
+}
+
 .action-primary--cat {
-  padding: 7px 14px;
-  font-size: 12px;
-  min-width: 120px;
-  line-height: 1.2;
+  padding: 6px 12px;
+  font-size: 11px;
+  min-width: 108px;
+  line-height: 1;
 }
 
 .action-more {
-  padding: 4px 8px;
-  font-size: 12px;
+  padding: 0 8px;
+  font-size: 11px;
   border-radius: 8px;
   border: 1px solid var(--ne-border);
   background: var(--ne-surface);
   color: var(--ne-text-muted);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-ellipsis {
+  min-width: 30px;
+  line-height: 1;
 }
 
 .action-more:hover {
@@ -3483,6 +3726,71 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.class-stats {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+}
+
+.class-avg {
+  color: var(--ne-primary, #409EFF);
+  font-weight: 600;
+}
+
+.class-pass {
+  color: #67C23A;
+  font-weight: 600;
+}
+
+.score-distribution-section {
+  margin-top: 24px;
+}
+
+.tier-cards {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tier-card {
+  flex: 1;
+  min-width: 140px;
+  border: 1px solid var(--ne-border);
+  border-left: 4px solid;
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--ne-surface);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.tier-card:hover {
+  border-color: var(--ne-hover-border);
+  box-shadow: var(--ne-shadow-soft);
+  transform: translateY(-2px);
+}
+
+.tier-label {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.tier-count {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ne-text-strong);
+}
+
+mark {
+  background: #FFD700;
+  padding: 0 2px;
+  border-radius: 2px;
 }
 
 .pwd-strength {

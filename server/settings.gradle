@@ -1,1 +1,9 @@
+pluginManagement {
+	repositories {
+		maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
 rootProject.name = 'nexeval-server'

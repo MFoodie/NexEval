@@ -14,7 +14,6 @@
         </div>
 
         <div class="hero-status">
-          <div class="status-item">
             <span class="status-label">进度</span>
             <div class="progress-inline">
               <div class="progress-track">
@@ -23,7 +22,6 @@
               <span class="progress-text">{{ answeredCount }}/{{ maxQuestions }}</span>
             </div>
           </div>
-        </div>
       </header>
 
       <section class="exam-body">
@@ -89,29 +87,10 @@
                   </div>
 
                   <div class="report-card">
-                    <h4 class="report-section-title">AI 题目难度调度轨迹</h4>
+                    <h4 class="report-section-title">AI 题目调度轨迹</h4>
                     <p class="report-card-desc">展示系统根据您的即时对错，动态调整题目难度的过程</p>
                     <div class="report-chart-wrap">
-                      <svg viewBox="0 0 300 140" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%">
-                        <defs>
-                          <linearGradient id="catTrajectoryFill" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" stop-color="#CF7357" stop-opacity="0.18" />
-                            <stop offset="100%" stop-color="#CF7357" stop-opacity="0.02" />
-                          </linearGradient>
-                        </defs>
-                        <path
-                          d="M8 112 C 28 110, 42 92, 58 90 C 74 88, 88 102, 106 96 C 124 90, 138 64, 156 62 C 174 60, 186 86, 206 76 C 226 66, 240 40, 258 38 C 274 36, 286 48, 296 44 L 296 136 L 8 136 Z"
-                          fill="url(#catTrajectoryFill)"
-                        />
-                        <path
-                          d="M8 112 C 28 110, 42 92, 58 90 C 74 88, 88 102, 106 96 C 124 90, 138 64, 156 62 C 174 60, 186 86, 206 76 C 226 66, 240 40, 258 38 C 274 36, 286 48, 296 44"
-                          fill="none"
-                          stroke="#CF7357"
-                          stroke-width="3"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        />
-                      </svg>
+                      <div ref="reportTrajectoryEl" class="report-trajectory-chart"></div>
                     </div>
                   </div>
                 </section>
@@ -156,6 +135,60 @@
                     开启错题针对性训练
                   </button>
                 </div>
+
+                <el-dialog v-model="reviewDialogVisible" title="题目解析" width="720px">
+                  <div v-if="selectedReviewAnswer" class="review-dialog-body">
+                    <div class="review-dialog-section">
+                      <div class="review-dialog-section-title">题目</div>
+                      <div class="review-dialog-stem">
+                        {{ selectedReviewAnswer.stem || '题干缺失' }}
+                      </div>
+                      <div v-if="selectedReviewAnswer.questionImagePath" class="review-dialog-image">
+                        <img :src="normalizeImageSrc(selectedReviewAnswer.questionImagePath)" alt="题目图片" />
+                      </div>
+                    </div>
+                    <div v-if="selectedReviewAnswer.options?.length" class="review-dialog-section">
+                      <div class="review-dialog-section-title">选项</div>
+                      <div class="review-dialog-options">
+                        <div
+                          v-for="(option, index) in selectedReviewAnswer.options"
+                          :key="`${selectedReviewAnswer.questionId}-${index}`"
+                          class="review-dialog-option"
+                          :class="{
+                            'is-correct': isCorrectOption(option, index, selectedReviewAnswer),
+                            'is-wrong': isSelectedOption(option, index, selectedReviewAnswer) && !selectedReviewAnswer.correct
+                          }"
+                        >
+                          <span class="review-dialog-option-label">{{ optionLabel(index, selectedReviewAnswer.type) }}</span>
+                          <span>{{ formatOptionText(option, selectedReviewAnswer.type) }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="review-dialog-section">
+                      <div class="review-dialog-section-title">答案对比</div>
+                      <div class="review-dialog-answers">
+                        <div class="review-dialog-row">
+                          <span>你的答案</span>
+                          <strong>{{ formatReviewAnswer(selectedReviewAnswer.answerText) }}</strong>
+                        </div>
+                        <div class="review-dialog-row">
+                          <span>正确答案</span>
+                          <strong>{{ formatReviewAnswer(selectedReviewAnswer.correctAnswer) }}</strong>
+                        </div>
+                        <div class="review-dialog-row">
+                          <span>判定</span>
+                          <strong :class="selectedReviewAnswer.correct ? 'review-dialog-correct' : 'review-dialog-wrong'">
+                            {{ selectedReviewAnswer.correct ? '正确' : '错误' }}
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-else class="placeholder">暂无答题详情</div>
+                  <template #footer>
+                    <el-button @click="reviewDialogVisible = false">关闭</el-button>
+                  </template>
+                </el-dialog>
               </div>
 
             <template v-else-if="currentQuestion">
@@ -269,11 +302,16 @@ const reportGenerating = ref(false);
 const reportGenerated = ref(false);
 const reportContent = ref("");
 const reportError = ref("");
+const attemptAnswers = ref([]);
+const reviewDialogVisible = ref(false);
+const selectedReviewIndex = ref(-1);
 
 const currentQuestion = ref(null);
 const answerValue = ref("");
 const growthChartEl = ref(null);
 const growthChart = shallowRef(null);
+const reportTrajectoryEl = ref(null);
+const reportTrajectoryChart = shallowRef(null);
 const growthPoints = ref([]);
 let wsClient = null;
 let reportTypingToken = 0;
@@ -347,14 +385,28 @@ const currentKnowledgePoints = computed(() => {
 
 const growthXAxis = computed(() => growthPoints.value.map(item => `第${item.questionNo}题`));
 const growthSeries = computed(() => growthPoints.value.map(item => item.score));
+const reportTrajectoryXAxis = computed(() => answerGrid.value.map(item => `第${item.no}题`));
+const reportTrajectorySeries = computed(() => answerGrid.value.map(item => (item.correct ? 1 : 0)));
 const weakKnowledgeTags = [
   "DMA控制方式（高频错题）",
   "Cache命中率计算"
 ];
-const answerGrid = computed(() => Array.from({ length: 20 }, (_, index) => ({
-  no: index + 1,
-  correct: index < 12
-})));
+const answerGrid = computed(() => {
+  const total = Number(maxQuestions.value) || attemptAnswers.value.length || 0;
+  return Array.from({ length: total }, (_, index) => {
+    const answer = attemptAnswers.value[index];
+    return {
+      no: index + 1,
+      correct: answer?.correct === true
+    };
+  });
+});
+const selectedReviewAnswer = computed(() => {
+  if (selectedReviewIndex.value < 0) {
+    return null;
+  }
+  return attemptAnswers.value[selectedReviewIndex.value] || null;
+});
 
 const questionImageSrc = computed(() => {
   const path = String(currentQuestion.value?.imagePath || "").trim();
@@ -400,6 +452,57 @@ function formatOptionText(option) {
     return option === "true" ? "正确" : "错误";
   }
   return option;
+}
+
+function formatReviewAnswer(answer) {
+  const text = String(answer || "").trim();
+  return text || "未作答";
+}
+
+function optionLabel(index, type) {
+  if (type === "judge") {
+    return index === 0 ? "T" : "F";
+  }
+  return String.fromCharCode(65 + index);
+}
+
+function isCorrectOption(option, index, detail) {
+  if (!detail) {
+    return false;
+  }
+  const correct = String(detail.correctAnswer || "").trim();
+  if (!correct) {
+    return false;
+  }
+  if (detail.type === "judge") {
+    return correct === option || correct === (index === 0 ? "true" : "false");
+  }
+  return correct === option || correct === optionLabel(index, detail.type);
+}
+
+function isSelectedOption(option, index, detail) {
+  if (!detail) {
+    return false;
+  }
+  const selected = String(detail.answerText || "").trim();
+  if (!selected) {
+    return false;
+  }
+  if (detail.type === "judge") {
+    return selected === option || selected === (index === 0 ? "true" : "false");
+  }
+  return selected === option || selected === optionLabel(index, detail.type);
+}
+
+function normalizeImageSrc(path) {
+  const text = String(path || "").trim();
+  if (!text) {
+    return "";
+  }
+  if (text.startsWith("http://") || text.startsWith("https://") || text.startsWith("/")) {
+    return text;
+  }
+  return `/${text}`;
 }
 
 function buildGrowthChartOption() {
@@ -480,6 +583,85 @@ function buildGrowthChartOption() {
   };
 }
 
+function buildReportTrajectoryOption() {
+  return {
+    animationDuration: 700,
+    animationDurationUpdate: 700,
+    animationEasing: "cubicOut",
+    animationEasingUpdate: "cubicOut",
+    grid: {
+      left: 34,
+      right: 20,
+      top: 24,
+      bottom: 28
+    },
+    tooltip: {
+      trigger: "item",
+      formatter: (params) => `第 ${params.dataIndex + 1} 题`
+    },
+    xAxis: {
+      type: "category",
+      boundaryGap: false,
+      data: reportTrajectoryXAxis.value,
+      axisLabel: {
+        show: false
+      },
+      axisLine: {
+        lineStyle: {
+          color: "rgba(111, 102, 89, 0.4)"
+        }
+      },
+      axisTick: {
+        show: false
+      }
+    },
+    yAxis: {
+      type: "value",
+      min: 0,
+      max: 1,
+      interval: 1,
+      axisLabel: {
+        color: "#6f6659",
+        fontSize: 11,
+        formatter: (value) => (value === 1 ? "1" : "0")
+      },
+      axisLine: {
+        show: false
+      },
+      splitLine: {
+        lineStyle: {
+          color: "rgba(111, 102, 89, 0.16)"
+        }
+      }
+    },
+    series: [
+      {
+        name: "正确性",
+        type: "line",
+        smooth: true,
+        symbol: "circle",
+        symbolSize: 6,
+        data: reportTrajectorySeries.value,
+        lineStyle: {
+          width: 3,
+          color: "#111111"
+        },
+        itemStyle: {
+          color: "#111111",
+          borderColor: "#ffffff",
+          borderWidth: 2
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: "rgba(17, 17, 17, 0.26)" },
+            { offset: 1, color: "rgba(17, 17, 17, 0.04)" }
+          ])
+        }
+      }
+    ]
+  };
+}
+
 function initGrowthChart() {
   if (!growthChartEl.value || growthChart.value) {
     return;
@@ -489,12 +671,29 @@ function initGrowthChart() {
   growthChart.value.setOption(buildGrowthChartOption());
 }
 
+function initReportTrajectoryChart() {
+  if (!reportTrajectoryEl.value || reportTrajectoryChart.value) {
+    return;
+  }
+
+  reportTrajectoryChart.value = echarts.init(reportTrajectoryEl.value);
+  reportTrajectoryChart.value.setOption(buildReportTrajectoryOption());
+}
+
 function updateGrowthChart() {
   if (!growthChart.value) {
     return;
   }
 
   growthChart.value.setOption(buildGrowthChartOption(), { notMerge: true });
+}
+
+function updateReportTrajectoryChart() {
+  if (!reportTrajectoryChart.value) {
+    return;
+  }
+
+  reportTrajectoryChart.value.setOption(buildReportTrajectoryOption(), { notMerge: true });
 }
 
 function syncGrowthPoint() {
@@ -515,6 +714,22 @@ function syncGrowthPoint() {
 
 function handleChartResize() {
   growthChart.value?.resize();
+  reportTrajectoryChart.value?.resize();
+}
+
+async function loadAttemptAnswers() {
+  if (!wsClient || !wsClient.isOpen()) {
+    return;
+  }
+
+  try {
+    const payload = await wsClient.request("GET_ATTEMPT_ANSWERS", {
+      sessionId: sessionId.value
+    });
+    attemptAnswers.value = Array.isArray(payload) ? payload : [];
+  } catch (error) {
+    ElMessage.error(error.message || "成绩加载失败。");
+  }
 }
 
 async function loadSessionState() {
@@ -659,21 +874,35 @@ async function typeReportText(fullText, token) {
 }
 
 function handleReviewQuestion(item) {
-  if (item.correct) {
-    ElMessage.success(`第 ${item.no} 题已作对，可查看完整解析。`);
+  const index = Number(item?.no || 0) - 1;
+  if (!Number.isFinite(index) || index < 0 || index >= attemptAnswers.value.length) {
+    ElMessage.warning("暂无答题详情");
     return;
   }
-  ElMessage.warning(`第 ${item.no} 题为薄弱项，建议优先复盘。`);
+  selectedReviewIndex.value = index;
+  reviewDialogVisible.value = true;
 }
 
 function handleStartWeaknessTraining() {
-  ElMessage.success("已进入错题针对性训练流程。");
+  router.push({
+    name: "cat-weakness",
+    query: {
+      courseNo: courseNoText.value,
+      courseName: courseNameText.value
+    }
+  });
 }
 
 function connectWebSocket() {
   wsClient = createExamSocket(null, {
     onOpen() {
-      loadSessionState().then(loadNextQuestion);
+      loadSessionState().then(() => {
+        if (finished.value) {
+          loadAttemptAnswers();
+          return;
+        }
+        loadNextQuestion();
+      });
     },
     onError() {
       ElMessage.error("WebSocket 连接失败");
@@ -698,11 +927,25 @@ watch(growthPoints, () => {
   updateGrowthChart();
 }, { deep: true });
 
+watch([answerGrid, finished], async () => {
+  if (finished.value) {
+    currentQuestion.value = null;
+    await loadAttemptAnswers();
+    nextTick(() => {
+      initReportTrajectoryChart();
+      updateReportTrajectoryChart();
+    });
+    return;
+  }
+}, { deep: true });
+
 onBeforeUnmount(() => {
   reportTypingToken += 1;
   window.removeEventListener("resize", handleChartResize);
   growthChart.value?.dispose();
   growthChart.value = null;
+  reportTrajectoryChart.value?.dispose();
+  reportTrajectoryChart.value = null;
   wsClient?.close();
 });
 </script>
@@ -1050,6 +1293,11 @@ onBeforeUnmount(() => {
   margin: 12px auto 0;
 }
 
+.report-trajectory-chart {
+  width: 100%;
+  height: 100%;
+}
+
 /* ── 技能进度条 ── */
 .skill-list {
   display: flex;
@@ -1140,6 +1388,7 @@ onBeforeUnmount(() => {
   gap: 12px;
   padding-top: 24px;
   border-top: 1px solid #e5e7eb;
+  flex-wrap: wrap;
 }
 
 .report-btn-secondary {
@@ -1175,6 +1424,16 @@ onBeforeUnmount(() => {
   .report-grid {
     grid-template-columns: 1fr;
   }
+
+  .report-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .report-btn-secondary,
+  .report-btn-primary {
+    width: 100%;
+  }
 }
 
 /* ── 下方各子标题 ── */
@@ -1187,6 +1446,113 @@ onBeforeUnmount(() => {
   font-weight: 700;
   letter-spacing: 0.04em;
   color: #374151;
+}
+
+.review-dialog-body {
+  display: grid;
+  gap: 16px;
+}
+
+.review-dialog-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #ffffff;
+}
+
+.review-dialog-section-title {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.review-dialog-stem {
+  font-size: 15px;
+  color: #111827;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.review-dialog-image {
+  margin-top: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.82);
+  padding: 10px;
+}
+
+.review-dialog-image img {
+  width: 100%;
+  display: block;
+  border-radius: 8px;
+}
+
+.review-dialog-options {
+  display: grid;
+  gap: 8px;
+}
+
+.review-dialog-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #fafafa;
+  font-size: 13px;
+  color: #374151;
+}
+
+.review-dialog-option.is-correct {
+  border-color: rgba(22, 163, 74, 0.45);
+  background: rgba(22, 163, 74, 0.08);
+}
+
+.review-dialog-option.is-wrong {
+  border-color: rgba(225, 29, 72, 0.55);
+  background: rgba(225, 29, 72, 0.08);
+}
+
+.review-dialog-option-label {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(17, 24, 39, 0.08);
+  color: #111827;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.review-dialog-answers {
+  display: grid;
+  gap: 8px;
+}
+
+.review-dialog-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.review-dialog-row strong {
+  color: #111827;
+}
+
+.review-dialog-correct {
+  color: #16a34a;
+}
+
+.review-dialog-wrong {
+  color: #e11d48;
 }
 
 
@@ -1314,6 +1680,11 @@ onBeforeUnmount(() => {
 .chart-placeholder-sub {
   margin-top: 6px;
   font-size: 12px;
+}
+
+.cat-growth-chart {
+  width: 100%;
+  height: 220px;
 }
 
 @media (max-width: 980px) {

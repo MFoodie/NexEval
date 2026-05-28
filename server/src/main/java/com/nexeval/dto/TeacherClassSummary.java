@@ -6,6 +6,8 @@ public record TeacherClassSummary(
   String cno,
   String cname,
   String eid,
-  List<ClassStudentSummary> students
+  List<ClassStudentSummary> students,
+  Double avgScore,
+  Double passRate
 ) {
 }

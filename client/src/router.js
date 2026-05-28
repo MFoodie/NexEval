@@ -5,6 +5,7 @@ import RegisterView from "./views/RegisterView.vue";
 import HomeView from "./views/HomeView.vue";
 import ExamRoomView from "./views/ExamRoomView.vue";
 import CatRoomView from "./views/CatRoomView.vue";
+import CatWeaknessView from "./views/CatWeaknessView.vue";
 import AdminView from "./views/AdminView.vue";
 import GradingView from "./views/GradingView.vue";
 import ForgotPasswordView from "./views/ForgotPasswordView.vue";
@@ -56,6 +57,14 @@ const routes = [
     path: "/cat/:sessionId",
     name: "cat",
     component: CatRoomView,
+    meta: {
+      requiresAuth: true
+    }
+  },
+  {
+    path: "/cat/weakness",
+    name: "cat-weakness",
+    component: CatWeaknessView,
     meta: {
       requiresAuth: true
     }
@@ -114,6 +123,10 @@ router.beforeEach((to) => {
   }
 
   if (to.name === "cat" && isAdmin) {
+    return { name: "admin" };
+  }
+
+  if (to.name === "cat-weakness" && isAdmin) {
     return { name: "admin" };
   }
 
