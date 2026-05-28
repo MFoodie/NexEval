@@ -211,6 +211,23 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
             optionalText(payload, "userId")
           );
           break;
+        case "GET_SCORE_DISTRIBUTION":
+          responsePayload = classQueryService.getScoreDistribution(
+            requireText(payload, "cno"),
+            requireText(payload, "eid")
+          );
+          break;
+        case "GET_SCORE_TIER_STUDENTS":
+          responsePayload = classQueryService.getScoreTierStudents(
+            requireText(payload, "cno"),
+            requireText(payload, "eid"),
+            Integer.parseInt(requireText(payload, "minPercent")),
+            Integer.parseInt(requireText(payload, "maxPercent")),
+            optionalInt(payload, "page") != null ? optionalInt(payload, "page") : 1,
+            optionalInt(payload, "pageSize") != null ? optionalInt(payload, "pageSize") : 10,
+            optionalText(payload, "keyword")
+          );
+          break;
         case "START_SESSION":
           responsePayload = handleStartSession(payload);
           break;

@@ -150,6 +150,10 @@
                     <span class="class-code">{{ clazz.cno }}</span>
                     <span class="class-name">{{ clazz.cname }}</span>
                   </div>
+                  <div class="class-stats" v-if="clazz.avgScore != null">
+                    <span class="class-avg">均分 {{ clazz.avgScore }}%</span>
+                    <span class="class-pass">及格率 {{ clazz.passRate }}%</span>
+                  </div>
                 </button>
               </div>
             </div>
@@ -185,6 +189,25 @@
                   </template>
                 </el-table-column>
               </el-table>
+
+              <div v-if="selectedClass" class="score-distribution-section">
+                <div class="section-title">五档分数分布</div>
+                <div v-if="distributionLoading" class="placeholder">正在加载...</div>
+                <div v-else-if="!scoreDistribution || scoreDistribution.totalStudents === 0" class="placeholder">暂无考试分数数据</div>
+                <div v-else class="tier-cards">
+                  <button
+                    v-for="tier in scoreDistribution.tiers"
+                    :key="tier.label"
+                    type="button"
+                    class="tier-card"
+                    :style="{ borderLeftColor: tier.color }"
+                    @click="openTierDialog(tier)"
+                  >
+                    <div class="tier-label" :style="{ color: tier.color }">{{ tier.label }}</div>
+                    <div class="tier-count">{{ tier.count }} 人</div>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </template>
@@ -721,6 +744,58 @@
         <el-button @click="wrongDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="tierDialogVisible" :title="tierDialogTitle" width="720px">
+      <div style="margin-bottom:12px;">
+        <el-input
+          v-model="tierKeyword"
+          placeholder="搜索学号或姓名"
+          size="small"
+          clearable
+          style="width:240px;"
+          @input="handleTierSearch"
+        />
+      </div>
+      <el-table :data="tierStudents" v-loading="tierLoading" size="small">
+        <el-table-column prop="sno" label="学号" width="120">
+          <template #default="scope">
+            <span v-html="highlightText(scope.row.sno)"></span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="name" label="姓名" width="120">
+          <template #default="scope">
+            <span v-html="highlightText(scope.row.name)"></span>
+          </template>
+        </el-table-column>
+        <el-table-column label="性别" width="80">
+          <template #default="scope">
+            {{ scope.row.sex ? '男' : '女' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="score" label="得分" width="80" />
+        <el-table-column prop="maxScore" label="满分" width="80" />
+        <el-table-column label="百分比" width="100">
+          <template #default="scope">
+            {{ scope.row.percent }}%
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <el-button type="primary" size="small" @click="exportTierCsv">导出 CSV</el-button>
+          <el-pagination
+            v-if="tierTotal > tierPageSize"
+            background
+            layout="prev, pager, next"
+            :total="tierTotal"
+            :page-size="tierPageSize"
+            :current-page="tierPage"
+            @current-change="handleTierPageChange"
+          />
+          <span v-else></span>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -831,6 +906,17 @@ const studentClasses = ref([]);
 const teacherLoading = ref(false);
 const studentLoading = ref(false);
 const selectedClass = ref(null);
+const scoreDistribution = ref(null);
+const distributionLoading = ref(false);
+const tierDialogVisible = ref(false);
+const tierDialogTitle = ref("");
+const selectedTier = ref(null);
+const tierStudents = ref([]);
+const tierTotal = ref(0);
+const tierPage = ref(1);
+const tierPageSize = ref(10);
+const tierLoading = ref(false);
+const tierKeyword = ref("");
 const searchKeyword = ref("");
 const wrongDialogVisible = ref(false);
 const wrongAnswers = ref([]);
@@ -1029,7 +1115,7 @@ async function fetchTeacherClasses() {
   try {
     const data = await wsClient.request("GET_TEACHER_CLASSES", { eid }, 20000);
     teacherClasses.value = Array.isArray(data) ? data : [];
-    selectedClass.value = teacherClasses.value[0] || null;
+    selectClass(teacherClasses.value[0] || null);
   } catch (error) {
     ElMessage.error(error.message || "教学班获取失败");
   } finally {
@@ -1561,6 +1647,125 @@ function handleStartExamForClass(clazz) {
 
 function selectClass(clazz) {
   selectedClass.value = clazz;
+  fetchScoreDistribution();
+}
+
+async function fetchScoreDistribution() {
+  const clazz = selectedClass.value;
+  if (!clazz || !wsClient || !wsClient.isOpen()) {
+    scoreDistribution.value = null;
+    return;
+  }
+
+  distributionLoading.value = true;
+  try {
+    const data = await wsClient.request("GET_SCORE_DISTRIBUTION", {
+      cno: clazz.cno,
+      eid: clazz.eid
+    }, 20000);
+    scoreDistribution.value = data || null;
+  } catch (error) {
+    scoreDistribution.value = null;
+  } finally {
+    distributionLoading.value = false;
+  }
+}
+
+function openTierDialog(tier) {
+  selectedTier.value = tier;
+  tierDialogTitle.value = `${tier.label} (${tier.minPercent}%-${tier.maxPercent}%)`;
+  tierKeyword.value = "";
+  tierPage.value = 1;
+  tierDialogVisible.value = true;
+  fetchTierStudents();
+}
+
+async function fetchTierStudents() {
+  const clazz = selectedClass.value;
+  const tier = selectedTier.value;
+  if (!clazz || !tier || !wsClient || !wsClient.isOpen()) {
+    return;
+  }
+
+  tierLoading.value = true;
+  try {
+    const data = await wsClient.request("GET_SCORE_TIER_STUDENTS", {
+      cno: clazz.cno,
+      eid: clazz.eid,
+      minPercent: tier.minPercent,
+      maxPercent: tier.maxPercent,
+      page: tierPage.value,
+      pageSize: tierPageSize.value,
+      keyword: tierKeyword.value
+    }, 20000);
+    if (data) {
+      tierStudents.value = data.students || [];
+      tierTotal.value = data.totalCount || 0;
+    } else {
+      tierStudents.value = [];
+      tierTotal.value = 0;
+    }
+  } catch (error) {
+    tierStudents.value = [];
+    tierTotal.value = 0;
+  } finally {
+    tierLoading.value = false;
+  }
+}
+
+function handleTierPageChange(page) {
+  tierPage.value = page;
+  fetchTierStudents();
+}
+
+let tierSearchTimer = null;
+function handleTierSearch() {
+  clearTimeout(tierSearchTimer);
+  tierSearchTimer = setTimeout(() => {
+    tierPage.value = 1;
+    fetchTierStudents();
+  }, 300);
+}
+
+function highlightText(text) {
+  const kw = tierKeyword.value.trim();
+  if (!kw || !text) return text;
+  const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(${escaped})`, "gi");
+  return String(text).replace(regex, "<mark>$1</mark>");
+}
+
+function exportTierCsv() {
+  const rows = tierStudents.value;
+  if (!rows || rows.length === 0) {
+    ElMessage.warning("没有数据可导出");
+    return;
+  }
+
+  const header = ["学号", "姓名", "性别", "得分", "满分", "百分比"];
+  const lines = [header.join(",")];
+
+  for (const r of rows) {
+    const row = [
+      r.sno || "",
+      r.name || "",
+      r.sex ? "男" : "女",
+      r.score ?? "",
+      r.maxScore ?? "",
+      (r.percent ?? "") + "%"
+    ];
+    lines.push(row.map(cell => /[,"\n]/.test(String(cell)) ? '"' + String(cell).replace(/"/g, '""') + '"' : String(cell)).join(","));
+  }
+
+  const bom = "﻿";
+  const blob = new Blob([bom + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `score_export_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  ElMessage.success("导出成功");
 }
 
 function openScoreAppealDialog(clazz) {
@@ -3166,6 +3371,71 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.class-stats {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+}
+
+.class-avg {
+  color: var(--ne-primary, #409EFF);
+  font-weight: 600;
+}
+
+.class-pass {
+  color: #67C23A;
+  font-weight: 600;
+}
+
+.score-distribution-section {
+  margin-top: 24px;
+}
+
+.tier-cards {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tier-card {
+  flex: 1;
+  min-width: 140px;
+  border: 1px solid var(--ne-border);
+  border-left: 4px solid;
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--ne-surface);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.tier-card:hover {
+  border-color: var(--ne-hover-border);
+  box-shadow: var(--ne-shadow-soft);
+  transform: translateY(-2px);
+}
+
+.tier-label {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.tier-count {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ne-text-strong);
+}
+
+mark {
+  background: #FFD700;
+  padding: 0 2px;
+  border-radius: 2px;
 }
 
 .pwd-strength {
