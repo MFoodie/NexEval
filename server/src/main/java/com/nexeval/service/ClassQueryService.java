@@ -15,6 +15,7 @@ import com.nexeval.repository.EssayQuestionBankRepository;
 import com.nexeval.repository.ExamAnswerRepository;
 import com.nexeval.repository.ExamAttemptRepository;
 import com.nexeval.repository.JudgeQuestionBankRepository;
+import com.nexeval.repository.QuestionBankRepository;
 import com.nexeval.repository.ScRecordRepository;
 import com.nexeval.repository.StudentProfileRepository;
 import com.nexeval.repository.TeacherProfileRepository;
@@ -33,6 +34,7 @@ public class ClassQueryService {
   private final ExamAnswerRepository examAnswerRepository;
   private final TeacherProfileRepository teacherProfileRepository;
   private final StudentProfileRepository studentProfileRepository;
+  private final QuestionBankRepository questionBankRepository;
   private final JudgeQuestionBankRepository judgeQuestionBankRepository;
   private final BlankQuestionBankRepository blankQuestionBankRepository;
   private final EssayQuestionBankRepository essayQuestionBankRepository;
@@ -44,6 +46,7 @@ public class ClassQueryService {
     ExamAnswerRepository examAnswerRepository,
     TeacherProfileRepository teacherProfileRepository,
     StudentProfileRepository studentProfileRepository,
+    QuestionBankRepository questionBankRepository,
     JudgeQuestionBankRepository judgeQuestionBankRepository,
     BlankQuestionBankRepository blankQuestionBankRepository,
     EssayQuestionBankRepository essayQuestionBankRepository
@@ -54,6 +57,7 @@ public class ClassQueryService {
     this.examAnswerRepository = examAnswerRepository;
     this.teacherProfileRepository = teacherProfileRepository;
     this.studentProfileRepository = studentProfileRepository;
+    this.questionBankRepository = questionBankRepository;
     this.judgeQuestionBankRepository = judgeQuestionBankRepository;
     this.blankQuestionBankRepository = blankQuestionBankRepository;
     this.essayQuestionBankRepository = essayQuestionBankRepository;
@@ -97,7 +101,7 @@ public class ClassQueryService {
         double sum = 0;
         int passCount = 0;
         for (ScoreRecord sr : scoreRecords) {
-          sum += sr.percent();
+          sum += sr.score();
           if (sr.percent() >= 60) {
             passCount++;
           }
@@ -410,7 +414,7 @@ public class ClassQueryService {
     int[] lowerBounds = {0, 60, 70, 80, 90};
     int[] upperBounds = {59, 69, 79, 89, 100};
     String[] labels = {"<60%", "60%-69%", "70%-79%", "80%-89%", "90%-100%"};
-    String[] colors = {"#FF0000", "#DB6D22", "#FAC50E", "#C5FA20", "#1C913E"};
+    String[] colors = {"#FF0000", "#FF7F27", "#FFC90E", "#C5FA20", "#1C913E"};
 
     List<ScoreDistribution.TierInfo> tiers = new ArrayList<>();
     for (int i = 0; i < labels.length; i++) {
@@ -430,7 +434,9 @@ public class ClassQueryService {
     }
 
     return switch (type) {
-      case CHOICE -> 1;
+      case CHOICE -> questionBankRepository.findById(questionId)
+        .map(com.nexeval.model.QuestionBank::getPoints)
+        .orElse(1);
       case JUDGE -> judgeQuestionBankRepository.findById(questionId)
         .map(com.nexeval.model.JudgeQuestionBank::getPoints)
         .orElse(null);

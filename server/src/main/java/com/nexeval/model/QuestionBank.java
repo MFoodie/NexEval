@@ -32,6 +32,9 @@ public class QuestionBank {
   @Column(name = "answer_key", nullable = false, length = 64)
   private String answerKey;
 
+  @Column(name = "points", nullable = false)
+  private int points;
+
   @Column(name = "difficulty", nullable = false)
   private double difficulty;
 
@@ -89,6 +92,14 @@ public class QuestionBank {
 
   public void setAnswerKey(String answerKey) {
     this.answerKey = answerKey;
+  }
+
+  public int getPoints() {
+    return points;
+  }
+
+  public void setPoints(int points) {
+    this.points = points;
   }
 
   public double getDifficulty() {

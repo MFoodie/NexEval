@@ -671,7 +671,7 @@ public class CatExamService {
         : questionBankRepository.findAllByActiveTrueAndCno(normalizedCno);
       for (QuestionBank q : questions) {
         if (matchesSearch(q.getStem(), normalizedKeyword) && matchesDifficulty(String.valueOf(q.getDifficulty()), normalizedDifficulty)) {
-          results.add(new QuestionSearchView(q.getId(), truncateStem(q.getStem()), "CHOICE", formatDifficulty(q.getDifficulty()), 0, q.getCno() == null ? "" : q.getCno()));
+          results.add(new QuestionSearchView(q.getId(), truncateStem(q.getStem()), "CHOICE", formatDifficulty(q.getDifficulty()), q.getPoints(), q.getCno() == null ? "" : q.getCno()));
         }
       }
     }
@@ -1820,7 +1820,9 @@ public class CatExamService {
     }
 
     return switch (type) {
-      case CHOICE -> 1;
+      case CHOICE -> questionBankRepository.findById(questionId)
+        .map(QuestionBank::getPoints)
+        .orElse(1);
       case JUDGE -> judgeQuestionBankRepository.findById(questionId)
         .map(JudgeQuestionBank::getPoints)
         .orElse(null);

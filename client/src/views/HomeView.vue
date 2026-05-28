@@ -151,7 +151,7 @@
                     <span class="class-name">{{ clazz.cname }}</span>
                   </div>
                   <div class="class-stats" v-if="clazz.avgScore != null">
-                    <span class="class-avg">均分 {{ clazz.avgScore }}%</span>
+                    <span class="class-avg">均分 {{ formatAvg(clazz.avgScore) }}</span>
                     <span class="class-pass">及格率 {{ clazz.passRate }}%</span>
                   </div>
                 </button>
@@ -166,10 +166,42 @@
                     {{ selectedClass ? `${selectedClass.cno} ${selectedClass.cname}` : "请先选择教学班" }}
                   </div>
                 </div>
-                <div v-if="selectedClass" class="student-count">共 {{ selectedClass.students?.length || 0 }} 人</div>
+                <div v-if="selectedClass" class="student-header-right">
+                  <div class="student-toolbar">
+                    <ClassTools
+                      :students="selectedClass.students || []"
+                      :course="selectedClass"
+                      @sort="handleTeacherStudentsSort"
+                    />
+                    <div class="teacher-search-bar">
+                      <el-input
+                        v-model="teacherStudentKeyword"
+                        clearable
+                        placeholder="搜索卡号/学号/姓名"
+                        class="search-input"
+                        size="small"
+                        @clear="resetTeacherStudentSearch"
+                        @keyup.enter="applyTeacherStudentSearch"
+                      >
+                        <template #prefix>
+                          <img :src="iconQuery" alt="" aria-hidden="true" class="search-prefix-icon" />
+                        </template>
+                      </el-input>
+                      <el-button
+                        class="search-button action-primary"
+                        size="small"
+                        type="primary"
+                        @click="applyTeacherStudentSearch"
+                      >
+                        查询
+                      </el-button>
+                    </div>
+                  </div>
+                  <div class="student-count">共 {{ filteredTeacherStudents.length }} 人</div>
+                </div>
               </div>
               <div v-if="!selectedClass" class="placeholder">请选择教学班查看学生</div>
-              <el-table v-else :data="selectedClass.students || []" size="small">
+              <el-table v-else :data="filteredTeacherStudents" size="small">
                 <el-table-column prop="userId" label="卡号" width="120" />
                 <el-table-column prop="sno" label="学号" width="120" />
                 <el-table-column prop="name" label="姓名" width="120" />
@@ -371,9 +403,13 @@
                   v-model="examCreateKeyword"
                   clearable
                   placeholder="搜索题干关键词"
-                  class="filter-item"
+                  class="filter-item exam-create-search-input"
                   @keyup.enter="handleSearchQuestions"
-                />
+                >
+                  <template #prefix>
+                    <img :src="iconQuery" alt="" aria-hidden="true" class="search-prefix-icon" />
+                  </template>
+                </el-input>
                 <el-button type="primary" :loading="examCreateSearching" @click="handleSearchQuestions">搜索</el-button>
               </div>
 
@@ -470,11 +506,12 @@
                   <span class="pq-points">{{ q.points }}分</span>
                   <el-button
                     size="small"
-                    type="danger"
-                    :icon="'Delete'"
-                    circle
+                    text
+                    class="paper-remove-btn"
                     @click="removeQuestionFromPaper(index)"
-                  />
+                  >
+                    <img :src="iconDelete" alt="" aria-hidden="true" class="paper-remove-icon" />
+                  </el-button>
                 </div>
               </div>
 
@@ -986,6 +1023,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import ClassTools from "../components/ClassTools.vue";
 import { ElMessage } from "element-plus";
 import { clearLogin, getLogin, saveLogin } from "../auth";
 import { createExamSocket } from "../ws";
@@ -995,9 +1033,10 @@ import iconPersonalInfo from "../assets/personal_info.svg";
 import iconExam from "../assets/exam.svg";
 import iconCorrect from "../assets/correct.svg";
 import iconCat from "../assets/CAT.svg";
-import iconCreateExam from "../assets/exam.svg";
+import iconCreateExam from "../assets/examcreate.svg";
 import iconExit from "../assets/exit.svg";
 import iconQuery from "../assets/query.svg";
+import iconDelete from "../assets/delete.svg";
 
 const route = useRoute();
 const router = useRouter();
@@ -1111,6 +1150,9 @@ const tierPageSize = ref(10);
 const tierLoading = ref(false);
 const tierKeyword = ref("");
 const searchKeyword = ref("");
+const teacherStudentKeyword = ref("");
+const teacherStudentQuery = ref("");
+const teacherStudentsOrder = ref("default");
 const wrongDialogVisible = ref(false);
 const wrongAnswers = ref([]);
 const wrongQuestionIndex = ref(0);
@@ -1172,6 +1214,28 @@ const selectedQuestionCount = computed(() => examCreateSelected.value.length);
 const selectedTotalPoints = computed(() =>
   examCreateSelected.value.reduce((sum, q) => sum + (q.points || 0), 0)
 );
+const filteredTeacherStudents = computed(() => {
+  const list = [...(selectedClass.value?.students || [])];
+  const keyword = String(teacherStudentQuery.value || "").trim().toLowerCase();
+  const filtered = !keyword
+    ? list
+    : list.filter((student) => {
+    const cardNoText = String(student.userId || "").toLowerCase();
+    const snoText = String(student.sno || "").toLowerCase();
+    const nameText = String(student.name || "").toLowerCase();
+    return cardNoText.includes(keyword) || snoText.includes(keyword) || nameText.includes(keyword);
+  });
+
+  if (teacherStudentsOrder.value === "gradeDesc") {
+    return filtered.sort((left, right) => {
+      const leftGrade = left?.grade == null || left.grade === "" ? Number.NEGATIVE_INFINITY : Number(left.grade);
+      const rightGrade = right?.grade == null || right.grade === "" ? Number.NEGATIVE_INFINITY : Number(right.grade);
+      return rightGrade - leftGrade;
+    });
+  }
+
+  return filtered;
+});
 
 const editVisible = ref(false);
 const saving = ref(false);
@@ -1433,6 +1497,27 @@ async function handleSearchCourses() {
   } finally {
     searching.value = false;
   }
+}
+
+function applyTeacherStudentSearch() {
+  teacherStudentQuery.value = String(teacherStudentKeyword.value || "").trim();
+}
+
+function resetTeacherStudentSearch() {
+  teacherStudentKeyword.value = "";
+  teacherStudentQuery.value = "";
+}
+
+function handleTeacherStudentsSort(sortedStudents) {
+  if (!selectedClass.value) {
+    return;
+  }
+
+  selectedClass.value = {
+    ...selectedClass.value,
+    students: Array.isArray(sortedStudents) ? sortedStudents : []
+  };
+  teacherStudentsOrder.value = "gradeDesc";
 }
 
 async function handleViewWrongQuestions(clazz, mode = "PRACTICE") {
@@ -1923,6 +2008,7 @@ function handleStartDefaultExam() {
 
 function selectClass(clazz) {
   selectedClass.value = clazz;
+  teacherStudentsOrder.value = "default";
   fetchScoreDistribution();
 }
 
@@ -2395,6 +2481,12 @@ onMounted(connectWebSocket);
 
 setActiveMenu(resolveInitialMenu());
 
+watch(selectedClass, () => {
+  teacherStudentKeyword.value = "";
+  teacherStudentQuery.value = "";
+  teacherStudentsOrder.value = "default";
+});
+
 watch(
   () => route.query.menu,
   (value) => {
@@ -2590,12 +2682,16 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.student-search-bar {
+.student-search-bar,
+.teacher-search-bar {
+  display: flex;
+  align-items: center;
   gap: 12px;
   justify-content: flex-end;
 }
 
-.student-search-bar .search-prefix-icon {
+.student-search-bar .search-prefix-icon,
+.teacher-search-bar .search-prefix-icon {
   width: 16px;
   height: 16px;
   display: block;
@@ -2603,18 +2699,21 @@ onBeforeUnmount(() => {
   margin-left: 6px;
 }
 
-.student-search-bar .el-input__inner {
+.student-search-bar .el-input__inner,
+.teacher-search-bar .el-input__inner {
   border-radius: 24px !important;
   min-height: 50px;
   padding: 0 14px;
 }
 
-.student-search-bar .search-input {
+.student-search-bar .search-input,
+.teacher-search-bar .search-input {
   min-width: 220px;
   flex: 0 0 auto;
 }
 
-.student-search-bar .search-button {
+.student-search-bar .search-button,
+.teacher-search-bar .search-button {
   min-width: 52px;
   border-radius: 8px !important;
   padding: 4px 6px !important;
@@ -3543,6 +3642,41 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
+.student-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.student-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex: 1 1 520px;
+  min-width: 0;
+}
+
+.student-header-right :deep(.class-tools) {
+  flex: 0 0 auto;
+}
+
+.student-header-right .teacher-search-bar {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.student-header-right .teacher-search-bar .search-input {
+  width: 280px;
+  min-width: 280px;
+  flex: 0 0 280px;
+}
+
 .grading-head {
   display: flex;
   justify-content: space-between;
@@ -3866,6 +4000,32 @@ mark {
   width: 140px;
 }
 
+.exam-create-search-input {
+  width: 170px;
+}
+
+.exam-create-search-input :deep(.el-input__wrapper) {
+  border-radius: 14px;
+  padding-left: 12px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
+.exam-create-search-input :deep(.el-input__prefix) {
+  margin-right: 8px;
+}
+
+.exam-create-search-input .search-prefix-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  opacity: 0.72;
+}
+
+.exam-create-search-input :deep(.el-input__inner) {
+  min-height: 30px;
+}
+
 .question-stem {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -3878,7 +4038,7 @@ mark {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  border-left: 1px solid #e5e7eb;
+  border-left: 1px solid var(--ne-border);
   padding-left: 20px;
 }
 
@@ -3890,7 +4050,7 @@ mark {
   display: flex;
   gap: 16px;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--ne-text-muted);
 }
 
 .paper-question-list {
@@ -3906,9 +4066,38 @@ mark {
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
-  background: #f9fafb;
+  background: linear-gradient(
+    135deg,
+    rgba(var(--ne-primary-rgb), 0.08),
+    rgba(var(--ne-accent-rgb), 0.06)
+  );
+  border: 1px solid var(--ne-border);
+  box-shadow: inset 0 0 0 1px rgba(var(--ne-primary-rgb), 0.04);
   border-radius: 6px;
   font-size: 13px;
+  color: var(--ne-text);
+}
+
+.paper-remove-btn {
+  padding: 0 !important;
+  min-width: 24px !important;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.paper-remove-btn:hover,
+.paper-remove-btn:focus {
+  background: rgba(var(--ne-primary-rgb), 0.12) !important;
+}
+
+.paper-remove-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 
 .pq-index {
@@ -3917,14 +4106,16 @@ mark {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #e5e7eb;
+  background: rgba(var(--ne-primary-rgb), 0.18);
+  border: 1px solid rgba(var(--ne-primary-rgb), 0.22);
+  color: var(--ne-text-strong);
   border-radius: 50%;
   font-size: 12px;
   flex-shrink: 0;
 }
 
 .pq-type {
-  color: #6b7280;
+  color: var(--ne-text-subtle);
   font-size: 12px;
   flex-shrink: 0;
   min-width: 48px;
@@ -3938,7 +4129,7 @@ mark {
 }
 
 .pq-points {
-  color: #3b82f6;
+  color: var(--ne-primary);
   font-weight: 500;
   flex-shrink: 0;
 }
@@ -3955,7 +4146,7 @@ mark {
   .exam-create-right {
     border-left: none;
     padding-left: 0;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid var(--ne-border);
     padding-top: 16px;
   }
 }

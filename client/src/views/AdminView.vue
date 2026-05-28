@@ -295,20 +295,25 @@
       <section class="card panel-card" v-if="activeMenu === 'teacher-vip'">
         <div class="panel-head">
           <h2 class="panel-title">教师权限</h2>
-          <div class="vip-toolbar">
+          <div class="vip-toolbar admin-search-bar">
             <el-input
               v-model="vipKeyword"
               clearable
               placeholder="搜索工号/卡号/姓名"
-              class="vip-search"
+              class="vip-search search-input"
+              size="small"
               @keyup.enter="loadTeacherVips"
-            />
-            <el-select v-model="vipStatus" class="vip-filter" placeholder="VIP 状态">
+            >
+              <template #prefix>
+                <img :src="iconQuery" alt="" aria-hidden="true" class="search-prefix-icon" />
+              </template>
+            </el-input>
+            <el-select v-model="vipStatus" class="vip-filter search-select" placeholder="VIP 状态" size="small">
               <el-option label="全部" value="all" />
               <el-option label="仅 VIP" value="vip" />
               <el-option label="非 VIP" value="nonvip" />
             </el-select>
-            <el-button type="primary" :loading="vipLoading" @click="loadTeacherVips">查询</el-button>
+            <el-button class="search-button action-primary" size="small" type="primary" :loading="vipLoading" @click="loadTeacherVips">查询</el-button>
           </div>
         </div>
 
@@ -340,20 +345,25 @@
       <section class="card panel-card" v-if="activeMenu === 'teacher-exam-perm'">
         <div class="panel-head">
           <h2 class="panel-title">出题权限</h2>
-          <div class="vip-toolbar">
+          <div class="vip-toolbar admin-search-bar">
             <el-input
               v-model="examPermKeyword"
               clearable
               placeholder="搜索工号/卡号/姓名"
-              class="vip-search"
+              class="vip-search search-input"
+              size="small"
               @keyup.enter="loadTeacherExamPerms"
-            />
-            <el-select v-model="examPermStatus" class="vip-filter" placeholder="出题权限状态">
+            >
+              <template #prefix>
+                <img :src="iconQuery" alt="" aria-hidden="true" class="search-prefix-icon" />
+              </template>
+            </el-input>
+            <el-select v-model="examPermStatus" class="vip-filter search-select" placeholder="出题权限状态" size="small">
               <el-option label="全部" value="all" />
               <el-option label="仅可出题" value="permitted" />
               <el-option label="不可出题" value="not_permitted" />
             </el-select>
-            <el-button type="primary" :loading="examPermLoading" @click="loadTeacherExamPerms">查询</el-button>
+            <el-button class="search-button action-primary" size="small" type="primary" :loading="examPermLoading" @click="loadTeacherExamPerms">查询</el-button>
           </div>
         </div>
 
@@ -372,7 +382,6 @@
           <el-table-column label="可出题" width="110">
             <template #default="scope">
               <el-switch
-                class="vip-switch"
                 :model-value="scope.row.canCreateExam"
                 :loading="examPermUpdatingId === scope.row.eid"
                 @change="(value) => handleExamPermToggle(scope.row, value)"
@@ -419,7 +428,8 @@ import iconRegister from "../assets/register.svg";
 import iconClass from "../assets/class.svg";
 import iconRecheck from "../assets/recheck.svg";
 import iconVIP from "../assets/VIP.svg";
-import iconExamPerm from "../assets/exam.svg";
+import iconExamPerm from "../assets/examperm.svg";
+import iconQuery from "../assets/query.svg";
 import iconExit from "../assets/exit.svg";
 
 const router = useRouter();
@@ -467,7 +477,7 @@ const menuItems = [
   { key: "register", label: "用户信息注册", icon: iconRegister },
   { key: "curriculum", label: "课程及教学班管理", icon: iconClass },
   { key: "review", label: "成绩复核审理", icon: iconRecheck },
-  { key: "teacher-vip", label: "教师权限", icon: iconVIP },
+  { key: "teacher-vip", label: "教师 VIP 权限", icon: iconVIP },
   { key: "teacher-exam-perm", label: "出题权限", icon: iconExamPerm }
 ];
 
@@ -1348,12 +1358,46 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
+.admin-search-bar {
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.admin-search-bar .search-prefix-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex: 0 0 auto;
+  margin-left: 6px;
+}
+
+.admin-search-bar :deep(.el-input__inner) {
+  border-radius: 20px !important;
+  min-height: 25px;
+  padding: 0 12px;
+}
+
+.admin-search-bar :deep(.el-select .el-input__wrapper) {
+  border-radius: 20px !important;
+  min-height: 25px;
+  padding: 0 8px;
+}
+
 .vip-search {
   width: 220px;
+  flex: 0 0 auto;
 }
 
 .vip-filter {
-  width: 120px;
+  width: 110px;
+}
+
+.admin-search-bar .search-button {
+  min-width: 52px;
+  border-radius: 8px !important;
+  padding: 4px 6px !important;
+  font-size: 12px !important;
+  min-height: auto !important;
 }
 
 .avatar-wrap {
