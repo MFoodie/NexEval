@@ -386,7 +386,8 @@ public class UserAuthService {
       toZhTitle(profile.getTitle()),
       "-",
       profile.getDepartment(),
-      profile.isVip()
+      profile.isVip(),
+      profile.isCanCreateExam()
     );
   }
 

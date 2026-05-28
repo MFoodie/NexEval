@@ -337,6 +337,51 @@
         </el-table>
       </section>
 
+      <section class="card panel-card" v-if="activeMenu === 'teacher-exam-perm'">
+        <div class="panel-head">
+          <h2 class="panel-title">出题权限</h2>
+          <div class="vip-toolbar">
+            <el-input
+              v-model="examPermKeyword"
+              clearable
+              placeholder="搜索工号/卡号/姓名"
+              class="vip-search"
+              @keyup.enter="loadTeacherExamPerms"
+            />
+            <el-select v-model="examPermStatus" class="vip-filter" placeholder="出题权限状态">
+              <el-option label="全部" value="all" />
+              <el-option label="仅可出题" value="permitted" />
+              <el-option label="不可出题" value="not_permitted" />
+            </el-select>
+            <el-button type="primary" :loading="examPermLoading" @click="loadTeacherExamPerms">查询</el-button>
+          </div>
+        </div>
+
+        <div v-if="examPermLoading" class="placeholder">正在加载教师列表...</div>
+        <div v-else-if="examPermTeachers.length === 0" class="placeholder">暂无教师数据</div>
+        <el-table v-else :data="examPermTeachers" size="small" class="vip-table">
+          <el-table-column prop="eid" label="工号" width="120" />
+          <el-table-column prop="userId" label="卡号" width="120" />
+          <el-table-column prop="name" label="姓名" width="120" />
+          <el-table-column prop="department" label="学院" min-width="160" />
+          <el-table-column label="职称" width="120">
+            <template #default="scope">
+              {{ formatTeacherTitle(scope.row.title) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="可出题" width="110">
+            <template #default="scope">
+              <el-switch
+                class="vip-switch"
+                :model-value="scope.row.canCreateExam"
+                :loading="examPermUpdatingId === scope.row.eid"
+                @change="(value) => handleExamPermToggle(scope.row, value)"
+              />
+            </template>
+          </el-table-column>
+        </el-table>
+      </section>
+
       <input
         ref="importInputRef"
         class="avatar-input"
@@ -374,6 +419,7 @@ import iconRegister from "../assets/register.svg";
 import iconClass from "../assets/class.svg";
 import iconRecheck from "../assets/recheck.svg";
 import iconVIP from "../assets/VIP.svg";
+import iconExamPerm from "../assets/exam.svg";
 import iconExit from "../assets/exit.svg";
 
 const router = useRouter();
@@ -385,6 +431,9 @@ const wsClient = createExamSocket(null, {
     }
     if (activeMenu.value === "teacher-vip") {
       loadTeacherVips();
+    }
+    if (activeMenu.value === "teacher-exam-perm") {
+      loadTeacherExamPerms();
     }
   }
 });
@@ -407,12 +456,19 @@ const vipUpdatingId = ref("");
 const vipKeyword = ref("");
 const vipStatus = ref("all");
 
+const examPermTeachers = ref([]);
+const examPermLoading = ref(false);
+const examPermUpdatingId = ref("");
+const examPermKeyword = ref("");
+const examPermStatus = ref("all");
+
 const menuItems = [
   { key: "profile", label: "个人信息", icon: iconPersonalInfo },
   { key: "register", label: "用户信息注册", icon: iconRegister },
   { key: "curriculum", label: "课程及教学班管理", icon: iconClass },
   { key: "review", label: "成绩复核审理", icon: iconRecheck },
-  { key: "teacher-vip", label: "教师权限", icon: iconVIP }
+  { key: "teacher-vip", label: "教师权限", icon: iconVIP },
+  { key: "teacher-exam-perm", label: "出题权限", icon: iconExamPerm }
 ];
 
 watch(activeMenu, (value) => {
@@ -421,6 +477,9 @@ watch(activeMenu, (value) => {
   }
   if (value === "teacher-vip") {
     loadTeacherVips();
+  }
+  if (value === "teacher-exam-perm") {
+    loadTeacherExamPerms();
   }
 });
 
@@ -901,12 +960,59 @@ async function handleVipToggle(row, value) {
   }
 }
 
+async function loadTeacherExamPerms() {
+  if (!wsClient.isOpen()) return;
+  examPermLoading.value = true;
+  try {
+    const data = await wsClient.request("GET_TEACHER_EXAM_PERMS", {
+      keyword: examPermKeyword.value.trim(),
+      permStatus: examPermStatus.value
+    }, 20000);
+    examPermTeachers.value = Array.isArray(data) ? data : [];
+  } catch (error) {
+    ElMessage.error(error.message || "教师列表获取失败");
+  } finally {
+    examPermLoading.value = false;
+  }
+}
+
+async function handleExamPermToggle(row, value) {
+  if (!wsClient.isOpen()) {
+    ElMessage.error("WebSocket 未连接，请稍后再试");
+    return;
+  }
+  if (!row?.eid) return;
+
+  const previous = row.canCreateExam;
+  row.canCreateExam = value;
+  examPermUpdatingId.value = row.eid;
+  try {
+    const payload = await wsClient.request("UPDATE_TEACHER_EXAM_PERM", {
+      eid: row.eid,
+      canCreateExam: value
+    });
+    const index = examPermTeachers.value.findIndex((item) => item.eid === payload.eid);
+    if (index !== -1) {
+      examPermTeachers.value.splice(index, 1, payload);
+    }
+    ElMessage.success("出题权限已更新");
+  } catch (error) {
+    row.canCreateExam = previous;
+    ElMessage.error(error.message || "出题权限更新失败");
+  } finally {
+    examPermUpdatingId.value = "";
+  }
+}
+
 onMounted(() => {
   if (activeMenu.value === "review") {
     loadScoreAppeals();
   }
   if (activeMenu.value === "teacher-vip") {
     loadTeacherVips();
+  }
+  if (activeMenu.value === "teacher-exam-perm") {
+    loadTeacherExamPerms();
   }
 });
 

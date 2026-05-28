@@ -194,6 +194,36 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
             optionalBoolean(payload, "vip")
           );
           break;
+        case "GET_TEACHER_EXAM_PERMS":
+          responsePayload = adminManagementService.listTeacherExamPermViews(
+            optionalText(payload, "keyword"),
+            optionalText(payload, "permStatus")
+          );
+          break;
+        case "UPDATE_TEACHER_EXAM_PERM":
+          responsePayload = adminManagementService.updateTeacherExamPerm(
+            requireText(payload, "eid"),
+            optionalBoolean(payload, "canCreateExam")
+          );
+          break;
+        case "SEARCH_QUESTIONS":
+          responsePayload = catExamService.searchQuestions(
+            optionalText(payload, "cno"),
+            optionalText(payload, "questionType"),
+            optionalText(payload, "difficulty"),
+            optionalText(payload, "keyword")
+          );
+          break;
+        case "CREATE_EXAM_PAPER":
+          responsePayload = catExamService.createExamPaper(
+            requireText(payload, "teacherEid"),
+            requireText(payload, "paperName"),
+            optionalText(payload, "description"),
+            optionalInt(payload, "durationMinutes"),
+            requireText(payload, "questionIdsJson"),
+            optionalText(payload, "classListJson")
+          );
+          break;
         case "IMPORT_BATCH":
           responsePayload = adminManagementService.importBatch(
             requireText(payload, "importType"),
@@ -254,7 +284,8 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
         case "START_EXAM":
           responsePayload = catExamService.startExamSession(
             requireText(payload, "userId"),
-            optionalText(payload, "courseNo")
+            optionalText(payload, "courseNo"),
+            optionalText(payload, "definitionId")
           );
           break;
         case "GET_EXAM_QUESTIONS":
