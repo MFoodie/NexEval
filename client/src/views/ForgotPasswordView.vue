@@ -46,12 +46,12 @@
 
         <div class="login-hero-mini">
           <h1 class="card-title">找回密码</h1>
-          <p class="card-subtitle">请输入您注册时使用的邮箱</p>
+          <p class="card-subtitle">请输入您注册时使用的邮箱或手机号</p>
         </div>
 
         <el-form class="login-form" @submit.prevent="handleSubmit">
-          <el-form-item label="邮箱">
-            <el-input v-model="identifier" placeholder="请输入邮箱" :disabled="submitted" />
+          <el-form-item label="邮箱/手机号">
+            <el-input v-model="identifier" placeholder="请输入邮箱或手机号" :disabled="submitted" />
           </el-form-item>
 
           <el-button
@@ -114,7 +114,7 @@ function handleThemeEvent(event) {
 
 async function handleSubmit() {
   if (!identifier.value.trim()) {
-    ElMessage.warning("请输入邮箱");
+    ElMessage.warning("请输入邮箱或手机号");
     return;
   }
 

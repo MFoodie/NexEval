@@ -331,167 +331,6 @@
         </section>
 
         <section
-          class="card panel-card bg-white rounded-xl border border-gray-200 shadow-sm p-6"
-          v-else-if="activeMenu === 'exam-create' && isExamCreator"
-        >
-          <div class="mb-6">
-            <h2 class="text-2xl font-semibold">组卷出题</h2>
-            <p class="text-sm">从题库中选择题目组成试卷。</p>
-          </div>
-
-          <div class="exam-create-layout">
-            <div class="exam-create-left">
-              <div class="section-title">筛选题目</div>
-              <div class="exam-create-filters">
-                <el-select v-model="examCreateCno" clearable placeholder="课程" class="filter-item">
-                  <el-option
-                    v-for="c in teacherClasses"
-                    :key="c.cno"
-                    :label="`${c.cno} ${c.cname}`"
-                    :value="c.cno"
-                  />
-                </el-select>
-                <el-select v-model="examCreateType" clearable placeholder="题型" class="filter-item">
-                  <el-option
-                    v-for="opt in questionTypeOptions"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.value"
-                  />
-                </el-select>
-                <el-select v-model="examCreateDifficulty" clearable placeholder="难度" class="filter-item">
-                  <el-option
-                    v-for="opt in questionDifficultyOptions"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.value"
-                  />
-                </el-select>
-                <el-input
-                  v-model="examCreateKeyword"
-                  clearable
-                  placeholder="搜索题干关键词"
-                  class="filter-item"
-                  @keyup.enter="handleSearchQuestions"
-                />
-                <el-button type="primary" :loading="examCreateSearching" @click="handleSearchQuestions">搜索</el-button>
-              </div>
-
-              <div v-if="examCreateSearching" class="placeholder">正在搜索题目...</div>
-              <div v-else-if="examCreateSearchResults.length === 0" class="placeholder">
-                请选择筛选条件后点击搜索
-              </div>
-              <el-table
-                v-else
-                :data="examCreateSearchResults"
-                size="small"
-                class="question-search-table"
-                max-height="400"
-              >
-                <el-table-column label="题干" min-width="300">
-                  <template #default="scope">
-                    <span class="question-stem">{{ scope.row.stem }}</span>
-                  </template>
-                </el-table-column>
-                <el-table-column label="题型" width="80">
-                  <template #default="scope">
-                    {{ formatQuestionType(scope.row.questionType) }}
-                  </template>
-                </el-table-column>
-                <el-table-column label="难度" width="60">
-                  <template #default="scope">
-                    {{ scope.row.difficulty }}
-                  </template>
-                </el-table-column>
-                <el-table-column label="分值" width="60">
-                  <template #default="scope">
-                    {{ scope.row.points }}
-                  </template>
-                </el-table-column>
-                <el-table-column label="操作" width="80">
-                  <template #default="scope">
-                    <el-button
-                      size="small"
-                      type="primary"
-                      :disabled="isQuestionSelected(scope.row.id)"
-                      @click="addQuestionToPaper(scope.row)"
-                    >
-                      {{ isQuestionSelected(scope.row.id) ? '已选' : '加入' }}
-                    </el-button>
-                  </template>
-                </el-table-column>
-              </el-table>
-            </div>
-
-            <div class="exam-create-right">
-              <div class="section-title">试卷预览</div>
-              <el-form label-width="80px" size="small" class="paper-form">
-                <el-form-item label="试卷名称">
-                  <el-input v-model="examCreatePaperName" placeholder="请输入试卷名称" />
-                </el-form-item>
-                <el-form-item label="描述">
-                  <el-input v-model="examCreateDescription" placeholder="试卷描述（可选）" />
-                </el-form-item>
-                <el-form-item label="考试时长">
-                  <el-input-number v-model="examCreateDuration" :min="1" :max="300" /> 分钟
-                </el-form-item>
-              </el-form>
-
-              <div class="section-title" style="margin-top:4px">发布到教学班</div>
-              <el-select
-                v-model="examCreateSelectedClasses"
-                multiple
-                placeholder="选择教学班（可多选）"
-                style="width:100%"
-              >
-                <el-option
-                  v-for="c in teacherClasses"
-                  :key="`${c.cno}-${c.eid}`"
-                  :label="`${c.cno} ${c.cname}`"
-                  :value="`${c.cno}|${c.eid}`"
-                />
-              </el-select>
-
-              <div class="paper-stats">
-                <span>共 {{ selectedQuestionCount }} 题</span>
-                <span>总分 {{ selectedTotalPoints }} 分</span>
-              </div>
-
-              <div v-if="examCreateSelected.length === 0" class="placeholder">尚未选择题目</div>
-              <div v-else class="paper-question-list">
-                <div
-                  v-for="(q, index) in examCreateSelected"
-                  :key="q.id"
-                  class="paper-question-item"
-                >
-                  <span class="pq-index">{{ index + 1 }}</span>
-                  <span class="pq-type">{{ formatQuestionType(q.questionType) }}</span>
-                  <span class="pq-stem">{{ q.stem }}</span>
-                  <span class="pq-points">{{ q.points }}分</span>
-                  <el-button
-                    size="small"
-                    type="danger"
-                    :icon="'Delete'"
-                    circle
-                    @click="removeQuestionFromPaper(index)"
-                  />
-                </div>
-              </div>
-
-              <el-button
-                type="primary"
-                class="create-paper-btn"
-                :loading="examCreateSubmitting"
-                :disabled="examCreateSelected.length === 0 || !examCreatePaperName.trim()"
-                @click="handleCreateExamPaper"
-              >
-                创建试卷
-              </el-button>
-            </div>
-          </div>
-        </section>
-
-        <section
           class="card panel-card exam-panel-card bg-white rounded-xl border border-gray-200 shadow-sm p-6"
           v-else-if="activeMenu === 'cat' && isStudent"
         >
@@ -698,29 +537,6 @@
       <template #footer>
         <el-button @click="practiceDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="startingPractice" @click="confirmPracticeStart">开始练习</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="paperDialogVisible" title="选择试卷" width="520px">
-      <div v-if="paperDialogLoading" class="placeholder">正在加载可用试卷...</div>
-      <div v-else-if="paperDialogPapers.length === 0" class="placeholder">
-        该课程暂无已发布的试卷，将使用默认考试。
-      </div>
-      <div v-else class="paper-dialog-list">
-        <div
-          v-for="paper in paperDialogPapers"
-          :key="paper.definitionId"
-          class="paper-dialog-item"
-          @click="handleSelectPaper(paper)"
-        >
-          <div class="paper-dialog-name">{{ paper.paperName }}</div>
-          <div class="paper-dialog-meta">
-            {{ paper.description || '无描述' }} · {{ paper.questionCount }} 题 · {{ paper.durationMinutes }} 分钟
-          </div>
-        </div>
-      </div>
-      <template #footer>
-        <el-button @click="handleStartDefaultExam">使用默认考试</el-button>
       </template>
     </el-dialog>
 
@@ -995,7 +811,6 @@ import iconPersonalInfo from "../assets/personal_info.svg";
 import iconExam from "../assets/exam.svg";
 import iconCorrect from "../assets/correct.svg";
 import iconCat from "../assets/CAT.svg";
-import iconCreateExam from "../assets/exam.svg";
 import iconExit from "../assets/exit.svg";
 import iconQuery from "../assets/query.svg";
 
@@ -1052,7 +867,6 @@ const wsTagType = computed(() => {
 const isStudent = computed(() => userType.value === "student");
 const isTeacher = computed(() => userType.value === "teacher");
 const isVipTeacher = computed(() => Boolean(isTeacher.value && teacherInfo.value?.vip));
-const isExamCreator = computed(() => Boolean(isTeacher.value && teacherInfo.value?.canCreateExam));
 const displayPhone = computed(() => formatPhoneForDisplay(phone.value));
 const actionPanelTitle = computed(() => (isTeacher.value ? "考试批改" : "题目练习与考试"));
 const practiceLevels = [
@@ -1072,19 +886,12 @@ const activeMenu = ref("action");
 const menuItems = computed(() => {
   const items = [
     { key: "profile", label: "个人信息", icon: iconPersonalInfo },
-    {
-      key: "action",
+    { 
+      key: "action", 
       label: actionPanelTitle.value,
       icon: isTeacher.value ? iconCorrect : iconExam
     }
   ];
-  if (isExamCreator.value) {
-    items.push({
-      key: "exam-create",
-      label: "组卷出题",
-      icon: iconCreateExam
-    });
-  }
   if (isStudent.value) {
     items.push({
       key: "cat",
@@ -1135,43 +942,6 @@ const appealReason = ref("");
 const appealHistoryVisible = ref(false);
 const appealHistoryList = ref([]);
 const appealLoading = ref(false);
-
-const examCreateCno = ref("");
-const examCreateType = ref("");
-const examCreateDifficulty = ref("");
-const examCreateKeyword = ref("");
-const examCreateSearchResults = ref([]);
-const examCreateSearching = ref(false);
-const examCreateSelected = ref([]);
-const examCreatePaperName = ref("");
-const examCreateDescription = ref("");
-const examCreateDuration = ref(60);
-const examCreateSubmitting = ref(false);
-const examCreateSelectedClasses = ref([]);
-
-const paperDialogVisible = ref(false);
-const paperDialogLoading = ref(false);
-const paperDialogPapers = ref([]);
-const paperDialogClass = ref(null);
-
-const questionTypeOptions = [
-  { value: "", label: "全部类型" },
-  { value: "CHOICE", label: "选择题" },
-  { value: "JUDGE", label: "判断题" },
-  { value: "BLANK", label: "填空题" },
-  { value: "ESSAY", label: "简答题" }
-];
-const questionDifficultyOptions = [
-  { value: "", label: "全部难度" },
-  { value: "easy", label: "易" },
-  { value: "medium", label: "中" },
-  { value: "hard", label: "难" }
-];
-
-const selectedQuestionCount = computed(() => examCreateSelected.value.length);
-const selectedTotalPoints = computed(() =>
-  examCreateSelected.value.reduce((sum, q) => sum + (q.points || 0), 0)
-);
 
 const editVisible = ref(false);
 const saving = ref(false);
@@ -1246,11 +1016,8 @@ function readSidebarCollapsed() {
 
 function normalizeActiveMenu(value) {
   const text = String(value || "").trim();
-  if (text === "profile" || text === "action" || text === "cat" || text === "exam-create") {
+  if (text === "profile" || text === "action" || text === "cat") {
     if (text === "cat" && !isStudent.value) {
-      return "action";
-    }
-    if (text === "exam-create" && !isExamCreator.value) {
       return "action";
     }
     return text;
@@ -1830,7 +1597,7 @@ async function confirmCatStart() {
   }
 }
 
-async function handleStartExam(courseNo = "", courseName = "", definitionId = "") {
+async function handleStartExam(courseNo = "", courseName = "") {
   if (!userId.value.trim()) {
     ElMessage.warning("Please input user id.");
     return;
@@ -1845,8 +1612,7 @@ async function handleStartExam(courseNo = "", courseName = "", definitionId = ""
   try {
     const payload = await wsClient.request("START_EXAM", {
       userId: userId.value.trim(),
-      courseNo: String(courseNo || "").trim(),
-      definitionId: String(definitionId || "").trim()
+      courseNo: String(courseNo || "").trim()
     });
     router.push({
       name: "exam",
@@ -1875,50 +1641,8 @@ function handleStartCatForClass(clazz) {
   confirmCatStart();
 }
 
-async function handleStartExamForClass(clazz) {
-  if (!clazz) return;
-  const sno = String(studentInfo.value?.sno || "").trim();
-  if (!sno) {
-    handleStartExam(clazz.cno, clazz.cname);
-    return;
-  }
-
-  paperDialogClass.value = clazz;
-  paperDialogLoading.value = true;
-  paperDialogPapers.value = [];
-  paperDialogVisible.value = true;
-
-  try {
-    const data = await wsClient.request("GET_AVAILABLE_PAPERS", {
-      sno,
-      userId: String(cardNo.value || "").trim()
-    }, 15000);
-    const allPapers = Array.isArray(data) ? data : [];
-    paperDialogPapers.value = allPapers.filter(
-      (p) => p.cno === clazz.cno && p.eid === clazz.eid
-    );
-  } catch {
-    paperDialogPapers.value = [];
-  } finally {
-    paperDialogLoading.value = false;
-  }
-}
-
-function handleSelectPaper(paper) {
-  paperDialogVisible.value = false;
-  handleStartExam(
-    paperDialogClass.value?.cno || "",
-    paperDialogClass.value?.cname || "",
-    paper?.definitionId || ""
-  );
-}
-
-function handleStartDefaultExam() {
-  paperDialogVisible.value = false;
-  handleStartExam(
-    paperDialogClass.value?.cno || "",
-    paperDialogClass.value?.cname || ""
-  );
+function handleStartExamForClass(clazz) {
+  handleStartExam(clazz?.cno || "", clazz?.cname || "");
 }
 
 function selectClass(clazz) {
@@ -2309,85 +2033,6 @@ async function handleAiReviewAnswer(answer) {
     ElMessage.error(error.message || "AI 批改失败");
   } finally {
     aiReviewingId.value = "";
-  }
-}
-
-async function handleSearchQuestions() {
-  if (!wsClient.isOpen()) return;
-  examCreateSearching.value = true;
-  try {
-    const data = await wsClient.request("SEARCH_QUESTIONS", {
-      cno: examCreateCno.value,
-      questionType: examCreateType.value,
-      difficulty: examCreateDifficulty.value,
-      keyword: examCreateKeyword.value.trim()
-    }, 20000);
-    examCreateSearchResults.value = Array.isArray(data) ? data : [];
-  } catch (error) {
-    ElMessage.error(error.message || "题目搜索失败");
-  } finally {
-    examCreateSearching.value = false;
-  }
-}
-
-function isQuestionSelected(questionId) {
-  return examCreateSelected.value.some((q) => q.id === questionId);
-}
-
-function addQuestionToPaper(question) {
-  if (!isQuestionSelected(question.id)) {
-    examCreateSelected.value.push({ ...question });
-  }
-}
-
-function removeQuestionFromPaper(index) {
-  examCreateSelected.value.splice(index, 1);
-}
-
-async function handleCreateExamPaper() {
-  if (!wsClient.isOpen()) {
-    ElMessage.error("WebSocket 未连接");
-    return;
-  }
-  if (!examCreatePaperName.value.trim()) {
-    ElMessage.error("请输入试卷名称");
-    return;
-  }
-  if (examCreateSelected.value.length === 0) {
-    ElMessage.error("请至少选择一道题目");
-    return;
-  }
-
-  examCreateSubmitting.value = true;
-  try {
-    const questionIds = examCreateSelected.value.map((q, i) => ({
-      questionId: q.id,
-      questionType: q.questionType,
-      displayOrder: i + 1
-    }));
-    const classList = examCreateSelectedClasses.value.map((s) => {
-      const [cno, eid] = s.split("|");
-      return { cno, eid };
-    });
-    await wsClient.request("CREATE_EXAM_PAPER", {
-      teacherEid: teacherInfo.value?.eid || "",
-      paperName: examCreatePaperName.value.trim(),
-      description: examCreateDescription.value.trim(),
-      durationMinutes: examCreateDuration.value,
-      questionIdsJson: JSON.stringify(questionIds),
-      classListJson: JSON.stringify(classList)
-    }, 30000);
-    ElMessage.success("试卷创建成功");
-    examCreatePaperName.value = "";
-    examCreateDescription.value = "";
-    examCreateDuration.value = 60;
-    examCreateSelected.value = [];
-    examCreateSelectedClasses.value = [];
-    examCreateSearchResults.value = [];
-  } catch (error) {
-    ElMessage.error(error.message || "试卷创建失败");
-  } finally {
-    examCreateSubmitting.value = false;
   }
 }
 
@@ -3839,155 +3484,5 @@ mark {
 ::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(2) .cell,
 ::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(3) .cell {
   font-weight: 400 !important;
-}
-
-/* Exam creation panel */
-.exam-create-layout {
-  display: grid;
-  grid-template-columns: 1fr 360px;
-  gap: 24px;
-  min-height: 500px;
-}
-
-.exam-create-left {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.exam-create-filters {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.filter-item {
-  width: 140px;
-}
-
-.question-stem {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.4;
-}
-
-.exam-create-right {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border-left: 1px solid #e5e7eb;
-  padding-left: 20px;
-}
-
-.paper-form {
-  margin-bottom: 0;
-}
-
-.paper-stats {
-  display: flex;
-  gap: 16px;
-  font-size: 14px;
-  color: #6b7280;
-}
-
-.paper-question-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.paper-question-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  background: #f9fafb;
-  border-radius: 6px;
-  font-size: 13px;
-}
-
-.pq-index {
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #e5e7eb;
-  border-radius: 50%;
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.pq-type {
-  color: #6b7280;
-  font-size: 12px;
-  flex-shrink: 0;
-  min-width: 48px;
-}
-
-.pq-stem {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pq-points {
-  color: #3b82f6;
-  font-weight: 500;
-  flex-shrink: 0;
-}
-
-.create-paper-btn {
-  margin-top: 8px;
-  width: 100%;
-}
-
-@media (max-width: 900px) {
-  .exam-create-layout {
-    grid-template-columns: 1fr;
-  }
-  .exam-create-right {
-    border-left: none;
-    padding-left: 0;
-    border-top: 1px solid #e5e7eb;
-    padding-top: 16px;
-  }
-}
-
-.paper-dialog-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.paper-dialog-item {
-  padding: 12px 16px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: border-color 0.2s, background-color 0.2s;
-}
-
-.paper-dialog-item:hover {
-  border-color: #409eff;
-  background-color: #ecf5ff;
-}
-
-.paper-dialog-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.paper-dialog-meta {
-  margin-top: 4px;
-  font-size: 13px;
-  color: #909399;
 }
 </style>
