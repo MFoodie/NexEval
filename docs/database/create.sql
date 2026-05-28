@@ -37,6 +37,7 @@ CREATE TABLE teacher (
     title ENUM('professor', 'associate_professor', 'lecture') NOT NULL,
     department varchar(30) NOT NULL,
     vip boolean NOT NULL DEFAULT false,
+    can_create_exam boolean NOT NULL DEFAULT false,
     PRIMARY KEY (eid),
     FOREIGN KEY (id) REFERENCES users(id)
 );
@@ -66,6 +67,22 @@ SET @sql := IF(
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+
+SET @col_exists2 := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+        AND table_name = 'teacher'
+        AND column_name = 'can_create_exam'
+);
+SET @sql2 := IF(
+    @col_exists2 = 0,
+    'ALTER TABLE teacher ADD COLUMN can_create_exam boolean NOT NULL DEFAULT false',
+    'SELECT 1'
+);
+PREPARE stmt2 FROM @sql2;
+EXECUTE stmt2;
+DEALLOCATE PREPARE stmt2;
 
 CREATE TABLE course(
     cno char(8),
