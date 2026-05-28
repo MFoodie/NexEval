@@ -1,5 +1,6 @@
 package com.nexeval.service;
 
+import com.nexeval.dto.AvailablePaperView;
 import com.nexeval.dto.AnswerRequest;
 import com.nexeval.dto.AnswerResponse;
 import com.nexeval.dto.ExamAnswerDetailView;
@@ -8,6 +9,7 @@ import com.nexeval.dto.ExamAnswerView;
 import com.nexeval.dto.NextQuestionResponse;
 import com.nexeval.dto.ScoreAppealRequest;
 import com.nexeval.dto.ScoreAppealView;
+import com.nexeval.dto.QuestionSearchView;
 import com.nexeval.dto.QuestionView;
 import com.nexeval.dto.StartExamResponse;
 import com.nexeval.model.BlankQuestionBank;
@@ -16,9 +18,12 @@ import com.nexeval.model.ExamAttempt;
 import com.nexeval.model.ExamAttemptStatus;
 import com.nexeval.model.EssayQuestionBank;
 import com.nexeval.model.ExamDefinition;
+import com.nexeval.model.ExamPaper;
 import com.nexeval.model.ExamPaperQuestion;
 import com.nexeval.model.ExamSession;
 import com.nexeval.model.JudgeQuestionBank;
+import com.nexeval.model.PaperPublish;
+import com.nexeval.model.PaperQuestionItem;
 import com.nexeval.model.PracticePaper;
 import com.nexeval.model.PracticePaperQuestion;
 import com.nexeval.model.ScoreAppeal;
@@ -35,9 +40,13 @@ import com.nexeval.repository.ExamAnswerRepository;
 import com.nexeval.repository.EssayQuestionBankRepository;
 import com.nexeval.repository.ExamDefinitionRepository;
 import com.nexeval.repository.ExamPaperQuestionRepository;
+import com.nexeval.repository.ExamPaperRepository;
 import com.nexeval.repository.JudgeQuestionBankRepository;
+import com.nexeval.repository.PaperPublishRepository;
+import com.nexeval.repository.PaperQuestionItemRepository;
 import com.nexeval.repository.PracticePaperQuestionRepository;
 import com.nexeval.repository.PracticePaperRepository;
+import com.nexeval.repository.ScRecordRepository;
 import com.nexeval.repository.ScoreAppealRepository;
 import com.nexeval.repository.TeacherProfileRepository;
 import com.nexeval.repository.QuestionBankRepository;
@@ -59,8 +68,11 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CatExamService {
@@ -84,6 +96,10 @@ public class CatExamService {
   private final ExamAttemptRepository examAttemptRepository;
   private final ScoreAppealRepository scoreAppealRepository;
   private final TeacherProfileRepository teacherProfileRepository;
+  private final ExamPaperRepository examPaperRepository;
+  private final PaperQuestionItemRepository paperQuestionItemRepository;
+  private final PaperPublishRepository paperPublishRepository;
+  private final ScRecordRepository scRecordRepository;
   private final AiGradingService aiGradingService;
   private final AiPracticeService aiPracticeService;
   private final IrtCatService irtCatService;
@@ -106,6 +122,10 @@ public class CatExamService {
     ExamAttemptRepository examAttemptRepository,
     ScoreAppealRepository scoreAppealRepository,
     TeacherProfileRepository teacherProfileRepository,
+    ExamPaperRepository examPaperRepository,
+    PaperQuestionItemRepository paperQuestionItemRepository,
+    PaperPublishRepository paperPublishRepository,
+    ScRecordRepository scRecordRepository,
     AiGradingService aiGradingService,
     AiPracticeService aiPracticeService,
     IrtCatService irtCatService
@@ -123,6 +143,10 @@ public class CatExamService {
     this.examAttemptRepository = examAttemptRepository;
     this.scoreAppealRepository = scoreAppealRepository;
     this.teacherProfileRepository = teacherProfileRepository;
+    this.examPaperRepository = examPaperRepository;
+    this.paperQuestionItemRepository = paperQuestionItemRepository;
+    this.paperPublishRepository = paperPublishRepository;
+    this.scRecordRepository = scRecordRepository;
     this.aiGradingService = aiGradingService;
     this.aiPracticeService = aiPracticeService;
     this.irtCatService = irtCatService;
@@ -202,8 +226,22 @@ public class CatExamService {
     return toStartResponse(session);
   }
 
-  public StartExamResponse startExamSession(String userId, String courseNo) {
+  public StartExamResponse startExamSession(String userId, String courseNo, String definitionId) {
     String normalizedCourseNo = normalizeSourceId(courseNo);
+    String normalizedDefinitionId = normalizeSourceId(definitionId);
+
+    if (!normalizedDefinitionId.isBlank()) {
+      ExamDefinition definition = resolveExamDefinition(normalizedDefinitionId);
+      List<QuestionItem> questionBank = loadPaperQuestions(definition.getPaper().getId());
+      int maxQuestions = questionBank.size();
+      int durationMinutes = definition.getDurationMinutes() > 0 ? definition.getDurationMinutes() : DEFAULT_EXAM_DURATION_MINUTES;
+
+      ExamSession session = createSession(userId, normalizedCourseNo, definition.getId(), maxQuestions,
+        SessionMode.EXAM, definition.getPaper().getId(), durationMinutes * 60);
+      cacheQuestionsForSession(session, questionBank);
+      return toStartResponse(session);
+    }
+
     if (normalizedCourseNo.isBlank()) {
       throw new IllegalArgumentException("courseNo is required for exam sessions");
     }
@@ -212,7 +250,6 @@ public class CatExamService {
     }
     ExamDefinition definition = resolveExamDefinition(null);
     List<QuestionItem> questionBank = loadCourseQuestionBank(normalizedCourseNo);
-    String paperId = null;
     int maxQuestions = questionBank.size();
 
     int durationMinutes = definition.getDurationMinutes() > 0
@@ -226,7 +263,7 @@ public class CatExamService {
       definition.getId(),
       maxQuestions,
       SessionMode.EXAM,
-      paperId,
+      null,
       timeLimitSeconds
     );
 
@@ -621,6 +658,168 @@ public class CatExamService {
       .orElse(false);
   }
 
+  public List<QuestionSearchView> searchQuestions(String cno, String questionType, String difficulty, String keyword) {
+    List<QuestionSearchView> results = new ArrayList<>();
+    String normalizedCno = cno == null ? "" : cno.trim();
+    String normalizedType = questionType == null ? "" : questionType.trim().toUpperCase();
+    String normalizedKeyword = keyword == null ? "" : keyword.trim().toLowerCase();
+    String normalizedDifficulty = difficulty == null ? "" : difficulty.trim();
+
+    if (normalizedType.isEmpty() || normalizedType.equals("CHOICE")) {
+      List<QuestionBank> questions = normalizedCno.isEmpty()
+        ? questionBankRepository.findAllByActiveTrue()
+        : questionBankRepository.findAllByActiveTrueAndCno(normalizedCno);
+      for (QuestionBank q : questions) {
+        if (matchesSearch(q.getStem(), normalizedKeyword) && matchesDifficulty(String.valueOf(q.getDifficulty()), normalizedDifficulty)) {
+          results.add(new QuestionSearchView(q.getId(), truncateStem(q.getStem()), "CHOICE", formatDifficulty(q.getDifficulty()), 0, q.getCno() == null ? "" : q.getCno()));
+        }
+      }
+    }
+
+    if (normalizedType.isEmpty() || normalizedType.equals("JUDGE")) {
+      List<JudgeQuestionBank> questions = normalizedCno.isEmpty()
+        ? judgeQuestionBankRepository.findAll()
+        : judgeQuestionBankRepository.findAllByActiveTrueAndCno(normalizedCno);
+      for (JudgeQuestionBank q : questions) {
+        if (!q.isActive()) continue;
+        if (matchesSearch(q.getStem(), normalizedKeyword) && matchesDifficulty(String.valueOf(q.getDifficulty()), normalizedDifficulty)) {
+          results.add(new QuestionSearchView(q.getId(), truncateStem(q.getStem()), "JUDGE", formatDifficulty(q.getDifficulty()), q.getPoints(), q.getCno() == null ? "" : q.getCno()));
+        }
+      }
+    }
+
+    if (normalizedType.isEmpty() || normalizedType.equals("BLANK")) {
+      List<BlankQuestionBank> questions = normalizedCno.isEmpty()
+        ? blankQuestionBankRepository.findAll()
+        : blankQuestionBankRepository.findAllByActiveTrueAndCno(normalizedCno);
+      for (BlankQuestionBank q : questions) {
+        if (!q.isActive()) continue;
+        if (matchesSearch(q.getStem(), normalizedKeyword) && matchesDifficulty(String.valueOf(q.getDifficulty()), normalizedDifficulty)) {
+          results.add(new QuestionSearchView(q.getId(), truncateStem(q.getStem()), "BLANK", formatDifficulty(q.getDifficulty()), q.getPoints(), q.getCno() == null ? "" : q.getCno()));
+        }
+      }
+    }
+
+    if (normalizedType.isEmpty() || normalizedType.equals("ESSAY")) {
+      List<EssayQuestionBank> questions = normalizedCno.isEmpty()
+        ? essayQuestionBankRepository.findAll()
+        : essayQuestionBankRepository.findAllByActiveTrueAndCno(normalizedCno);
+      for (EssayQuestionBank q : questions) {
+        if (!q.isActive()) continue;
+        if (matchesSearch(q.getStem(), normalizedKeyword) && matchesDifficulty(String.valueOf(q.getDifficulty()), normalizedDifficulty)) {
+          results.add(new QuestionSearchView(q.getId(), truncateStem(q.getStem()), "ESSAY", formatDifficulty(q.getDifficulty()), q.getPoints(), q.getCno() == null ? "" : q.getCno()));
+        }
+      }
+    }
+
+    return results;
+  }
+
+  private boolean matchesSearch(String stem, String keyword) {
+    if (keyword.isEmpty()) return true;
+    return stem != null && stem.toLowerCase().contains(keyword);
+  }
+
+  private boolean matchesDifficulty(String diffStr, String filter) {
+    if (filter.isEmpty()) return true;
+    try {
+      double d = Double.parseDouble(diffStr);
+      return switch (filter) {
+        case "easy" -> d <= 2.0;
+        case "medium" -> d > 2.0 && d <= 3.5;
+        case "hard" -> d > 3.5;
+        default -> true;
+      };
+    } catch (NumberFormatException e) {
+      return true;
+    }
+  }
+
+  private String formatDifficulty(double d) {
+    if (d <= 2.0) return "易";
+    if (d <= 3.5) return "中";
+    return "难";
+  }
+
+  private String truncateStem(String stem) {
+    if (stem == null) return "";
+    return stem.length() > 80 ? stem.substring(0, 80) + "..." : stem;
+  }
+
+  @Transactional
+  public Map<String, Object> createExamPaper(String teacherEid, String paperName, String description,
+                                              Integer durationMinutes, String questionIdsJson,
+                                              String classListJson) {
+    String paperId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+    String definitionId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+
+    ExamPaper paper = new ExamPaper();
+    paper.setId(paperId);
+    paper.setName(paperName.trim());
+    paper.setActive(true);
+    examPaperRepository.save(paper);
+
+    int duration = durationMinutes != null && durationMinutes > 0 ? durationMinutes : 60;
+
+    ExamDefinition definition = new ExamDefinition();
+    definition.setId(definitionId);
+    definition.setName(paperName.trim());
+    definition.setDescription(description != null ? description.trim() : "");
+    definition.setDurationMinutes(duration);
+    definition.setActive(true);
+    definition.setDefault(false);
+    definition.setPaper(paper);
+    examDefinitionRepository.save(definition);
+
+    try {
+      ObjectMapper mapper = new ObjectMapper();
+      JsonNode items = mapper.readTree(questionIdsJson);
+      int maxQuestions = 0;
+      for (int i = 0; i < items.size(); i++) {
+        com.fasterxml.jackson.databind.JsonNode item = items.get(i);
+        PaperQuestionItem pqi = new PaperQuestionItem();
+        pqi.setPaperId(paperId);
+        pqi.setQuestionId(item.path("questionId").asText());
+        pqi.setQuestionType(item.path("questionType").asText().toUpperCase());
+        pqi.setDisplayOrder(i + 1);
+        paperQuestionItemRepository.save(pqi);
+        maxQuestions++;
+      }
+      definition.setMaxQuestions(maxQuestions);
+      examDefinitionRepository.save(definition);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("题目列表解析失败: " + e.getMessage());
+    }
+
+    int publishCount = 0;
+    String normalizedClassList = classListJson != null ? classListJson.trim() : "";
+    if (!normalizedClassList.isEmpty()) {
+      try {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode classItems = mapper.readTree(normalizedClassList);
+        for (int i = 0; i < classItems.size(); i++) {
+          JsonNode cls = classItems.get(i);
+          PaperPublish pub = new PaperPublish();
+          pub.setDefinitionId(definitionId);
+          pub.setCno(cls.path("cno").asText().trim());
+          pub.setEid(cls.path("eid").asText().trim());
+          paperPublishRepository.save(pub);
+          publishCount++;
+        }
+      } catch (Exception e) {
+        throw new IllegalArgumentException("教学班列表解析失败: " + e.getMessage());
+      }
+    }
+
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("paperId", paperId);
+    result.put("definitionId", definitionId);
+    result.put("name", paperName.trim());
+    result.put("publishCount", publishCount);
+    result.put("message", "试卷创建成功");
+    return result;
+  }
+
   public NextQuestionResponse getNextQuestion(String sessionId) {
     ExamSession session = requireSession(sessionId);
 
@@ -844,9 +1043,14 @@ public class CatExamService {
     String sourceId = normalizeSourceId(session.getExamId());
     String cacheKey = session.getMode().name() + ":" + (sourceId.isBlank() ? "DEFAULT" : sourceId);
     if (session.getMode() == SessionMode.EXAM) {
-      String courseNo = normalizeSourceId(session.getCourseNo());
-      if (!courseNo.isBlank() && isCourseSource(courseNo)) {
-        cacheKey = session.getMode().name() + ":COURSE:" + courseNo;
+      String paperId = session.getPaperId();
+      if (paperId != null && !paperId.isBlank()) {
+        cacheKey = session.getMode().name() + ":PAPER:" + session.getSessionId();
+      } else {
+        String courseNo = normalizeSourceId(session.getCourseNo());
+        if (!courseNo.isBlank() && isCourseSource(courseNo)) {
+          cacheKey = session.getMode().name() + ":COURSE:" + courseNo;
+        }
       }
     } else if (session.getMode() == SessionMode.PRACTICE) {
       // Practice sessions must not reuse another session's generated bank.
@@ -891,6 +1095,11 @@ public class CatExamService {
     }
 
     if (session.getMode() == SessionMode.EXAM) {
+      String paperId = session.getPaperId();
+      if (paperId != null && !paperId.isBlank()) {
+        log.info("loadQuestionBankForSession: using paper questions for paperId={}", paperId);
+        return loadPaperQuestions(paperId);
+      }
       String courseNo = normalizeSourceId(session.getCourseNo());
       if (!courseNo.isBlank() && isCourseSource(courseNo)) {
         log.info("loadQuestionBankForSession: using course question bank for course={}", courseNo);
@@ -1307,6 +1516,69 @@ public class CatExamService {
     sessions.put(sessionId, session);
     persistAttempt(session);
     return session;
+  }
+
+  private void cacheQuestionsForSession(ExamSession session, List<QuestionItem> questions) {
+    examQuestionCache.put(session.getSessionId(), questions);
+  }
+
+  private List<QuestionItem> loadPaperQuestions(String paperId) {
+    List<PaperQuestionItem> items = paperQuestionItemRepository.findAllByPaperIdOrderByDisplayOrderAsc(paperId);
+    if (items.isEmpty()) {
+      throw new NoSuchElementException("Paper has no questions: " + paperId);
+    }
+    return items.stream()
+      .map(pqi -> loadQuestionByIdAndType(pqi.getQuestionId(), pqi.getQuestionType()))
+      .toList();
+  }
+
+  private QuestionItem loadQuestionByIdAndType(String questionId, String questionType) {
+    return switch (questionType) {
+      case "CHOICE" -> questionBankRepository.findById(questionId)
+        .map(this::toQuestionItem)
+        .orElseThrow(() -> new NoSuchElementException("Choice question not found: " + questionId));
+      case "JUDGE" -> judgeQuestionBankRepository.findById(questionId)
+        .map(this::toQuestionItem)
+        .orElseThrow(() -> new NoSuchElementException("Judge question not found: " + questionId));
+      case "BLANK" -> blankQuestionBankRepository.findById(questionId)
+        .map(this::toQuestionItem)
+        .orElseThrow(() -> new NoSuchElementException("Blank question not found: " + questionId));
+      case "ESSAY" -> essayQuestionBankRepository.findById(questionId)
+        .map(this::toQuestionItem)
+        .orElseThrow(() -> new NoSuchElementException("Essay question not found: " + questionId));
+      default -> throw new IllegalArgumentException("Unknown question type: " + questionType);
+    };
+  }
+
+  public List<AvailablePaperView> getAvailablePapers(String sno, String userId) {
+    if (sno == null || sno.trim().isEmpty()) {
+      return List.of();
+    }
+    String normalizedUserId = userId == null ? "" : userId.trim();
+    List<ScRecordRepository.StudentClassRow> classes = scRecordRepository.findStudentClasses(sno.trim());
+    List<AvailablePaperView> results = new ArrayList<>();
+    for (ScRecordRepository.StudentClassRow row : classes) {
+      List<PaperPublish> publishes = paperPublishRepository.findAllByCnoAndEid(row.getCno(), row.getEid());
+      for (PaperPublish pub : publishes) {
+        examDefinitionRepository.findByIdAndActiveTrue(pub.getDefinitionId()).ifPresent(def -> {
+          String paperId = def.getPaper().getId();
+          if (!normalizedUserId.isEmpty()) {
+            List<ExamAttempt> completed = examAttemptRepository.findAllByUserIdAndPaperIdAndStatus(
+              normalizedUserId, paperId, ExamAttemptStatus.SUBMITTED);
+            if (!completed.isEmpty()) {
+              return;
+            }
+          }
+          int questionCount = paperQuestionItemRepository.findAllByPaperIdOrderByDisplayOrderAsc(paperId).size();
+          results.add(new AvailablePaperView(
+            def.getId(), paperId, def.getName(),
+            def.getDescription() != null ? def.getDescription() : "",
+            def.getDurationMinutes(), questionCount, row.getCno(), row.getEid()
+          ));
+        });
+      }
+    }
+    return results;
   }
 
   private StartExamResponse toStartResponse(ExamSession session) {

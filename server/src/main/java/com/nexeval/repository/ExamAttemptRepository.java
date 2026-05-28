@@ -1,6 +1,7 @@
 package com.nexeval.repository;
 
 import com.nexeval.model.ExamAttempt;
+import com.nexeval.model.ExamAttemptStatus;
 import com.nexeval.model.SessionMode;
 import java.util.List;
 import java.util.Optional;
@@ -22,4 +23,6 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, Long> 
     String courseNo,
     SessionMode mode
   );
+
+  List<ExamAttempt> findAllByUserIdAndPaperIdAndStatus(String userId, String paperId, ExamAttemptStatus status);
 }
