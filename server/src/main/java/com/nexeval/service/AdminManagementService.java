@@ -4,7 +4,6 @@ import com.nexeval.dto.BulkImportResult;
 import com.nexeval.model.Course;
 import com.nexeval.model.ScRecord;
 import com.nexeval.model.ScRecordId;
-import com.nexeval.dto.TeacherExamPermView;
 import com.nexeval.dto.TeacherVipView;
 import com.nexeval.model.StudentProfile;
 import com.nexeval.model.TeacherProfile;
@@ -94,37 +93,6 @@ public class AdminManagementService {
       profile.getTitle(),
       profile.getDepartment(),
       profile.isVip()
-    );
-  }
-
-  public List<TeacherExamPermView> listTeacherExamPermViews(String keyword, String permStatus) {
-    String normalizedKeyword = normalizeNullable(keyword);
-    String normalizedStatus = normalizeNullable(permStatus).toLowerCase(Locale.ROOT);
-    String status = switch (normalizedStatus) {
-      case "permitted", "not_permitted" -> normalizedStatus;
-      default -> "all";
-    };
-    return teacherProfileRepository.findTeacherExamPermViews(normalizedKeyword, status);
-  }
-
-  @Transactional
-  public TeacherExamPermView updateTeacherExamPerm(String eid, boolean canCreateExam) {
-    String normalizedEid = required(eid, "eid");
-    TeacherProfile profile = teacherProfileRepository.findFirstByEid(normalizedEid)
-      .orElseThrow(() -> new IllegalArgumentException("教师工号不存在"));
-    profile.setCanCreateExam(canCreateExam);
-    teacherProfileRepository.save(profile);
-
-    UserAccount account = userAccountRepository.findById(profile.getId())
-      .orElseThrow(() -> new IllegalArgumentException("教师账户不存在"));
-
-    return new TeacherExamPermView(
-      profile.getEid(),
-      account.getId(),
-      account.getName(),
-      profile.getTitle(),
-      profile.getDepartment(),
-      profile.isCanCreateExam()
     );
   }
 

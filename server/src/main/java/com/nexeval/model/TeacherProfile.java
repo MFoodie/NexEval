@@ -28,9 +28,6 @@ public class TeacherProfile {
   @Column(name = "vip", nullable = false)
   private boolean vip;
 
-  @Column(name = "can_create_exam", nullable = false)
-  private boolean canCreateExam;
-
   public String getEid() {
     return eid;
   }
@@ -77,13 +74,5 @@ public class TeacherProfile {
 
   public void setVip(boolean vip) {
     this.vip = vip;
-  }
-
-  public boolean isCanCreateExam() {
-    return canCreateExam;
-  }
-
-  public void setCanCreateExam(boolean canCreateExam) {
-    this.canCreateExam = canCreateExam;
   }
 }
