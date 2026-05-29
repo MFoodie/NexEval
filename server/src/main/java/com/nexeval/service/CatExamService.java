@@ -22,6 +22,7 @@ import com.nexeval.model.ExamPaper;
 import com.nexeval.model.ExamPaperQuestion;
 import com.nexeval.model.ExamSession;
 import com.nexeval.model.JudgeQuestionBank;
+import com.nexeval.model.JudgeQuestionMedia;
 import com.nexeval.model.PaperPublish;
 import com.nexeval.model.PaperQuestionItem;
 import com.nexeval.model.PracticePaper;
@@ -42,6 +43,7 @@ import com.nexeval.repository.ExamDefinitionRepository;
 import com.nexeval.repository.ExamPaperQuestionRepository;
 import com.nexeval.repository.ExamPaperRepository;
 import com.nexeval.repository.JudgeQuestionBankRepository;
+import com.nexeval.repository.JudgeQuestionMediaRepository;
 import com.nexeval.repository.PaperPublishRepository;
 import com.nexeval.repository.PaperQuestionItemRepository;
 import com.nexeval.repository.PracticePaperQuestionRepository;
@@ -90,6 +92,7 @@ public class CatExamService {
   private final PracticePaperQuestionRepository practicePaperQuestionRepository;
   private final QuestionBankRepository questionBankRepository;
   private final JudgeQuestionBankRepository judgeQuestionBankRepository;
+  private final JudgeQuestionMediaRepository judgeQuestionMediaRepository;
   private final BlankQuestionBankRepository blankQuestionBankRepository;
   private final EssayQuestionBankRepository essayQuestionBankRepository;
   private final ExamAnswerRepository examAnswerRepository;
@@ -116,6 +119,7 @@ public class CatExamService {
     PracticePaperQuestionRepository practicePaperQuestionRepository,
     QuestionBankRepository questionBankRepository,
     JudgeQuestionBankRepository judgeQuestionBankRepository,
+    JudgeQuestionMediaRepository judgeQuestionMediaRepository,
     BlankQuestionBankRepository blankQuestionBankRepository,
     EssayQuestionBankRepository essayQuestionBankRepository,
     ExamAnswerRepository examAnswerRepository,
@@ -137,6 +141,7 @@ public class CatExamService {
     this.practicePaperQuestionRepository = practicePaperQuestionRepository;
     this.questionBankRepository = questionBankRepository;
     this.judgeQuestionBankRepository = judgeQuestionBankRepository;
+    this.judgeQuestionMediaRepository = judgeQuestionMediaRepository;
     this.blankQuestionBankRepository = blankQuestionBankRepository;
     this.essayQuestionBankRepository = essayQuestionBankRepository;
     this.examAnswerRepository = examAnswerRepository;
@@ -1423,17 +1428,18 @@ public class CatExamService {
       question.getDifficultyB(),
       question.getDiscriminationA(),
       QuestionType.CHOICE,
-      1,
+      question.getPoints(),
       true
     );
   }
 
   private QuestionItem toQuestionItem(JudgeQuestionBank question) {
+    JudgeQuestionMedia media = findJudgeQuestionMediaSafely(question.getId());
     return new QuestionItem(
       question.getId(),
       question.getStem(),
-      null,
-      null,
+      media != null ? media.getImagePath() : null,
+      media != null ? media.getImageMode() : null,
       JUDGE_OPTIONS,
       question.isAnswerKey() ? "true" : "false",
       question.getDifficulty(),
@@ -1477,6 +1483,18 @@ public class CatExamService {
       question.getPoints(),
       false
     );
+  }
+
+  private JudgeQuestionMedia findJudgeQuestionMediaSafely(String questionId) {
+    if (questionId == null || questionId.isBlank()) {
+      return null;
+    }
+    try {
+      return judgeQuestionMediaRepository.findById(questionId).orElse(null);
+    } catch (RuntimeException ex) {
+      log.debug("judge question media unavailable for {}", questionId, ex);
+      return null;
+    }
   }
 
   private NextQuestionResponse buildFinishedResponse(ExamSession session) {
@@ -1866,7 +1884,10 @@ public class CatExamService {
         .map(QuestionBank::getImagePath)
         .orElse("");
       case JUDGE -> judgeQuestionBankRepository.findById(answer.getQuestionId())
-        .map(q -> "")
+        .map(q -> {
+          JudgeQuestionMedia media = findJudgeQuestionMediaSafely(q.getId());
+          return media != null && media.getImagePath() != null ? media.getImagePath() : "";
+        })
         .orElse("");
       case BLANK -> blankQuestionBankRepository.findById(answer.getQuestionId())
         .map(BlankQuestionBank::getImagePath)

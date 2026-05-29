@@ -529,6 +529,16 @@
         </section>
 
         <section
+          class="card panel-card bg-white rounded-xl border border-gray-200 shadow-sm p-6"
+          v-else-if="activeMenu === 'problem-create' && isExamCreator"
+        >
+          <ProblemCreateView
+            :teacher-info="teacherInfo"
+            :teacher-classes="teacherClasses"
+          />
+        </section>
+
+        <section
           class="card panel-card exam-panel-card bg-white rounded-xl border border-gray-200 shadow-sm p-6"
           v-else-if="activeMenu === 'cat' && isStudent"
         >
@@ -1024,6 +1034,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ClassTools from "../components/ClassTools.vue";
+import ProblemCreateView from "./ProblemCreateView.vue";
 import { ElMessage } from "element-plus";
 import { clearLogin, getLogin, saveLogin } from "../auth";
 import { createExamSocket } from "../ws";
@@ -1034,6 +1045,7 @@ import iconExam from "../assets/exam.svg";
 import iconCorrect from "../assets/correct.svg";
 import iconCat from "../assets/CAT.svg";
 import iconCreateExam from "../assets/examcreate.svg";
+import iconAddProblem from "../assets/add_problem.svg";
 import iconExit from "../assets/exit.svg";
 import iconQuery from "../assets/query.svg";
 import iconDelete from "../assets/delete.svg";
@@ -1122,6 +1134,11 @@ const menuItems = computed(() => {
       key: "exam-create",
       label: "组卷出题",
       icon: iconCreateExam
+    });
+    items.push({
+      key: "problem-create",
+      label: "题目增加",
+      icon: iconAddProblem
     });
   }
   if (isStudent.value) {
@@ -1310,11 +1327,11 @@ function readSidebarCollapsed() {
 
 function normalizeActiveMenu(value) {
   const text = String(value || "").trim();
-  if (text === "profile" || text === "action" || text === "cat" || text === "exam-create") {
+  if (text === "profile" || text === "action" || text === "cat" || text === "exam-create" || text === "problem-create") {
     if (text === "cat" && !isStudent.value) {
       return "action";
     }
-    if (text === "exam-create" && !isExamCreator.value) {
+    if ((text === "exam-create" || text === "problem-create") && !isExamCreator.value) {
       return "action";
     }
     return text;
@@ -3672,9 +3689,9 @@ onBeforeUnmount(() => {
 }
 
 .student-header-right .teacher-search-bar .search-input {
-  width: 280px;
-  min-width: 280px;
-  flex: 0 0 280px;
+  width: 220px;
+  min-width: 220px;
+  flex: 0 0 220px;
 }
 
 .grading-head {
@@ -3793,6 +3810,13 @@ onBeforeUnmount(() => {
 .student-subtitle {
   color: var(--ne-text-strong);
   font-weight: 600;
+}
+
+.student-subtitle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 72ch;
 }
 
 .student-count {

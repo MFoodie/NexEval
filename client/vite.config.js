@@ -39,6 +39,16 @@ export default defineConfig({
         changeOrigin: true,
         secure: false
       },
+      "/api/question-image": {
+        target: "https://localhost:8443",
+        changeOrigin: true,
+        secure: false
+      },
+      "/api/question-bank": {
+        target: "https://localhost:8443",
+        changeOrigin: true,
+        secure: false
+      },
       "/api/password-reset": {
         target: "https://localhost:8443",
         changeOrigin: true,
