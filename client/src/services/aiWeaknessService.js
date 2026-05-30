@@ -33,3 +33,7 @@ export function fetchWeaknessQuestion(payload) {
 export function fetchWeaknessExplanation(payload) {
   return postJson("/api/ai/weakness/explain", payload);
 }
+
+export function fetchAiQuestionDraft(payload) {
+  return postJson("/api/question-bank/ai-draft", payload);
+}

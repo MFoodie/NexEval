@@ -3,6 +3,7 @@ package com.nexeval.service;
 import com.nexeval.dto.AvailablePaperView;
 import com.nexeval.dto.AnswerRequest;
 import com.nexeval.dto.AnswerResponse;
+import com.nexeval.dto.CatKnowledgeInsightsResponse;
 import com.nexeval.dto.ExamAnswerDetailView;
 import com.nexeval.dto.ExamAttemptView;
 import com.nexeval.dto.ExamAnswerView;
@@ -105,6 +106,7 @@ public class CatExamService {
   private final ScRecordRepository scRecordRepository;
   private final AiGradingService aiGradingService;
   private final AiPracticeService aiPracticeService;
+  private final AiWeaknessService aiWeaknessService;
   private final IrtCatService irtCatService;
 
   private final Map<String, ExamSession> sessions = new ConcurrentHashMap<>();
@@ -132,6 +134,7 @@ public class CatExamService {
     ScRecordRepository scRecordRepository,
     AiGradingService aiGradingService,
     AiPracticeService aiPracticeService,
+    AiWeaknessService aiWeaknessService,
     IrtCatService irtCatService
   ) {
     this.webSocketHub = webSocketHub;
@@ -154,6 +157,7 @@ public class CatExamService {
     this.scRecordRepository = scRecordRepository;
     this.aiGradingService = aiGradingService;
     this.aiPracticeService = aiPracticeService;
+    this.aiWeaknessService = aiWeaknessService;
     this.irtCatService = irtCatService;
   }
 
@@ -642,6 +646,30 @@ public class CatExamService {
     payload.put("systemPrecision", safePrecision);
     payload.put("answeredCount", safeAnswered);
     payload.put("maxQuestions", safeMax);
+    return payload;
+  }
+
+  public Map<String, Object> generateCatKnowledgeInsights(
+    String sessionId,
+    String courseNo,
+    String courseName
+  ) {
+    String normalizedSessionId = sessionId == null ? "" : sessionId.trim();
+    if (normalizedSessionId.isBlank()) {
+      throw new IllegalArgumentException("sessionId is required");
+    }
+
+    List<ExamAnswerDetailView> answers = getAttemptAnswers(normalizedSessionId);
+    CatKnowledgeInsightsResponse insights = aiWeaknessService.generateCatKnowledgeInsights(
+      normalizeSourceId(courseNo),
+      courseName == null ? "" : courseName.trim(),
+      answers
+    );
+
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("sessionId", normalizedSessionId);
+    payload.put("masteryPoints", insights.masteryPoints() == null ? List.of() : insights.masteryPoints());
+    payload.put("weakPoints", insights.weakPoints() == null ? List.of() : insights.weakPoints());
     return payload;
   }
 

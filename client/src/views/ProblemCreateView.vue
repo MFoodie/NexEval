@@ -19,7 +19,19 @@
 
     <el-form v-else class="problem-create-form" label-position="top" @submit.prevent>
       <section class="problem-create-section">
-        <div class="problem-create-section__title">基础信息</div>
+        <div class="problem-create-section__header">
+          <div class="problem-create-section__title">基础信息</div>
+          <el-button
+            v-if="canUseAiDraft"
+            type="primary"
+            plain
+            :loading="aiGenerating"
+            :disabled="!canGenerateAiDraft"
+            @click="generateAiDraft"
+          >
+            AI出题
+          </el-button>
+        </div>
         <div class="problem-create-row problem-create-row--four">
           <el-form-item label="课程">
             <el-select v-model="form.cno" placeholder="选择课程">
@@ -157,6 +169,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
+import { fetchAiQuestionDraft } from "../services/aiWeaknessService";
 
 const props = defineProps({
   teacherInfo: {
@@ -205,6 +218,7 @@ function createDefaultForm() {
 const form = reactive(createDefaultForm());
 const createdQuestionId = ref("");
 const submitting = ref(false);
+const aiGenerating = ref(false);
 const imageUploading = ref(false);
 const fileInputRef = ref(null);
 
@@ -226,6 +240,24 @@ const courseOptions = computed(() => {
 
 const currentTypeLabel = computed(() => {
   return questionTypeOptions.find((item) => item.value === form.questionType)?.label || "题目";
+});
+
+const selectedCourse = computed(() => {
+  return courseOptions.value.find((item) => item.cno === form.cno) || null;
+});
+
+const canUseAiDraft = computed(() => {
+  return Boolean(props.teacherInfo?.vip && props.teacherInfo?.canCreateExam);
+});
+
+const canGenerateAiDraft = computed(() => {
+  return Boolean(
+    normalize(props.teacherInfo?.eid) &&
+    normalize(form.cno) &&
+    normalize(form.questionType) &&
+    normalize(form.difficulty) &&
+    Number(form.points || 0) > 0
+  );
 });
 
 const imagePreviewSrc = computed(() => {
@@ -316,6 +348,51 @@ async function handleImageSelected(event) {
 function removeImage() {
   form.imagePath = "";
   form.imageMode = 1;
+}
+
+function fillDraftToForm(draft) {
+  form.stem = normalize(draft?.stem);
+
+  if (form.questionType === "CHOICE") {
+    const options = Array.isArray(draft?.options) ? draft.options.map(normalize).slice(0, 4) : [];
+    while (options.length < 4) {
+      options.push("");
+    }
+    form.options = options;
+
+    const answerKey = normalize(draft?.answerKey);
+    const answerIndex = options.findIndex((item) => item === answerKey);
+    form.choiceAnswerIndex = answerIndex >= 0 ? answerIndex : null;
+  } else if (form.questionType === "JUDGE") {
+    form.judgeAnswer = normalize(draft?.answerKey).toLowerCase() === "false" ? "false" : "true";
+  } else if (form.questionType === "BLANK") {
+    form.blankAnswer = normalize(draft?.answerKey);
+  }
+}
+
+async function generateAiDraft() {
+  if (!canGenerateAiDraft.value) {
+    ElMessage.warning("请先完成课程、题型、难度和分值四项基础信息");
+    return;
+  }
+
+  aiGenerating.value = true;
+  try {
+    const payload = await fetchAiQuestionDraft({
+      teacherEid: normalize(props.teacherInfo?.eid),
+      cno: form.cno,
+      courseName: normalize(selectedCourse.value?.cname),
+      questionType: form.questionType,
+      points: Number(form.points || 0),
+      difficulty: form.difficulty
+    });
+    fillDraftToForm(payload);
+    ElMessage.success("AI 已生成题目草稿，请审查后再写入题库");
+  } catch (error) {
+    ElMessage.error(error.message || "AI 出题失败");
+  } finally {
+    aiGenerating.value = false;
+  }
 }
 
 function buildPayload() {
@@ -446,6 +523,14 @@ function resetForm(keepCourse) {
 .problem-create-section {
   display: grid;
   gap: 14px;
+}
+
+.problem-create-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .problem-create-section__title {

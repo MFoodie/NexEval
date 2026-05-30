@@ -1,5 +1,7 @@
 package com.nexeval.controller;
 
+import com.nexeval.dto.QuestionAIDraftRequest;
+import com.nexeval.dto.QuestionAIDraftResponse;
 import com.nexeval.dto.QuestionCreateRequest;
 import com.nexeval.service.QuestionBankManagementService;
 import java.util.Map;
@@ -22,5 +24,10 @@ public class QuestionBankController {
   @PostMapping
   public ResponseEntity<Map<String, Object>> createQuestion(@RequestBody QuestionCreateRequest request) {
     return ResponseEntity.ok(questionBankManagementService.createQuestion(request));
+  }
+
+  @PostMapping("/ai-draft")
+  public ResponseEntity<QuestionAIDraftResponse> generateAiDraft(@RequestBody QuestionAIDraftRequest request) {
+    return ResponseEntity.ok(questionBankManagementService.generateAiDraft(request));
   }
 }

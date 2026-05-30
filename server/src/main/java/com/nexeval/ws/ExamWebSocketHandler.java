@@ -390,6 +390,13 @@ public class ExamWebSocketHandler extends TextWebSocketHandler {
             optionalInt(payload, "maxQuestions")
           );
           break;
+        case "GENERATE_CAT_KNOWLEDGE_INSIGHTS":
+          responsePayload = catExamService.generateCatKnowledgeInsights(
+            requireText(payload, "sessionId"),
+            optionalText(payload, "courseNo"),
+            optionalText(payload, "courseName")
+          );
+          break;
         default:
           throw new IllegalArgumentException("Unsupported action: " + action);
       }

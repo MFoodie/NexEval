@@ -10,6 +10,9 @@ import com.alibaba.dashscope.exception.ApiException;
 import com.alibaba.dashscope.exception.NoApiKeyException;
 import com.alibaba.dashscope.exception.UploadFileException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexeval.dto.CatKnowledgeInsightsResponse;
+import com.nexeval.dto.ExamAnswerDetailView;
+import com.nexeval.dto.QuestionAIDraftResponse;
 import com.nexeval.dto.WeaknessExplainRequest;
 import com.nexeval.dto.WeaknessExplainResponse;
 import com.nexeval.dto.WeaknessQuestionRequest;
@@ -76,6 +79,63 @@ public class AiWeaknessService {
     String prompt = buildExplainPrompt(request);
     String text = callDashscope(prompt, "你是错题解析助手，请输出简洁中文解析。", "AI 解析生成失败");
     return new WeaknessExplainResponse(text.trim());
+  }
+
+  public CatKnowledgeInsightsResponse generateCatKnowledgeInsights(
+    String courseNo,
+    String courseName,
+    List<ExamAnswerDetailView> answers
+  ) {
+    if (apiKey.isBlank()) {
+      throw new IllegalStateException("DashScope API Key 鏈厤缃?");
+    }
+
+    List<ExamAnswerDetailView> safeAnswers = answers == null ? List.of() : answers;
+    if (safeAnswers.isEmpty()) {
+      return new CatKnowledgeInsightsResponse(List.of(), List.of());
+    }
+
+    String prompt = buildCatKnowledgePrompt(courseNo, courseName, safeAnswers);
+    String rawText = callDashscope(
+      prompt,
+      "You are a CAT learning-diagnosis assistant. Infer concrete knowledge points and return strict JSON only.",
+      "AI CAT knowledge analysis failed"
+    );
+    String jsonText = extractJson(rawText);
+
+    try {
+      CatKnowledgeInsightsResponse payload = objectMapper.readValue(jsonText, CatKnowledgeInsightsResponse.class);
+      return sanitizeCatKnowledgeInsights(payload, safeAnswers);
+    } catch (IOException ex) {
+      throw new IllegalStateException("AI 杩斿洖涓嶆槸鏈夋晥 JSON");
+    }
+  }
+
+  public QuestionAIDraftResponse generateTeacherQuestionDraft(
+    String courseNo,
+    String courseName,
+    String questionType,
+    Integer points,
+    String difficulty
+  ) {
+    if (apiKey.isBlank()) {
+      throw new IllegalStateException("DashScope API Key unavailable");
+    }
+
+    String prompt = buildTeacherQuestionDraftPrompt(courseNo, courseName, questionType, points, difficulty);
+    String rawText = callDashscope(
+      prompt,
+      "You are a question-generation assistant for teachers. Return strict JSON only.",
+      "AI question draft generation failed"
+    );
+    String jsonText = extractJson(rawText);
+
+    try {
+      QuestionAIDraftResponse payload = objectMapper.readValue(jsonText, QuestionAIDraftResponse.class);
+      return sanitizeTeacherQuestionDraft(payload, questionType);
+    } catch (IOException ex) {
+      throw new IllegalStateException("AI question draft is not valid JSON");
+    }
   }
 
   private String callDashscope(String prompt, String systemRole, String errorMessage) {
@@ -170,6 +230,233 @@ public class AiWeaknessService {
     return builder.toString();
   }
 
+  private String buildCatKnowledgePrompt(
+    String courseNo,
+    String courseName,
+    List<ExamAnswerDetailView> answers
+  ) {
+    int total = answers.size();
+    long correctCount = answers.stream().filter(item -> Boolean.TRUE.equals(item.correct())).count();
+    long wrongCount = total - correctCount;
+    int correctRate = total == 0 ? 0 : (int) Math.round(correctCount * 100.0 / total);
+    StringBuilder builder = new StringBuilder();
+    builder.append("Analyze the following CAT answer history and infer concrete course knowledge points.\n");
+    builder.append("Course No: ").append(normalize(courseNo)).append('\n');
+    builder.append("Course Name: ").append(normalize(courseName)).append('\n');
+    builder.append("Answered: ").append(total).append('\n');
+    builder.append("Correct: ").append(correctCount).append('\n');
+    builder.append("Wrong: ").append(wrongCount).append('\n');
+    builder.append("Correct Rate: ").append(correctRate).append("%\n");
+    builder.append("Return JSON only in this format:\n");
+    builder.append("{\"masteryPoints\":[{\"point\":\"Point A\",\"score\":82}],\"weakPoints\":[\"Point B\"]}\n");
+    builder.append("Requirements:\n");
+    builder.append("1. point and weakPoints must be specific knowledge points, not question types like choice/judge/blank/essay.\n");
+    builder.append("2. masteryPoints should contain 2 to 4 items with integer score from 0 to 100.\n");
+    builder.append("3. weakPoints should contain 1 to 3 weak knowledge points for the current course.\n");
+    builder.append("4. Scores must reflect this specific attempt, especially current wrong answers and current correct rate.\n");
+    builder.append("5. Avoid fixed template scores such as 90,88,85,82 unless the current attempt truly supports them.\n");
+    builder.append("6. Return JSON only, with no markdown.\n");
+    builder.append("Wrong answer evidence:\n");
+
+    int wrongIndex = 0;
+    for (ExamAnswerDetailView item : answers) {
+      if (Boolean.TRUE.equals(item.correct())) {
+        continue;
+      }
+      wrongIndex += 1;
+      builder.append("W").append(wrongIndex)
+        .append(". stem=").append(compactText(item.stem(), 120))
+        .append("; userAnswer=").append(compactText(item.answerText(), 40))
+        .append("; correctAnswer=").append(compactText(item.correctAnswer(), 40))
+        .append('\n');
+    }
+
+    builder.append("Correct answer evidence:\n");
+
+    int limit = Math.min(answers.size(), 20);
+    for (int i = 0; i < limit; i++) {
+      ExamAnswerDetailView item = answers.get(i);
+      if (!Boolean.TRUE.equals(item.correct())) {
+        continue;
+      }
+      builder.append(i + 1)
+        .append(". stem=").append(compactText(item.stem(), 120))
+        .append("; correctAnswer=").append(compactText(item.correctAnswer(), 40))
+        .append('\n');
+    }
+
+    return builder.toString();
+  }
+
+  private String buildTeacherQuestionDraftPrompt(
+    String courseNo,
+    String courseName,
+    String questionType,
+    Integer points,
+    String difficulty
+  ) {
+    String normalizedType = normalize(questionType).toUpperCase();
+    StringBuilder builder = new StringBuilder();
+    builder.append("Generate one new exam question draft for a teacher.\n");
+    builder.append("Course No: ").append(normalize(courseNo)).append('\n');
+    builder.append("Course Name: ").append(normalize(courseName)).append('\n');
+    builder.append("Question Type: ").append(normalizedType).append('\n');
+    builder.append("Points: ").append(points == null ? 5 : points).append('\n');
+    builder.append("Difficulty: ").append(normalize(difficulty)).append('\n');
+    builder.append("Return JSON only in this format:\n");
+    builder.append("{\"type\":\"CHOICE\",\"stem\":\"...\",\"options\":[\"...\"],\"answerKey\":\"...\",\"standardAnswer\":\"\",\"scoringRubric\":\"\"}\n");
+    builder.append("Requirements:\n");
+    builder.append("1. The question must match the given course, difficulty, points, and question type.\n");
+    builder.append("2. CHOICE: provide exactly 4 options and one correct answer matching one option.\n");
+    builder.append("3. JUDGE: provide a stem and answerKey as true or false.\n");
+    builder.append("4. BLANK: provide a stem and a concise answerKey.\n");
+    builder.append("5. ESSAY: provide a stem only; answerKey can be empty.\n");
+    builder.append("6. No markdown, no explanation, JSON only.\n");
+    return builder.toString();
+  }
+
+  private CatKnowledgeInsightsResponse sanitizeCatKnowledgeInsights(
+    CatKnowledgeInsightsResponse payload,
+    List<ExamAnswerDetailView> answers
+  ) {
+    if (payload == null) {
+      return new CatKnowledgeInsightsResponse(List.of(), List.of());
+    }
+
+    List<CatKnowledgeInsightsResponse.MasteryPoint> masteryPoints = new java.util.ArrayList<>();
+    java.util.Set<String> masterySeen = new java.util.LinkedHashSet<>();
+    List<CatKnowledgeInsightsResponse.MasteryPoint> rawMastery =
+      payload.masteryPoints() == null ? List.of() : payload.masteryPoints();
+
+    for (CatKnowledgeInsightsResponse.MasteryPoint item : rawMastery) {
+      String point = normalize(item == null ? null : item.point());
+      if (point.isBlank() || !masterySeen.add(point)) {
+        continue;
+      }
+      masteryPoints.add(new CatKnowledgeInsightsResponse.MasteryPoint(
+        point,
+        clampScore(item == null ? null : item.score())
+      ));
+      if (masteryPoints.size() >= 4) {
+        break;
+      }
+    }
+
+    masteryPoints.sort((left, right) -> Integer.compare(
+      clampScore(right == null ? null : right.score()),
+      clampScore(left == null ? null : left.score())
+    ));
+    masteryPoints = calibrateMasteryScores(masteryPoints, answers);
+
+    List<String> weakPoints = new java.util.ArrayList<>();
+    java.util.Set<String> weakSeen = new java.util.LinkedHashSet<>();
+    List<String> rawWeakPoints = payload.weakPoints() == null ? List.of() : payload.weakPoints();
+    for (String item : rawWeakPoints) {
+      String point = normalize(item);
+      if (point.isBlank() || !weakSeen.add(point)) {
+        continue;
+      }
+      weakPoints.add(point);
+      if (weakPoints.size() >= 3) {
+        break;
+      }
+    }
+
+    return new CatKnowledgeInsightsResponse(masteryPoints, weakPoints);
+  }
+
+  private QuestionAIDraftResponse sanitizeTeacherQuestionDraft(QuestionAIDraftResponse payload, String questionType) {
+    if (payload == null) {
+      throw new IllegalStateException("AI did not return a question draft");
+    }
+
+    String normalizedType = normalize(questionType).toUpperCase();
+    String stem = normalize(payload.stem());
+    if (stem.isBlank()) {
+      throw new IllegalStateException("AI returned an empty stem");
+    }
+
+    return switch (normalizedType) {
+      case "CHOICE" -> sanitizeChoiceDraft(payload, stem);
+      case "JUDGE" -> sanitizeJudgeDraft(payload, stem);
+      case "BLANK" -> sanitizeBlankDraft(payload, stem);
+      case "ESSAY" -> new QuestionAIDraftResponse("ESSAY", stem, List.of(), "", "", "");
+      default -> throw new IllegalArgumentException("Unsupported question type");
+    };
+  }
+
+  private QuestionAIDraftResponse sanitizeChoiceDraft(QuestionAIDraftResponse payload, String stem) {
+    List<String> options = (payload.options() == null ? List.<String>of() : payload.options())
+      .stream()
+      .map(this::normalize)
+      .filter(text -> !text.isBlank())
+      .limit(4)
+      .toList();
+    if (options.size() != 4) {
+      throw new IllegalStateException("AI choice draft must contain exactly 4 options");
+    }
+
+    String answerKey = normalize(payload.answerKey());
+    if (answerKey.length() == 1) {
+      int index = Character.toUpperCase(answerKey.charAt(0)) - 'A';
+      if (index >= 0 && index < options.size()) {
+        answerKey = options.get(index);
+      }
+    }
+    if (!options.contains(answerKey)) {
+      throw new IllegalStateException("AI choice draft answer does not match options");
+    }
+
+    return new QuestionAIDraftResponse("CHOICE", stem, options, answerKey, "", "");
+  }
+
+  private QuestionAIDraftResponse sanitizeJudgeDraft(QuestionAIDraftResponse payload, String stem) {
+    String answerKey = normalize(payload.answerKey()).toLowerCase();
+    if (!answerKey.equals("true") && !answerKey.equals("false")) {
+      if (answerKey.equals("正确")) {
+        answerKey = "true";
+      } else if (answerKey.equals("错误")) {
+        answerKey = "false";
+      } else {
+        throw new IllegalStateException("AI judge draft answer must be true or false");
+      }
+    }
+
+    return new QuestionAIDraftResponse("JUDGE", stem, List.of("true", "false"), answerKey, "", "");
+  }
+
+  private QuestionAIDraftResponse sanitizeBlankDraft(QuestionAIDraftResponse payload, String stem) {
+    String answerKey = normalize(payload.answerKey());
+    if (answerKey.isBlank()) {
+      throw new IllegalStateException("AI blank draft answer cannot be empty");
+    }
+    return new QuestionAIDraftResponse("BLANK", stem, List.of(), answerKey, "", "");
+  }
+
+  private List<CatKnowledgeInsightsResponse.MasteryPoint> calibrateMasteryScores(
+    List<CatKnowledgeInsightsResponse.MasteryPoint> points,
+    List<ExamAnswerDetailView> answers
+  ) {
+    if (points == null || points.isEmpty()) {
+      return List.of();
+    }
+
+    int total = answers == null ? 0 : answers.size();
+    long correctCount = answers == null ? 0 : answers.stream().filter(item -> Boolean.TRUE.equals(item.correct())).count();
+    int baseScore = total == 0 ? 60 : (int) Math.round(correctCount * 100.0 / total);
+    int spread = Math.min(18, Math.max(8, total == 0 ? 8 : (int) Math.round((1 - correctCount * 1.0 / total) * 20)));
+
+    List<CatKnowledgeInsightsResponse.MasteryPoint> calibrated = new java.util.ArrayList<>();
+    for (int i = 0; i < points.size(); i++) {
+      CatKnowledgeInsightsResponse.MasteryPoint item = points.get(i);
+      int aiScore = clampScore(item == null ? null : item.score());
+      int target = clampScore(baseScore + spread / 2 - i * Math.max(4, spread / 3));
+      int finalScore = clampScore((int) Math.round(aiScore * 0.35 + target * 0.65));
+      calibrated.add(new CatKnowledgeInsightsResponse.MasteryPoint(item.point(), finalScore));
+    }
+    return calibrated;
+  }
+
   private String extractText(MultiModalConversationResult result) {
     if (result == null || result.getOutput() == null) {
       throw new IllegalStateException("AI 返回为空");
@@ -215,5 +502,20 @@ public class AiWeaknessService {
 
   private String normalize(String value) {
     return value == null ? "" : value.trim();
+  }
+
+  private String compactText(String value, int maxLength) {
+    String text = normalize(value).replace('\n', ' ').replace('\r', ' ');
+    if (text.length() <= maxLength) {
+      return text;
+    }
+    return text.substring(0, Math.max(0, maxLength - 3)) + "...";
+  }
+
+  private Integer clampScore(Integer score) {
+    if (score == null) {
+      return 0;
+    }
+    return Math.max(0, Math.min(100, score));
   }
 }

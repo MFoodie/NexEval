@@ -1,5 +1,7 @@
 package com.nexeval.service;
 
+import com.nexeval.dto.QuestionAIDraftRequest;
+import com.nexeval.dto.QuestionAIDraftResponse;
 import com.nexeval.dto.QuestionCreateRequest;
 import com.nexeval.model.BlankQuestionBank;
 import com.nexeval.model.EssayQuestionBank;
@@ -36,6 +38,7 @@ public class QuestionBankManagementService {
   private final BlankQuestionBankRepository blankQuestionBankRepository;
   private final EssayQuestionBankRepository essayQuestionBankRepository;
   private final JudgeQuestionMediaRepository judgeQuestionMediaRepository;
+  private final AiWeaknessService aiWeaknessService;
 
   public QuestionBankManagementService(
     TeacherProfileRepository teacherProfileRepository,
@@ -44,7 +47,8 @@ public class QuestionBankManagementService {
     JudgeQuestionBankRepository judgeQuestionBankRepository,
     BlankQuestionBankRepository blankQuestionBankRepository,
     EssayQuestionBankRepository essayQuestionBankRepository,
-    JudgeQuestionMediaRepository judgeQuestionMediaRepository
+    JudgeQuestionMediaRepository judgeQuestionMediaRepository,
+    AiWeaknessService aiWeaknessService
   ) {
     this.teacherProfileRepository = teacherProfileRepository;
     this.teachingClassRepository = teachingClassRepository;
@@ -53,28 +57,18 @@ public class QuestionBankManagementService {
     this.blankQuestionBankRepository = blankQuestionBankRepository;
     this.essayQuestionBankRepository = essayQuestionBankRepository;
     this.judgeQuestionMediaRepository = judgeQuestionMediaRepository;
+    this.aiWeaknessService = aiWeaknessService;
   }
 
   @Transactional
   public Map<String, Object> createQuestion(QuestionCreateRequest request) {
     if (request == null) {
-      throw new IllegalArgumentException("请求体不能为空");
+      throw new IllegalArgumentException("request cannot be null");
     }
 
     String teacherEid = required(request.teacherEid(), "teacherEid");
-    var teacherProfile = teacherProfileRepository.findFirstByEid(teacherEid)
-      .orElseThrow(() -> new IllegalArgumentException("教师工号不存在"));
-    if (!teacherProfile.isCanCreateExam()) {
-      throw new IllegalArgumentException("当前教师没有出题权限");
-    }
-
     String courseNo = required(request.cno(), "cno");
-    boolean teachesCourse = teachingClassRepository.findTeacherClasses(teacherEid)
-      .stream()
-      .anyMatch(item -> courseNo.equals(item.getCno()));
-    if (!teachesCourse) {
-      throw new IllegalArgumentException("只能为本人教学班对应课程新增题目");
-    }
+    validateTeacherCoursePermission(teacherEid, courseNo, false);
 
     QuestionType questionType = parseQuestionType(request.questionType());
     String questionId = UUID.randomUUID().toString().replace("-", "");
@@ -132,15 +126,33 @@ public class QuestionBankManagementService {
         request.standardAnswer(),
         request.scoringRubric()
       );
-      default -> throw new IllegalArgumentException("不支持的题型");
+      default -> throw new IllegalArgumentException("unsupported question type");
     }
 
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("questionId", questionId);
     result.put("questionType", questionType.name());
     result.put("cno", courseNo);
-    result.put("message", "题目新增成功");
+    result.put("message", "Question created successfully");
     return result;
+  }
+
+  public QuestionAIDraftResponse generateAiDraft(QuestionAIDraftRequest request) {
+    if (request == null) {
+      throw new IllegalArgumentException("request cannot be null");
+    }
+
+    String teacherEid = required(request.teacherEid(), "teacherEid");
+    String courseNo = required(request.cno(), "cno");
+    validateTeacherCoursePermission(teacherEid, courseNo, true);
+
+    return aiWeaknessService.generateTeacherQuestionDraft(
+      courseNo,
+      normalize(request.courseName()),
+      required(request.questionType(), "questionType"),
+      request.points(),
+      required(request.difficulty(), "difficulty")
+    );
   }
 
   private void createChoiceQuestion(
@@ -157,12 +169,12 @@ public class QuestionBankManagementService {
   ) {
     List<String> options = normalizeOptions(rawOptions);
     if (options.size() < 2) {
-      throw new IllegalArgumentException("选择题至少需要两个选项");
+      throw new IllegalArgumentException("choice questions require at least 2 options");
     }
 
     String answerKey = required(rawAnswerKey, "answerKey");
     if (!options.contains(answerKey)) {
-      throw new IllegalArgumentException("选择题答案必须命中现有选项");
+      throw new IllegalArgumentException("choice answer must match one existing option");
     }
 
     QuestionBank question = new QuestionBank();
@@ -221,7 +233,7 @@ public class QuestionBankManagementService {
         media.setImageMode(imageMode);
         judgeQuestionMediaRepository.save(media);
       } catch (DataAccessException ex) {
-        throw new IllegalArgumentException("判断题图片保存失败，请先执行 judge_question_media 建表脚本");
+        throw new IllegalArgumentException("failed to save judge question image");
       }
     }
   }
@@ -288,7 +300,7 @@ public class QuestionBankManagementService {
     try {
       return QuestionType.valueOf(normalized);
     } catch (IllegalArgumentException ex) {
-      throw new IllegalArgumentException("题型不合法");
+      throw new IllegalArgumentException("invalid question type");
     }
   }
 
@@ -309,14 +321,14 @@ public class QuestionBankManagementService {
     return switch (normalized) {
       case "true", "1", "yes", "y", "正确" -> true;
       case "false", "0", "no", "n", "错误" -> false;
-      default -> throw new IllegalArgumentException("判断题答案只能是正确或错误");
+      default -> throw new IllegalArgumentException("judge answer must be true or false");
     };
   }
 
   private int normalizePoints(Integer rawPoints) {
     int points = rawPoints == null ? 5 : rawPoints;
     if (points <= 0 || points > 100) {
-      throw new IllegalArgumentException("分值必须在 1 到 100 之间");
+      throw new IllegalArgumentException("points must be between 1 and 100");
     }
     return points;
   }
@@ -326,7 +338,7 @@ public class QuestionBankManagementService {
       case "easy" -> 1.5;
       case "medium" -> 3.0;
       case "hard" -> 4.5;
-      default -> throw new IllegalArgumentException("难度必须是 easy、medium 或 hard");
+      default -> throw new IllegalArgumentException("difficulty must be easy, medium, or hard");
     };
   }
 
@@ -346,7 +358,7 @@ public class QuestionBankManagementService {
       return null;
     }
     if (!imagePath.startsWith("/question-images/")) {
-      throw new IllegalArgumentException("题目图片路径不合法");
+      throw new IllegalArgumentException("invalid question image path");
     }
     return imagePath;
   }
@@ -357,15 +369,33 @@ public class QuestionBankManagementService {
     }
     BigDecimal normalized = rawImageMode.setScale(2, RoundingMode.HALF_UP);
     if (normalized.compareTo(new BigDecimal("0.10")) < 0 || normalized.compareTo(BigDecimal.ONE) > 0) {
-      throw new IllegalArgumentException("图片缩放比例必须在 0.10 到 1.00 之间");
+      throw new IllegalArgumentException("image scale must be between 0.10 and 1.00");
     }
     return normalized;
+  }
+
+  private void validateTeacherCoursePermission(String teacherEid, String courseNo, boolean requireVip) {
+    var teacherProfile = teacherProfileRepository.findFirstByEid(teacherEid)
+      .orElseThrow(() -> new IllegalArgumentException("teacher not found"));
+    if (!teacherProfile.isCanCreateExam()) {
+      throw new IllegalArgumentException("current teacher has no question-creation permission");
+    }
+    if (requireVip && !teacherProfile.isVip()) {
+      throw new IllegalArgumentException("AI question drafting requires VIP permission");
+    }
+
+    boolean teachesCourse = teachingClassRepository.findTeacherClasses(teacherEid)
+      .stream()
+      .anyMatch(item -> courseNo.equals(item.getCno()));
+    if (!teachesCourse) {
+      throw new IllegalArgumentException("question operations are limited to your own courses");
+    }
   }
 
   private String required(String value, String fieldName) {
     String text = normalize(value);
     if (text.isBlank()) {
-      throw new IllegalArgumentException(fieldName + " 不能为空");
+      throw new IllegalArgumentException(fieldName + " cannot be blank");
     }
     return text;
   }

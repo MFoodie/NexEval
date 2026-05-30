@@ -69,21 +69,28 @@
 
                 <section class="report-grid">
                   <div class="report-card">
-                    <h4 class="report-section-title">核心技能掌握度分级</h4>
-                    <div class="skill-list">
-                      <div class="skill-row">
-                        <div class="skill-label-row"><span>指令系统</span><span>85%</span></div>
-                        <div class="skill-track"><div class="skill-fill" style="background:#111111;width:85%"></div></div>
-                      </div>
-                      <div class="skill-row">
-                        <div class="skill-label-row"><span>存储体系</span><span>60%</span></div>
-                        <div class="skill-track"><div class="skill-fill" style="background:#9ca3af;width:60%"></div></div>
-                      </div>
-                      <div class="skill-row">
-                        <div class="skill-label-row"><span>I/O 接口</span><span>21%</span></div>
-                        <div class="skill-track"><div class="skill-fill" style="background:#CF7357;width:21%"></div></div>
+                    <h4 class="report-section-title">核心知识点掌握度</h4>
+                    <div v-if="knowledgeMasteryRows.length" class="skill-list">
+                      <div
+                        v-for="item in knowledgeMasteryRows"
+                        :key="item.key"
+                        class="skill-row"
+                      >
+                        <div class="skill-label-row">
+                          <span>{{ item.label }}</span>
+                          <span>{{ item.percent }}%</span>
+                        </div>
+                        <div class="skill-track">
+                          <div
+                            class="skill-fill"
+                            :style="{ background: item.color, width: `${item.percent}%` }"
+                          ></div>
+                        </div>
                       </div>
                     </div>
+                    <p v-else-if="knowledgeInsightsLoading" class="report-empty">AI 正在识别本次练习涉及的核心知识点...</p>
+                    <p v-else-if="knowledgeInsightsReady" class="report-empty">暂未生成可展示的知识点掌握度。</p>
+                    <p v-else class="report-empty">系统正在准备知识点评估。</p>
                   </div>
 
                   <div class="report-card">
@@ -97,15 +104,14 @@
 
                 <section class="report-card">
                   <h4 class="report-section-title">答题详情与薄弱知识点聚类</h4>
-                  <div>
-                    <span
-                      v-for="tag in weakKnowledgeTags"
-                      :key="tag"
-                      class="report-tag"
-                    >
+                  <div v-if="weakKnowledgeTags.length">
+                    <span v-for="tag in weakKnowledgeTags" :key="tag" class="report-tag">
                       {{ tag }}
                     </span>
                   </div>
+                  <p v-else-if="knowledgeInsightsLoading" class="report-empty">AI 正在分析薄弱知识点...</p>
+                  <p v-else-if="knowledgeInsightsReady" class="report-empty">暂未识别出明确的薄弱知识点。</p>
+                  <p v-else class="report-empty">系统正在准备薄弱知识点分析。</p>
                   <div class="report-answer-grid">
                     <button
                       v-for="item in answerGrid"
@@ -303,6 +309,10 @@ const reportGenerated = ref(false);
 const reportContent = ref("");
 const reportError = ref("");
 const attemptAnswers = ref([]);
+const knowledgeInsightsLoading = ref(false);
+const knowledgeInsightsReady = ref(false);
+const knowledgeMasteryRows = ref([]);
+const weakKnowledgeTags = ref([]);
 const reviewDialogVisible = ref(false);
 const selectedReviewIndex = ref(-1);
 
@@ -315,6 +325,7 @@ const reportTrajectoryChart = shallowRef(null);
 const growthPoints = ref([]);
 let wsClient = null;
 let reportTypingToken = 0;
+const knowledgeBarColors = ["#111111", "#63000F", "#B3001C", "#ff0000"];
 
 const typeLabels = {
   choice: "选择题",
@@ -385,22 +396,16 @@ const currentKnowledgePoints = computed(() => {
 
 const growthXAxis = computed(() => growthPoints.value.map(item => `第${item.questionNo}题`));
 const growthSeries = computed(() => growthPoints.value.map(item => item.score));
-const reportTrajectoryXAxis = computed(() => answerGrid.value.map(item => `第${item.no}题`));
-const reportTrajectorySeries = computed(() => answerGrid.value.map(item => (item.correct ? 1 : 0)));
-const weakKnowledgeTags = [
-  "DMA控制方式（高频错题）",
-  "Cache命中率计算"
-];
 const answerGrid = computed(() => {
-  const total = Number(maxQuestions.value) || attemptAnswers.value.length || 0;
-  return Array.from({ length: total }, (_, index) => {
-    const answer = attemptAnswers.value[index];
+  return attemptAnswers.value.filter(Boolean).map((answer, index) => {
     return {
       no: index + 1,
       correct: answer?.correct === true
     };
   });
 });
+const reportTrajectoryXAxis = computed(() => answerGrid.value.map(item => `第${item.no}题`));
+const reportTrajectorySeries = computed(() => answerGrid.value.map(item => (item.correct ? 1 : 0)));
 const selectedReviewAnswer = computed(() => {
   if (selectedReviewIndex.value < 0) {
     return null;
@@ -447,11 +452,77 @@ const questionImageStyle = computed(() => {
   };
 });
 
-function formatOptionText(option) {
-  if (currentQuestion.value?.type === "judge") {
+function formatOptionText(option, type = currentQuestion.value?.type) {
+  if (type === "judge") {
     return option === "true" ? "正确" : "错误";
   }
   return option;
+}
+
+function clampInsightPercent(value) {
+  const percent = Number(value);
+  if (!Number.isFinite(percent)) {
+    return 0;
+  }
+  return Math.min(100, Math.max(0, Math.round(percent)));
+}
+
+function buildAiMasteryRows(items) {
+  const rows = [];
+  const seen = new Set();
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const label = String(item?.point || item?.label || "").trim();
+    if (!label || seen.has(label)) {
+      continue;
+    }
+    const percent = clampInsightPercent(item?.score);
+    rows.push({
+      key: label,
+      label,
+      percent
+    });
+    seen.add(label);
+    if (rows.length >= 4) {
+      break;
+    }
+  }
+
+  let colorIndex = -1;
+  let lastPercent = null;
+
+  return rows
+    .sort((left, right) => right.percent - left.percent)
+    .map((item) => {
+      if (item.percent !== lastPercent) {
+        colorIndex += 1;
+        lastPercent = item.percent;
+      }
+
+      return {
+        ...item,
+        color: knowledgeBarColors[Math.min(colorIndex, knowledgeBarColors.length - 1)]
+      };
+    });
+}
+
+function buildAiWeakKnowledgeTags(items) {
+  const tags = [];
+  const seen = new Set();
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const label = String(item || "").trim();
+    if (!label || seen.has(label)) {
+      continue;
+    }
+    tags.push(label);
+    seen.add(label);
+    if (tags.length >= 3) {
+      break;
+    }
+  }
+
+  return tags;
 }
 
 function formatReviewAnswer(answer) {
@@ -717,6 +788,71 @@ function handleChartResize() {
   reportTrajectoryChart.value?.resize();
 }
 
+function disposeReportTrajectoryChart() {
+  reportTrajectoryChart.value?.dispose();
+  reportTrajectoryChart.value = null;
+}
+
+function disconnectWebSocket() {
+  wsClient?.close();
+  wsClient = null;
+}
+
+function resetSessionState() {
+  reportTypingToken += 1;
+  loading.value = false;
+  submitting.value = false;
+  answeredCount.value = 0;
+  maxQuestions.value = 20;
+  theta.value = 0;
+  standardError.value = 9.99;
+  finished.value = false;
+  reportGenerating.value = false;
+  reportGenerated.value = false;
+  reportContent.value = "";
+  reportError.value = "";
+  attemptAnswers.value = [];
+  knowledgeInsightsLoading.value = false;
+  knowledgeInsightsReady.value = false;
+  knowledgeMasteryRows.value = [];
+  weakKnowledgeTags.value = [];
+  reviewDialogVisible.value = false;
+  selectedReviewIndex.value = -1;
+  currentQuestion.value = null;
+  answerValue.value = "";
+  growthPoints.value = [];
+  disposeReportTrajectoryChart();
+  updateGrowthChart();
+}
+
+async function loadCatKnowledgeInsights(silent = true) {
+  if (!wsClient || !wsClient.isOpen()) {
+    return;
+  }
+
+  knowledgeInsightsLoading.value = true;
+  knowledgeInsightsReady.value = false;
+
+  try {
+    const payload = await wsClient.request("GENERATE_CAT_KNOWLEDGE_INSIGHTS", {
+      sessionId: sessionId.value,
+      courseNo: courseNoText.value,
+      courseName: courseNameText.value || courseTitle.value
+    }, 20000);
+    knowledgeMasteryRows.value = buildAiMasteryRows(payload?.masteryPoints);
+    weakKnowledgeTags.value = buildAiWeakKnowledgeTags(payload?.weakPoints);
+  } catch (error) {
+    knowledgeMasteryRows.value = [];
+    weakKnowledgeTags.value = [];
+    if (!silent) {
+      ElMessage.warning(error.message || "知识点分析生成失败。");
+    }
+  } finally {
+    knowledgeInsightsLoading.value = false;
+    knowledgeInsightsReady.value = true;
+  }
+}
+
 async function loadAttemptAnswers() {
   if (!wsClient || !wsClient.isOpen()) {
     return;
@@ -894,11 +1030,11 @@ function handleStartWeaknessTraining() {
 }
 
 function connectWebSocket() {
+  disconnectWebSocket();
   wsClient = createExamSocket(null, {
     onOpen() {
       loadSessionState().then(() => {
         if (finished.value) {
-          loadAttemptAnswers();
           return;
         }
         loadNextQuestion();
@@ -910,7 +1046,6 @@ function connectWebSocket() {
   });
 }
 
-onMounted(connectWebSocket);
 onMounted(() => {
   nextTick(() => {
     initGrowthChart();
@@ -927,16 +1062,32 @@ watch(growthPoints, () => {
   updateGrowthChart();
 }, { deep: true });
 
-watch([answerGrid, finished], async () => {
-  if (finished.value) {
-    currentQuestion.value = null;
-    await loadAttemptAnswers();
-    nextTick(() => {
-      initReportTrajectoryChart();
-      updateReportTrajectoryChart();
-    });
+watch(() => String(sessionId.value || ""), (newSessionId, oldSessionId) => {
+  if (!newSessionId || newSessionId === oldSessionId) {
     return;
   }
+  resetSessionState();
+  connectWebSocket();
+}, { immediate: true });
+
+watch(finished, async (isFinished) => {
+  if (isFinished) {
+    currentQuestion.value = null;
+    await loadAttemptAnswers();
+    await loadCatKnowledgeInsights(true);
+    return;
+  }
+  disposeReportTrajectoryChart();
+});
+
+watch(answerGrid, () => {
+  if (!finished.value) {
+    return;
+  }
+  nextTick(() => {
+    initReportTrajectoryChart();
+    updateReportTrajectoryChart();
+  });
 }, { deep: true });
 
 onBeforeUnmount(() => {
@@ -944,9 +1095,8 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", handleChartResize);
   growthChart.value?.dispose();
   growthChart.value = null;
-  reportTrajectoryChart.value?.dispose();
-  reportTrajectoryChart.value = null;
-  wsClient?.close();
+  disposeReportTrajectoryChart();
+  disconnectWebSocket();
 });
 </script>
 
@@ -1330,6 +1480,13 @@ onBeforeUnmount(() => {
 .skill-fill {
   height: 100%;
   border-radius: 999px;
+}
+
+.report-empty {
+  margin: 0;
+  font-size: 13px;
+  color: #9ca3af;
+  line-height: 1.7;
 }
 
 /* ── 薄弱知识点标签 ── */
