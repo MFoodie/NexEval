@@ -49,6 +49,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false
       },
+      "/api/ai": {
+        target: "https://localhost:8443",
+        changeOrigin: true,
+        secure: false
+      },
       "/api/password-reset": {
         target: "https://localhost:8443",
         changeOrigin: true,

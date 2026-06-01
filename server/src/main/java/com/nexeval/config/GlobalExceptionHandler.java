@@ -12,4 +12,9 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ApiResponse> handleBadRequest(IllegalArgumentException ex) {
     return ResponseEntity.badRequest().body(new ApiResponse(false, ex.getMessage()));
   }
+
+  @ExceptionHandler(IllegalStateException.class)
+  public ResponseEntity<ApiResponse> handleIllegalState(IllegalStateException ex) {
+    return ResponseEntity.internalServerError().body(new ApiResponse(false, ex.getMessage()));
+  }
 }

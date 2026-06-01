@@ -31,7 +31,7 @@
           <template v-else>
             <div
               v-if="finished"
-              class="report-wrapper max-w-4xl mx-auto p-6 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-10"
+              class="report-wrapper"
             >
                 <section class="report-ai-section">
                   <div class="report-badge">
@@ -577,6 +577,10 @@ function normalizeImageSrc(path) {
 }
 
 function buildGrowthChartOption() {
+  if (finished.value && reportTrajectorySeries.value.length) {
+    return buildMiniTrajectoryOption();
+  }
+
   return {
     animationDuration: 700,
     animationDurationUpdate: 700,
@@ -647,6 +651,92 @@ function buildGrowthChartOption() {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: "rgba(17, 17, 17, 0.26)" },
             { offset: 1, color: "rgba(17, 17, 17, 0.04)" }
+          ])
+        }
+      }
+    ]
+  };
+}
+
+function buildMiniTrajectoryOption() {
+  const dark = document.documentElement.getAttribute("data-theme") === "dark";
+  const axisColor = dark ? "rgba(176, 184, 195, 0.28)" : "rgba(111, 102, 89, 0.4)";
+  const splitColor = dark ? "rgba(176, 184, 195, 0.12)" : "rgba(111, 102, 89, 0.16)";
+  const labelColor = dark ? "#b0b8c3" : "#6f6659";
+  const lineColor = dark ? "#f0b35b" : "#111111";
+  const borderColor = dark ? "#14171c" : "#ffffff";
+  const areaTop = dark ? "rgba(240, 179, 91, 0.22)" : "rgba(17, 17, 17, 0.26)";
+  const areaBottom = dark ? "rgba(240, 179, 91, 0.02)" : "rgba(17, 17, 17, 0.04)";
+
+  return {
+    animationDuration: 700,
+    animationDurationUpdate: 700,
+    animationEasing: "cubicOut",
+    animationEasingUpdate: "cubicOut",
+    grid: {
+      left: 26,
+      right: 14,
+      top: 12,
+      bottom: 18
+    },
+    tooltip: {
+      trigger: "item",
+      formatter: (params) => `第 ${params.dataIndex + 1} 题`
+    },
+    xAxis: {
+      type: "category",
+      boundaryGap: false,
+      data: reportTrajectoryXAxis.value,
+      axisLabel: {
+        show: false
+      },
+      axisLine: {
+        lineStyle: {
+          color: axisColor
+        }
+      },
+      axisTick: {
+        show: false
+      }
+    },
+    yAxis: {
+      type: "value",
+      min: 0,
+      max: 1,
+      interval: 1,
+      axisLabel: {
+        show: false
+      },
+      axisLine: {
+        show: false
+      },
+      splitLine: {
+        lineStyle: {
+          color: splitColor
+        }
+      }
+    },
+    series: [
+      {
+        name: "正确性",
+        type: "line",
+        smooth: true,
+        symbol: "circle",
+        symbolSize: 5,
+        data: reportTrajectorySeries.value,
+        lineStyle: {
+          width: 2.5,
+          color: lineColor
+        },
+        itemStyle: {
+          color: lineColor,
+          borderColor,
+          borderWidth: 2
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: areaTop },
+            { offset: 1, color: areaBottom }
           ])
         }
       }
@@ -1020,11 +1110,26 @@ function handleReviewQuestion(item) {
 }
 
 function handleStartWeaknessTraining() {
+  const trainingKey = `cat-weakness-${Date.now()}`;
+  const payload = {
+    weakPoints: weakKnowledgeTags.value,
+    wrongAnswers: attemptAnswers.value
+      .filter(item => item && item.correct !== true)
+      .map(item => ({
+        id: item.questionId || item.answerId || "",
+        stem: item.stem || "",
+        correct: item.correct === true,
+        userAnswer: item.answerText || "",
+        correctAnswer: item.correctAnswer || ""
+      }))
+  };
+  window.sessionStorage.setItem(trainingKey, JSON.stringify(payload));
   router.push({
     name: "cat-weakness",
     query: {
       courseNo: courseNoText.value,
-      courseName: courseNameText.value
+      courseName: courseNameText.value,
+      trainingKey
     }
   });
 }
@@ -1087,6 +1192,7 @@ watch(answerGrid, () => {
   nextTick(() => {
     initReportTrajectoryChart();
     updateReportTrajectoryChart();
+    updateGrowthChart();
   });
 }, { deep: true });
 
@@ -1333,12 +1439,17 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 36px;
+  border-radius: 24px;
+  border: 1px solid var(--ne-border);
+  background: var(--ne-surface);
+  box-shadow: var(--ne-shadow-soft);
+  padding: 24px;
 }
 
 /* ── 第一块：AI 智能评估简报 ── */
 .report-ai-section {
-  background: #FDFCF8;
-  border: 1px solid rgba(207, 115, 87, 0.18);
+  background: rgba(var(--ne-primary-rgb), 0.04);
+  border: 1px solid rgba(var(--ne-primary-rgb), 0.14);
   border-radius: 12px;
   padding: 20px;
 }
@@ -1348,15 +1459,15 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 3px 12px;
   border-radius: 999px;
-  background: rgba(207, 115, 87, 0.12);
-  color: #CF7357;
+  background: rgba(var(--ne-primary-rgb), 0.12);
+  color: var(--ne-primary);
   font-size: 12px;
   font-weight: 600;
   margin-bottom: 16px;
 }
 
 .report-ai-inner {
-  border-left: 3px solid #CF7357;
+  border-left: 3px solid var(--ne-primary);
   padding-left: 14px;
 }
 
@@ -1373,7 +1484,7 @@ onBeforeUnmount(() => {
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.01em;
-  color: #111111;
+  color: var(--ne-text-strong);
 }
 
 .report-main-subtitle {
@@ -1381,22 +1492,22 @@ onBeforeUnmount(() => {
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #9ca3af;
+  color: var(--ne-text-subtle);
 }
 
 .report-content-box {
   margin-top: 14px;
   min-height: 132px;
   border-radius: 8px;
-  border: 1px solid rgba(207, 115, 87, 0.12);
-  background: #ffffff;
+  border: 1px solid rgba(var(--ne-primary-rgb), 0.12);
+  background: rgba(var(--ne-primary-rgb), 0.02);
   padding: 12px 16px;
 }
 
 /* ── AI 内容文字 ── */
 .report-content-text {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--ne-text);
   line-height: 1.95;
   letter-spacing: 0.01em;
   white-space: pre-wrap;
@@ -1405,7 +1516,7 @@ onBeforeUnmount(() => {
 
 .report-content-placeholder {
   font-size: 13px;
-  color: #b0b7c3;
+  color: var(--ne-text-muted);
   line-height: 1.7;
   margin: 0;
 }
@@ -1425,14 +1536,14 @@ onBeforeUnmount(() => {
 
 .report-card {
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
+  border: 1px solid var(--ne-border);
+  background: rgba(var(--ne-primary-rgb), 0.02);
   padding: 24px;
 }
 
 .report-card-desc {
   font-size: 13px;
-  color: #9ca3af;
+  color: var(--ne-text-muted);
   margin: 0 0 12px;
   line-height: 1.6;
 }
@@ -1466,14 +1577,14 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   font-size: 13px;
   font-weight: 500;
-  color: #374151;
+  color: var(--ne-text);
 }
 
 .skill-track {
   width: 100%;
   height: 7px;
   border-radius: 999px;
-  background: #f3f4f6;
+  background: rgba(var(--ne-primary-rgb), 0.08);
   overflow: hidden;
 }
 
@@ -1485,7 +1596,7 @@ onBeforeUnmount(() => {
 .report-empty {
   margin: 0;
   font-size: 13px;
-  color: #9ca3af;
+  color: var(--ne-text-muted);
   line-height: 1.7;
 }
 
@@ -1494,11 +1605,11 @@ onBeforeUnmount(() => {
   display: inline-block;
   font-size: 11px;
   font-family: monospace;
-  background: #fff1f2;
-  color: #e11d48;
+  background: rgba(var(--ne-primary-rgb), 0.1);
+  color: var(--ne-primary);
   padding: 3px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(225, 29, 72, 0.15);
+  border: 1px solid rgba(var(--ne-primary-rgb), 0.18);
   margin-right: 6px;
   margin-bottom: 6px;
 }
@@ -1544,22 +1655,22 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 12px;
   padding-top: 24px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--ne-border);
   flex-wrap: wrap;
 }
 
 .report-btn-secondary {
   padding: 8px 16px;
   font-size: 13px;
-  color: #6b7280;
-  border: 1px solid #d1d5db;
+  color: var(--ne-text-muted);
+  border: 1px solid var(--ne-border);
   border-radius: 8px;
   background: transparent;
   cursor: pointer;
 }
 
 .report-btn-secondary:hover {
-  background: #f9fafb;
+  background: var(--ne-hover-bg);
 }
 
 .report-btn-primary {
@@ -1597,12 +1708,12 @@ onBeforeUnmount(() => {
 .report-section-title {
   margin: 0 0 18px;
   padding: 0 0 12px 10px;
-  border-left: 3px solid #CF7357;
-  border-bottom: 1px solid #e5e7eb;
+  border-left: 3px solid var(--ne-primary);
+  border-bottom: 1px solid var(--ne-border);
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: #374151;
+  color: var(--ne-text-strong);
 }
 
 .review-dialog-body {
@@ -1842,6 +1953,21 @@ onBeforeUnmount(() => {
 .cat-growth-chart {
   width: 100%;
   height: 220px;
+}
+
+[data-theme="dark"] .report-wrapper {
+  background: #11161d;
+  border-color: #2a323d;
+}
+
+[data-theme="dark"] .report-ai-section,
+[data-theme="dark"] .report-card {
+  background: #171d25;
+}
+
+[data-theme="dark"] .report-content-box,
+[data-theme="dark"] .review-dialog-section {
+  background: #1a212b;
 }
 
 @media (max-width: 980px) {

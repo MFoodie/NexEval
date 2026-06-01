@@ -57,4 +57,5 @@ nexeval:
 dashscope:
   api-key: "sk-f5396c4057cb49a4a3ffb16117d0e37e"
   model: ${DASHSCOPE_MODEL:qwen3-vl-flash}
+  timeout-millis: ${DASHSCOPE_TIMEOUT_MILLIS:45000}
   confidence-threshold: ${DASHSCOPE_CONFIDENCE_THRESHOLD:0.8}
