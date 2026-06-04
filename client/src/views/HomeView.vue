@@ -2524,12 +2524,14 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: var(--home-sidebar-width) 1fr;
   width: 100%;
+  min-height: 100%;
+  align-items: stretch;
   gap: 16px;
   transition: grid-template-columns 0.28s ease;
 }
 
 .min-h-screen {
-  min-height: 100vh;
+  min-height: 100%;
 }
 
 .w-full {
@@ -2852,11 +2854,11 @@ onBeforeUnmount(() => {
 }
 
 .home-sidebar {
-  align-self: start;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  min-height: 520px;
+  min-height: 100%;
   transition: gap 0.28s ease;
   background: var(--ne-surface);
   border: 1px solid var(--ne-border);

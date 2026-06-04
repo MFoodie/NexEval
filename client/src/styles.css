@@ -157,9 +157,10 @@ a {
 }
 
 .shell {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .topbar {
@@ -340,9 +341,11 @@ a {
 
 .content {
   flex: 1;
+  min-height: 0;
   width: 100%;
   margin: 0;
   padding: 0;
+  overflow: hidden;
 }
 
 .card {

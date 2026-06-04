@@ -58,7 +58,7 @@
         <div class="profile-head">
           <h2 class="panel-title">简介</h2>
           <div class="profile-head-actions">
-            <el-button class="profile-op" type="primary" size="small" @click="triggerAvatarPicker">修改个人信息</el-button>
+            <el-button class="profile-op" type="primary" size="small" @click="openEditDialog">修改个人信息</el-button>
             <el-button class="profile-op" size="small" :loading="avatarSaving" @click="handleResetAvatar">
               恢复默认头像
             </el-button>
@@ -400,6 +400,36 @@
       />
     </main>
 
+    <el-dialog v-model="editVisible" title="修改个人信息" width="520px">
+      <el-form label-position="top">
+        <el-form-item label="姓名">
+          <el-input v-model="editForm.name" placeholder="请输入姓名" />
+        </el-form-item>
+
+        <el-form-item label="手机号">
+          <el-input v-model="editForm.phone" placeholder="请输入手机号" />
+        </el-form-item>
+
+        <el-form-item label="邮箱">
+          <el-input v-model="editForm.email" placeholder="请输入邮箱" />
+        </el-form-item>
+
+        <el-form-item label="新密码（不修改可留空）">
+          <el-input v-model="editForm.newPassword" type="password" show-password placeholder="请输入新密码" />
+          <div class="pwd-strength">
+            密码强度：
+            <el-tag size="small" :type="passwordStrengthTagType">{{ passwordStrengthText }}</el-tag>
+          </div>
+          <p class="pwd-hint">规则：大写、小写、数字、特殊符号中至少满足三种。</p>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="editVisible = false">取消</el-button>
+        <el-button type="primary" :loading="profileSaving" @click="handleSaveProfile">保存</el-button>
+      </template>
+    </el-dialog>
+
     <div class="water-wave-container">
       <div class="water-wave">
         <div class="wave-layer wave-layer-1"></div>
@@ -433,7 +463,7 @@ import iconQuery from "../assets/query.svg";
 import iconExit from "../assets/exit.svg";
 
 const router = useRouter();
-const loginInfo = getLogin();
+const loginInfo = reactive(getLogin() || {});
 const wsClient = createExamSocket(null, {
   onOpen() {
     if (activeMenu.value === "review") {
@@ -465,6 +495,14 @@ const vipLoading = ref(false);
 const vipUpdatingId = ref("");
 const vipKeyword = ref("");
 const vipStatus = ref("all");
+const editVisible = ref(false);
+const profileSaving = ref(false);
+const editForm = ref({
+  name: "",
+  phone: "",
+  email: "",
+  newPassword: ""
+});
 
 const examPermTeachers = ref([]);
 const examPermLoading = ref(false);
@@ -506,11 +544,51 @@ const sexText = computed(() => {
 });
 
 const displayPhone = computed(() => {
-  const text = String(loginInfo?.phone || "").trim();
-  if (!text || /^0+$/.test(text)) {
-    return "-";
+  return formatPhoneForDisplay(loginInfo?.phone);
+});
+
+const passwordStrengthScore = computed(() => {
+  const value = editForm.value.newPassword || "";
+  let score = 0;
+
+  if (/[A-Z]/.test(value)) score++;
+  if (/[a-z]/.test(value)) score++;
+  if (/\d/.test(value)) score++;
+  if (/[^A-Za-z0-9]/.test(value)) score++;
+
+  return score;
+});
+
+const passwordStrengthText = computed(() => {
+  if (!editForm.value.newPassword) {
+    return "鏈缃?";
   }
-  return text;
+
+  if (passwordStrengthScore.value <= 1) {
+    return "寮?";
+  }
+
+  if (passwordStrengthScore.value === 2) {
+    return "涓?";
+  }
+
+  return "寮?";
+});
+
+const passwordStrengthTagType = computed(() => {
+  if (!editForm.value.newPassword) {
+    return "info";
+  }
+
+  if (passwordStrengthScore.value <= 1) {
+    return "danger";
+  }
+
+  if (passwordStrengthScore.value === 2) {
+    return "warning";
+  }
+
+  return "success";
 });
 
 const saving = ref(false);
@@ -619,6 +697,47 @@ function withAvatarVersion(url) {
   return `${url}${divider}t=${Date.now()}`;
 }
 
+function isAllZeroPhone(value) {
+  const text = String(value || "").trim();
+  return text !== "" && /^0+$/.test(text);
+}
+
+function formatPhoneForDisplay(value) {
+  const text = String(value || "").trim();
+  if (!text || text === "-" || isAllZeroPhone(text)) {
+    return "-";
+  }
+  return text;
+}
+
+function applyProfile(profile) {
+  const next = {
+    ...loginInfo,
+    ...profile,
+    cardNo: profile?.id || profile?.cardNo || loginInfo.cardNo || "",
+    name: profile?.name || "",
+    phone: profile?.phone || "",
+    email: profile?.email || "",
+    avatarUrl: profile?.avatarUrl || loginInfo.avatarUrl || "",
+    type: profile?.type || loginInfo.type || "",
+    sex: typeof profile?.sex === "boolean" ? profile.sex : loginInfo.sex
+  };
+
+  Object.assign(loginInfo, next);
+  saveLogin(next);
+  avatarUrl.value = withAvatarVersion(next.avatarUrl || "/avatar/admin_male.png");
+}
+
+function openEditDialog() {
+  editForm.value = {
+    name: loginInfo?.name || "",
+    phone: displayPhone.value === "-" ? "" : displayPhone.value,
+    email: loginInfo?.email || "",
+    newPassword: ""
+  };
+  editVisible.value = true;
+}
+
 function triggerAvatarPicker() {
   avatarInputRef.value?.click();
 }
@@ -654,8 +773,7 @@ async function handleAvatarFileChange(event) {
       imageBase64: circlePngDataUrl
     }, 30000);
 
-    saveLogin(profile);
-    avatarUrl.value = withAvatarVersion(profile.avatarUrl || "/avatar/admin_male.png");
+    applyProfile(profile);
     ElMessage.success("头像已更新");
   } catch (error) {
     ElMessage.error(error.message || "头像更新失败");
@@ -676,8 +794,7 @@ async function handleResetAvatar() {
       userId: loginInfo?.cardNo
     });
 
-    saveLogin(profile);
-    avatarUrl.value = withAvatarVersion(profile.avatarUrl || "/avatar/admin_male.png");
+    applyProfile(profile);
     ElMessage.success("已恢复默认头像");
   } catch (error) {
     ElMessage.error(error.message || "恢复默认头像失败");
@@ -725,6 +842,42 @@ function cropImageToCirclePng(file, size = 256) {
 
     reader.readAsDataURL(file);
   });
+}
+
+async function handleSaveProfile() {
+  if (!editForm.value.name.trim()) {
+    ElMessage.warning("姓名不能为空");
+    return;
+  }
+
+  if (editForm.value.newPassword && passwordStrengthScore.value < 3) {
+    ElMessage.warning("新密码复杂度不足，需至少满足三种字符类型");
+    return;
+  }
+
+  if (!wsClient.isOpen()) {
+    ElMessage.error("WebSocket 未连接，请稍后再试");
+    return;
+  }
+
+  profileSaving.value = true;
+  try {
+    const profile = await wsClient.request("UPDATE_PROFILE", {
+      userId: loginInfo?.cardNo,
+      name: editForm.value.name.trim(),
+      phone: editForm.value.phone.trim(),
+      email: editForm.value.email.trim(),
+      newPassword: editForm.value.newPassword
+    });
+
+    applyProfile(profile);
+    editVisible.value = false;
+    ElMessage.success("个人信息已更新");
+  } catch (error) {
+    ElMessage.error(error.message || "修改失败");
+  } finally {
+    profileSaving.value = false;
+  }
 }
 
 async function handleRegister() {
@@ -1036,6 +1189,8 @@ onBeforeUnmount(() => {
   --admin-sidebar-width: 240px;
   display: grid;
   grid-template-columns: var(--admin-sidebar-width) 1fr;
+  min-height: 100%;
+  align-items: stretch;
   gap: 16px;
   transition: grid-template-columns 0.28s ease;
 }
@@ -1047,7 +1202,8 @@ onBeforeUnmount(() => {
 .sidebar {
   position: relative;
   z-index: 10;
-  min-height: 520px;
+  min-height: 100%;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1293,6 +1449,18 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.pwd-strength {
+  margin-top: 10px;
+  color: var(--ne-text-muted);
+  font-size: 13px;
+}
+
+.pwd-hint {
+  margin: 8px 0 0;
+  color: var(--ne-text-subtle);
+  font-size: 12px;
 }
 
 .register-grid {
