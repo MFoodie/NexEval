@@ -60,7 +60,7 @@
       <div class="max-w-7xl mx-auto w-full flex flex-col gap-6">
         <section class="card panel-card bg-white rounded-xl border border-gray-200 shadow-sm p-6" v-if="activeMenu === 'profile'">
         <div class="profile-head">
-          <h2 class="panel-title">简介</h2>
+          <h2 class="panel-title">个人信息概况</h2>
           <div class="profile-head-actions">
             <el-button class="profile-op" type="primary" size="small" @click="openEditDialog">修改个人信息</el-button>
             <el-button class="profile-op" size="small" :loading="avatarSaving" @click="handleResetAvatar">
@@ -118,15 +118,11 @@
         <section class="card panel-card exam-panel-card bg-white rounded-xl border border-gray-200 shadow-sm p-6" v-else-if="activeMenu === 'action'">
         <div class="mb-6">
           <h2 class="text-2xl font-semibold">{{ actionPanelTitle }}</h2>
-          <p class="text-sm">考试、练习与批改在此统一管理。</p>
+          <p class="text-sm">点击“考试”可以进入对应科目的考试，点击其右侧省略号可进行题目练习、查看错题和成绩复核。</p>
         </div>
         <div class="exam-intro grid grid-cols-1 gap-4 md:grid-cols-2">
           <div class="exam-intro-item bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <div class="exam-intro-title text-sm text-gray-500 mb-1">当前视图</div>
-            <div class="exam-intro-value text-2xl font-semibold text-gray-900">{{ actionPanelTitle }}</div>
-          </div>
-          <div class="exam-intro-item bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <div class="exam-intro-title text-sm text-gray-500 mb-1">教学班/课程</div>
+            <div class="exam-intro-title text-sm text-gray-500 mb-1">教学班/课程 数量</div>
             <div class="exam-intro-value text-2xl font-semibold text-gray-900">{{ isTeacher ? teacherClasses.length : studentClasses.length }}</div>
           </div>
         </div>
@@ -245,109 +241,18 @@
         </template>
 
         <template v-else-if="isStudent">
-          <div v-if="studentLoading" class="placeholder">正在加载教学班...</div>
-          <div v-else class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-            <div class="mb-4 flex items-center student-search-bar">
-              <el-input
-                class="search-input"
-                style="width:260px;"
-                v-model="searchKeyword"
-                placeholder="按课程号或课程名搜索"
-                size="small"
-                clearable
-                @clear="fetchStudentClasses"
-                @keyup.enter="handleSearchCourses"
-              >
-                <template #prefix>
-                  <img :src="iconQuery" alt="" aria-hidden="true" class="search-prefix-icon" />
-                </template>
-              </el-input>
-              <el-button class="search-button action-primary" size="small" type="primary" @click="handleSearchCourses">搜索</el-button>
-            </div>
-            <div class="section-title">课程列表</div>
-            <el-table :data="studentClasses" size="small" class="student-classes-table">
-              <el-table-column
-                prop="cno"
-                label="课程号"
-                width="120"
-                align="left"
-                header-align="left"
-                class-name="col-large"
-                header-class-name="col-large-header"
-              />
-
-              <el-table-column
-                prop="cname"
-                label="课程名"
-                width="130"
-                align="left"
-                header-align="left"
-                class-name="col-cname col-large"
-                header-class-name="col-cname-header col-large-header"
-              />
-
-              <el-table-column
-                prop="teacherName"
-                label="教师姓名"
-                width="160"
-                align="center"
-                header-align="center"
-                class-name="col-large col-teacher-cell"
-                header-class-name="col-large col-teacher-header"
-              />
-
-              <el-table-column
-                prop="grade"
-                label="成绩"
-                width="60"
-                align="center"
-                header-align="center"
-                class-name="col-large col-score-cell"
-                header-class-name="col-large col-score-header"
-              />
-
-              <el-table-column prop="classMax" label="班级最高" width="80" align="center" header-align="center"
-                class-name="col-stat" header-class-name="col-stat-header">
-                <template #default="{ row }">{{ row.classMax ?? '-' }}</template>
-              </el-table-column>
-              
-              <el-table-column prop="classMin" label="班级最低" width="80" align="center" header-align="center"
-                class-name="col-stat" header-class-name="col-stat-header">
-                <template #default="{ row }">{{ row.classMin ?? '-' }}</template>
-              </el-table-column>
-              
-              <el-table-column prop="classAvg" label="班级均分" width="80" align="center" header-align="center"
-                class-name="col-stat" header-class-name="col-stat-header">
-                <template #default="{ row }">{{ row.classAvg != null ? formatAvg(row.classAvg) : '-' }}</template>
-              </el-table-column>
-
-              <el-table-column label="操作" width="240" align="center" header-align="center">
-                <template #default="scope">
-                  <div class="student-action-grid">
-                    <el-button
-                      type="primary"
-                      size="small"
-                      class="action-primary action-primary--exam"
-                      :loading="startingExam"
-                      @click="handleStartExamForClass(scope.row)"
-                    >
-                      进入考试
-                    </el-button>
-                    <el-dropdown trigger="hover" placement="bottom-start">
-                      <el-button size="small" class="action-more action-ellipsis" aria-label="更多操作">...</el-button>
-                      <template #dropdown>
-                        <el-dropdown-menu>
-                          <el-dropdown-item @click="handleStartPracticeForClass(scope.row)">题目练习</el-dropdown-item>
-                          <el-dropdown-item @click="handleViewWrongQuestions(scope.row, 'PRACTICE')">查看错题</el-dropdown-item>
-                          <el-dropdown-item @click="openAppealHistory(scope.row)">成绩复核</el-dropdown-item>
-                        </el-dropdown-menu>
-                      </template>
-                    </el-dropdown>
-                  </div>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
+          <StudentCoursePanel
+            :loading="studentLoading"
+            :student-classes="studentClasses"
+            :icon-query="iconQuery"
+            :search-courses="searchStudentCourses"
+            :reset-courses="fetchStudentClasses"
+            :load-course-members="loadCourseMembers"
+            @start-exam="handleStartExamForClass"
+            @start-practice="handleStartPracticeForClass"
+            @view-wrong="handleViewWrongQuestions"
+            @appeal="openAppealHistory"
+          />
         </template>
 
         <el-form v-else @submit.prevent>
@@ -544,7 +449,7 @@
         >
           <div class="mb-6">
             <h2 class="text-2xl font-semibold">CAT 智能自适应练习</h2>
-            <p class="text-sm">基于实时作答表现自动调整难度，提供个性化练习路径。</p>
+            <p class="text-sm">基于实时作答表现自动调整难度，提供个性化练习路径。点击“CAT练习”即可练习，点击其右侧省略号查看错题</p>
           </div>
 
           <div v-if="studentLoading" class="placeholder">正在加载教学班...</div>
@@ -1034,6 +939,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ClassTools from "../components/ClassTools.vue";
+import StudentCoursePanel from "../components/StudentCoursePanel.vue";
 import ProblemCreateView from "./ProblemCreateView.vue";
 import { ElMessage } from "element-plus";
 import { clearLogin, getLogin, saveLogin } from "../auth";
@@ -1166,7 +1072,6 @@ const tierPage = ref(1);
 const tierPageSize = ref(10);
 const tierLoading = ref(false);
 const tierKeyword = ref("");
-const searchKeyword = ref("");
 const teacherStudentKeyword = ref("");
 const teacherStudentQuery = ref("");
 const teacherStudentsOrder = ref("default");
@@ -1176,7 +1081,6 @@ const wrongQuestionIndex = ref(0);
 const showCorrectAnswer = ref(false);
 const currentWrong = computed(() => wrongAnswers.value[wrongQuestionIndex.value] || null);
 const totalWrong = computed(() => wrongAnswers.value.length);
-const searching = ref(false);
 const gradingVisible = ref(false);
 const gradingLoading = ref(false);
 const gradingStudent = ref(null);
@@ -1231,6 +1135,7 @@ const selectedQuestionCount = computed(() => examCreateSelected.value.length);
 const selectedTotalPoints = computed(() =>
   examCreateSelected.value.reduce((sum, q) => sum + (q.points || 0), 0)
 );
+
 const filteredTeacherStudents = computed(() => {
   const list = [...(selectedClass.value?.students || [])];
   const keyword = String(teacherStudentQuery.value || "").trim().toLowerCase();
@@ -1493,27 +1398,33 @@ function formatAvg(value) {
   return Number(value).toFixed(1);
 }
 
-async function handleSearchCourses() {
+async function searchStudentCourses(keyword) {
   if (!wsClient || !wsClient.isOpen()) {
     ElMessage.error("WebSocket 未连接，无法检索");
     return;
   }
 
-  // 空关键字时视为重置，直接重新获取学生课程列表
-  if (!searchKeyword.value || !String(searchKeyword.value).trim()) {
-    await fetchStudentClasses();
-    return;
-  }
-
-  searching.value = true;
   try {
-    const data = await wsClient.request("SEARCH_COURSE_SCORES", { userId: cardNo.value, keyword: searchKeyword.value }, 20000);
+    const data = await wsClient.request("SEARCH_COURSE_SCORES", {
+      userId: cardNo.value,
+      keyword: String(keyword || "").trim()
+    }, 20000);
     studentClasses.value = Array.isArray(data) ? data : [];
   } catch (err) {
     ElMessage.error(err.message || "检索失败");
-  } finally {
-    searching.value = false;
   }
+}
+
+async function loadCourseMembers(clazz) {
+  if (!wsClient || !wsClient.isOpen()) {
+    ElMessage.error("WebSocket 未连接，请稍后再试");
+    return [];
+  }
+
+  return wsClient.request("GET_COURSE_MEMBERS", {
+    courseNo: String(clazz?.cno || "").trim(),
+    teacherEid: String(clazz?.eid || "").trim()
+  }, 15000);
 }
 
 function applyTeacherStudentSearch() {
@@ -2701,7 +2612,6 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.student-search-bar,
 .teacher-search-bar {
   display: flex;
   align-items: center;
@@ -2709,7 +2619,6 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
 }
 
-.student-search-bar .search-prefix-icon,
 .teacher-search-bar .search-prefix-icon {
   width: 16px;
   height: 16px;
@@ -2718,20 +2627,17 @@ onBeforeUnmount(() => {
   margin-left: 6px;
 }
 
-.student-search-bar .el-input__inner,
 .teacher-search-bar .el-input__inner {
   border-radius: 24px !important;
   min-height: 50px;
   padding: 0 14px;
 }
 
-.student-search-bar .search-input,
 .teacher-search-bar .search-input {
   min-width: 220px;
   flex: 0 0 auto;
 }
 
-.student-search-bar .search-button,
 .teacher-search-bar .search-button {
   min-width: 52px;
   border-radius: 8px !important;
@@ -3190,13 +3096,15 @@ onBeforeUnmount(() => {
 }
 
 .exam-intro {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  margin: -70px 0 20px;
 }
 .exam-intro-item {
-  padding: 18px 20px;
+  width: 130px;
+  min-height: 74px;
+  padding: 12px 14px;
   border-radius: 14px;
   border: 1px solid var(--ne-border);
   background: var(--ne-surface);
@@ -3207,10 +3115,11 @@ onBeforeUnmount(() => {
   margin-bottom: 6px;
 }
 .exam-intro-value {
-  margin-top: 0;
+  margin-top: 4px;
   color: var(--ne-text-strong);
   font-weight: 700;
-  font-size: 20px;
+  font-size: 18px;
+  text-align: center;
 }
 
 
@@ -3358,13 +3267,7 @@ onBeforeUnmount(() => {
   justify-content: flex-start;
   gap: 8px;
   min-height: 60px;
-  margin-left: 50px;
-}
-
-.student-action-buttons--wrap {
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  white-space: normal;
+  margin-left: 0;
 }
 
 .student-action-buttons .el-button {
@@ -3378,11 +3281,6 @@ onBeforeUnmount(() => {
   font-weight: 600;
   border-radius: 8px;
   line-height: 1.2;
-}
-
-.action-primary--exam {
-  padding: 5px 10px;
-  font-size: 11px;
 }
 
 .action-primary--cat {
@@ -3620,11 +3518,6 @@ onBeforeUnmount(() => {
   font-size: 14px !important;
   font-weight: 600 !important;
 }
-::v-deep(.col-score-cell .cell) {
-  font-size: 14px !important;
-  font-weight: 700 !important;
-}
-
 .ws-line {
   margin: 0 0 14px;
   color: var(--ne-text-muted);
@@ -3983,9 +3876,18 @@ mark {
     justify-content: flex-start;
   }
 
-  .profile-summary,
-  .exam-intro {
+  .profile-summary {
     grid-template-columns: 1fr;
+  }
+
+  .exam-intro {
+    display: block;
+    width: auto;
+    margin: 12px 0 16px;
+  }
+
+  .exam-intro-item {
+    width: auto;
   }
 
   .profile-info-table th,
@@ -3995,11 +3897,15 @@ mark {
   }
 }
 
-::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(1) .cell,
-::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(2) .cell,
 ::v-deep(.student-classes-table) .el-table__body-wrapper td:nth-child(3) .cell {
   font-weight: 400 !important;
 }
+
+::v-deep(.student-classes-table) .cell {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
 
 /* Exam creation panel */
 .exam-create-layout {

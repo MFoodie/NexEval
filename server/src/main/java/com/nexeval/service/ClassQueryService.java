@@ -1,6 +1,7 @@
 package com.nexeval.service;
 
 import com.nexeval.dto.ClassStudentSummary;
+import com.nexeval.dto.CourseMemberSummary;
 import com.nexeval.dto.ScoreDistribution;
 import com.nexeval.dto.ScoreTierPage;
 import com.nexeval.dto.StudentClassSummary;
@@ -20,9 +21,13 @@ import com.nexeval.repository.ScRecordRepository;
 import com.nexeval.repository.StudentProfileRepository;
 import com.nexeval.repository.TeacherProfileRepository;
 import com.nexeval.repository.TeachingClassRepository;
+import com.nexeval.repository.UserAccountRepository;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -34,10 +39,12 @@ public class ClassQueryService {
   private final ExamAnswerRepository examAnswerRepository;
   private final TeacherProfileRepository teacherProfileRepository;
   private final StudentProfileRepository studentProfileRepository;
+  private final UserAccountRepository userAccountRepository;
   private final QuestionBankRepository questionBankRepository;
   private final JudgeQuestionBankRepository judgeQuestionBankRepository;
   private final BlankQuestionBankRepository blankQuestionBankRepository;
   private final EssayQuestionBankRepository essayQuestionBankRepository;
+  private final Path avatarDirectory;
 
   public ClassQueryService(
     TeachingClassRepository teachingClassRepository,
@@ -46,10 +53,12 @@ public class ClassQueryService {
     ExamAnswerRepository examAnswerRepository,
     TeacherProfileRepository teacherProfileRepository,
     StudentProfileRepository studentProfileRepository,
+    UserAccountRepository userAccountRepository,
     QuestionBankRepository questionBankRepository,
     JudgeQuestionBankRepository judgeQuestionBankRepository,
     BlankQuestionBankRepository blankQuestionBankRepository,
-    EssayQuestionBankRepository essayQuestionBankRepository
+    EssayQuestionBankRepository essayQuestionBankRepository,
+    @Value("${nexeval.avatar.dir:./avatar}") String avatarDirectory
   ) {
     this.teachingClassRepository = teachingClassRepository;
     this.scRecordRepository = scRecordRepository;
@@ -57,10 +66,12 @@ public class ClassQueryService {
     this.examAnswerRepository = examAnswerRepository;
     this.teacherProfileRepository = teacherProfileRepository;
     this.studentProfileRepository = studentProfileRepository;
+    this.userAccountRepository = userAccountRepository;
     this.questionBankRepository = questionBankRepository;
     this.judgeQuestionBankRepository = judgeQuestionBankRepository;
     this.blankQuestionBankRepository = blankQuestionBankRepository;
     this.essayQuestionBankRepository = essayQuestionBankRepository;
+    this.avatarDirectory = Path.of(avatarDirectory).toAbsolutePath().normalize();
   }
 
   public List<TeacherClassSummary> getTeacherClasses(String eid) {
@@ -168,6 +179,34 @@ public class ClassQueryService {
       .toList();
   }
 
+  public List<CourseMemberSummary> getCourseMembers(String courseNo, String teacherEid) {
+    String normalizedCourseNo = required(courseNo, "courseNo");
+    String normalizedTeacherEid = required(teacherEid, "teacherEid");
+
+    var teacherProfile = teacherProfileRepository.findFirstByEid(normalizedTeacherEid)
+      .orElseThrow(() -> new IllegalArgumentException("教师工号不存在"));
+    var teacherAccount = userAccountRepository.findById(teacherProfile.getId())
+      .orElseThrow(() -> new IllegalArgumentException("教师账号不存在"));
+
+    List<CourseMemberSummary> members = new ArrayList<>();
+    members.add(new CourseMemberSummary(
+      teacherAccount.getId(),
+      teacherAccount.getName(),
+      resolveAvatarUrl(teacherAccount.getId(), "teacher", teacherAccount.isSex()),
+      true
+    ));
+
+    scRecordRepository.findClassStudents(normalizedCourseNo, normalizedTeacherEid)
+      .forEach(student -> members.add(new CourseMemberSummary(
+        student.getUserId(),
+        student.getName(),
+        resolveAvatarUrl(student.getUserId(), "student", student.isSex()),
+        false
+      )));
+
+    return members;
+  }
+
   private String required(String value, String fieldName) {
     String text = value == null ? "" : value.trim();
     if (text.isBlank()) {
@@ -199,6 +238,14 @@ public class ClassQueryService {
     }
 
     return null;
+  }
+
+  private String resolveAvatarUrl(String userId, String type, boolean sex) {
+    Path customAvatar = avatarDirectory.resolve(userId + ".png");
+    if (Files.exists(customAvatar)) {
+      return "/avatar/" + userId + ".png";
+    }
+    return "/avatar/" + type + "_" + (sex ? "male" : "female") + ".png";
   }
 
   public java.util.List<com.nexeval.dto.CourseScoreSummary> searchCourseScoresForStudent(
