@@ -309,7 +309,33 @@ public class CatExamService {
     state.put("timeLimitSeconds", timeLimitSeconds == null ? -1 : timeLimitSeconds);
     state.put("remainingSeconds", remainingSeconds);
     state.put("answeredQuestionIds", session.getAnsweredQuestionIds().stream().toList());
+    state.put("growthPoints", buildGrowthPoints(session));
     return state;
+  }
+
+  private List<Map<String, Object>> buildGrowthPoints(ExamSession session) {
+    List<ExamSession.IrtAnswerRecord> history = session.getIrtHistory();
+    if (history == null || history.isEmpty()) {
+      return List.of();
+    }
+
+    List<Map<String, Object>> points = new ArrayList<>(history.size());
+    List<ExamSession.IrtAnswerRecord> prefix = new ArrayList<>(history.size());
+    for (int i = 0; i < history.size(); i++) {
+      prefix.add(history.get(i));
+      IrtCatService.IrtEstimate estimate = irtCatService.estimateThetaEap(prefix);
+      points.add(Map.of(
+        "questionNo", i + 1,
+        "score", thetaToPercent(estimate.theta())
+      ));
+    }
+    return points;
+  }
+
+  private int thetaToPercent(double theta) {
+    double normalized = ((theta + 3.0) / 6.0) * 100.0;
+    int score = (int) Math.round(normalized);
+    return Math.max(0, Math.min(100, score));
   }
 
   public List<ExamAnswerView> getSessionAnswers(String sessionId) {

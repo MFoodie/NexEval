@@ -452,6 +452,23 @@ const questionImageStyle = computed(() => {
   };
 });
 
+function normalizeGrowthPoints(items) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items
+    .map((item, index) => {
+      const questionNo = Number(item?.questionNo);
+      const score = Number(item?.score);
+      return {
+        questionNo: Number.isFinite(questionNo) && questionNo > 0 ? questionNo : index + 1,
+        score: Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 0
+      };
+    })
+    .filter((item) => item.questionNo > 0);
+}
+
 function formatOptionText(option, type = currentQuestion.value?.type) {
   if (type === "judge") {
     return option === "true" ? "正确" : "错误";
@@ -577,9 +594,14 @@ function normalizeImageSrc(path) {
 }
 
 function buildGrowthChartOption() {
-  if (finished.value && reportTrajectorySeries.value.length) {
-    return buildMiniTrajectoryOption();
-  }
+  const dark = document.documentElement.getAttribute("data-theme") === "dark";
+  const axisColor = dark ? "rgba(176, 184, 195, 0.28)" : "rgba(111, 102, 89, 0.28)";
+  const splitColor = dark ? "rgba(176, 184, 195, 0.12)" : "rgba(111, 102, 89, 0.12)";
+  const labelColor = dark ? "#b0b8c3" : "#6f6659";
+  const lineColor = dark ? "#f0b35b" : "#111111";
+  const borderColor = dark ? "#14171c" : "#ffffff";
+  const areaTop = dark ? "rgba(240, 179, 91, 0.18)" : "rgba(17, 17, 17, 0.18)";
+  const areaBottom = dark ? "rgba(240, 179, 91, 0.02)" : "rgba(17, 17, 17, 0.02)";
 
   return {
     animationDuration: 700,
@@ -587,108 +609,32 @@ function buildGrowthChartOption() {
     animationEasing: "cubicOut",
     animationEasingUpdate: "cubicOut",
     grid: {
-      left: 34,
-      right: 20,
-      top: 24,
+      left: 36,
+      right: 16,
+      top: 16,
       bottom: 28
     },
     tooltip: {
-      trigger: "axis"
+      trigger: "axis",
+      formatter: (params) => {
+        const point = params?.[0];
+        if (!point) {
+          return "";
+        }
+        return `${point.axisValue}<br/>AI预估掌握度：${point.value}%`;
+      }
     },
     xAxis: {
       type: "category",
       boundaryGap: false,
       data: growthXAxis.value,
       axisLabel: {
-        color: "#6f6659",
-        fontSize: 11
-      },
-      axisLine: {
-        lineStyle: {
-          color: "rgba(111, 102, 89, 0.4)"
+        color: labelColor,
+        fontSize: 11,
+        interval: (index) => {
+          const lastIndex = growthXAxis.value.length - 1;
+          return index === 0 || index === lastIndex || index % 5 === 0;
         }
-      },
-      axisTick: {
-        show: false
-      }
-    },
-    yAxis: {
-      type: "value",
-      min: 0,
-      max: 100,
-      splitNumber: 5,
-      axisLabel: {
-        color: "#6f6659",
-        fontSize: 11
-      },
-      axisLine: {
-        show: false
-      },
-      splitLine: {
-        lineStyle: {
-          color: "rgba(111, 102, 89, 0.16)"
-        }
-      }
-    },
-    series: [
-      {
-        name: "预估分",
-        type: "line",
-        smooth: true,
-        symbol: "circle",
-        symbolSize: 7,
-        data: growthSeries.value,
-        lineStyle: {
-          width: 3,
-          color: "#111111"
-        },
-        itemStyle: {
-          color: "#111111",
-          borderColor: "#ffffff",
-          borderWidth: 2
-        },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: "rgba(17, 17, 17, 0.26)" },
-            { offset: 1, color: "rgba(17, 17, 17, 0.04)" }
-          ])
-        }
-      }
-    ]
-  };
-}
-
-function buildMiniTrajectoryOption() {
-  const dark = document.documentElement.getAttribute("data-theme") === "dark";
-  const axisColor = dark ? "rgba(176, 184, 195, 0.28)" : "rgba(111, 102, 89, 0.4)";
-  const splitColor = dark ? "rgba(176, 184, 195, 0.12)" : "rgba(111, 102, 89, 0.16)";
-  const labelColor = dark ? "#b0b8c3" : "#6f6659";
-  const lineColor = dark ? "#f0b35b" : "#111111";
-  const borderColor = dark ? "#14171c" : "#ffffff";
-  const areaTop = dark ? "rgba(240, 179, 91, 0.22)" : "rgba(17, 17, 17, 0.26)";
-  const areaBottom = dark ? "rgba(240, 179, 91, 0.02)" : "rgba(17, 17, 17, 0.04)";
-
-  return {
-    animationDuration: 700,
-    animationDurationUpdate: 700,
-    animationEasing: "cubicOut",
-    animationEasingUpdate: "cubicOut",
-    grid: {
-      left: 26,
-      right: 14,
-      top: 12,
-      bottom: 18
-    },
-    tooltip: {
-      trigger: "item",
-      formatter: (params) => `第 ${params.dataIndex + 1} 题`
-    },
-    xAxis: {
-      type: "category",
-      boundaryGap: false,
-      data: reportTrajectoryXAxis.value,
-      axisLabel: {
-        show: false
       },
       axisLine: {
         lineStyle: {
@@ -702,10 +648,11 @@ function buildMiniTrajectoryOption() {
     yAxis: {
       type: "value",
       min: 0,
-      max: 1,
-      interval: 1,
+      max: 100,
+      splitNumber: 5,
       axisLabel: {
-        show: false
+        color: labelColor,
+        fontSize: 11
       },
       axisLine: {
         show: false
@@ -718,14 +665,14 @@ function buildMiniTrajectoryOption() {
     },
     series: [
       {
-        name: "正确性",
+        name: "AI预估掌握度",
         type: "line",
         smooth: true,
         symbol: "circle",
-        symbolSize: 5,
-        data: reportTrajectorySeries.value,
+        symbolSize: 6,
+        data: growthSeries.value,
         lineStyle: {
-          width: 2.5,
+          width: 3,
           color: lineColor
         },
         itemStyle: {
@@ -972,6 +919,7 @@ async function loadSessionState() {
     answeredCount.value = payload.answeredCount ?? answeredCount.value;
     maxQuestions.value = payload.maxQuestions ?? maxQuestions.value;
     finished.value = payload.finished ?? finished.value;
+    growthPoints.value = normalizeGrowthPoints(payload.growthPoints);
   } catch (error) {
     ElMessage.error(error.message || "会话状态获取失败。")
   }
