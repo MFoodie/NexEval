@@ -140,6 +140,7 @@ body {
   margin: 0;
   min-height: 100vh;
   background: var(--ne-bg);
+  overflow-y: auto;
 }
 
 #app,
@@ -157,10 +158,9 @@ a {
 }
 
 .shell {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 .topbar {
@@ -345,7 +345,7 @@ a {
   width: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .card {
