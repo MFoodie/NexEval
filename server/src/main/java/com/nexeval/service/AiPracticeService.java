@@ -9,6 +9,7 @@ import com.alibaba.dashscope.common.Role;
 import com.alibaba.dashscope.exception.ApiException;
 import com.alibaba.dashscope.exception.NoApiKeyException;
 import com.alibaba.dashscope.exception.UploadFileException;
+import com.nexeval.dto.ExamAnswerDetailView;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -89,7 +90,8 @@ public class AiPracticeService {
     int estimatedScore,
     int systemPrecision,
     int answeredCount,
-    int maxQuestions
+    int maxQuestions,
+    List<ExamAnswerDetailView> answers
   ) {
     if (apiKey.isBlank()) {
       throw new IllegalStateException("DashScope API Key 未配置");
@@ -101,7 +103,8 @@ public class AiPracticeService {
       estimatedScore,
       systemPrecision,
       answeredCount,
-      maxQuestions
+      maxQuestions,
+      answers
     );
 
     MultiModalMessage systemMessage = MultiModalMessage.builder()
@@ -167,21 +170,49 @@ public class AiPracticeService {
     int estimatedScore,
     int systemPrecision,
     int answeredCount,
-    int maxQuestions
+    int maxQuestions,
+    List<ExamAnswerDetailView> answers
   ) {
+    List<ExamAnswerDetailView> safeAnswers = answers == null ? List.of() : answers;
+    long correctCount = safeAnswers.stream().filter(item -> Boolean.TRUE.equals(item.correct())).count();
+    int correctRate = safeAnswers.isEmpty()
+      ? 0
+      : (int) Math.round(correctCount * 100.0 / safeAnswers.size());
     StringBuilder builder = new StringBuilder();
-    builder.append("请基于以下 CAT 训练数据，生成一段 180~260 字的中文学习诊断报告。\n");
+    builder.append("请严格基于以下 CAT 本次作答记录，生成一段 180~260 字的中文学习诊断报告。\n");
     builder.append("课程编号：").append(normalize(courseNo)).append('\n');
     builder.append("课程名称：").append(normalize(courseName)).append('\n');
-    builder.append("已答题数：").append(answeredCount).append('/').append(maxQuestions).append('\n');
-    builder.append("AI 预估掌握度：").append(estimatedScore).append("%\n");
-    builder.append("系统精准度：").append(systemPrecision).append("%\n");
+    builder.append("实际答题数：").append(answeredCount).append('/').append(maxQuestions).append('\n');
+    builder.append("实际答对数：").append(correctCount).append('\n');
+    builder.append("实际正确率：").append(correctRate).append("%\n");
+    builder.append("IRT 能力估计（不是正确率）：").append(estimatedScore).append("%\n");
+    builder.append("能力估计稳定度（不是正确率）：").append(systemPrecision).append("%\n");
+    builder.append("逐题证据（题号只以这里的序号为准）：\n");
+    for (int i = 0; i < safeAnswers.size(); i++) {
+      ExamAnswerDetailView answer = safeAnswers.get(i);
+      builder.append(i + 1)
+        .append(". 题干=").append(compact(answer.stem(), 160))
+        .append("; 学生答案=").append(compact(answer.answerText(), 60))
+        .append("; 正确答案=").append(compact(answer.correctAnswer(), 60))
+        .append("; 判定=").append(Boolean.TRUE.equals(answer.correct()) ? "正确" : "错误")
+        .append("; 难度=").append(answer.difficulty() == null ? "未知" : answer.difficulty())
+        .append('\n');
+    }
     builder.append("写作要求：\n");
-    builder.append("1) 语言专业、克制，避免空话。\n");
-    builder.append("2) 必须指出 2 个优势维度和 1~2 个薄弱维度。\n");
-    builder.append("3) 给出可执行的下一步训练建议。\n");
-    builder.append("4) 只输出纯文本，不要 Markdown，不要项目符号。\n");
+    builder.append("1) 只能使用上述数据，不得编造题目、题号、答案、知识点或作答表现。\n");
+    builder.append("2) 不得引用大于实际答题数的题号；提到某题时必须与对应题干和判定一致。\n");
+    builder.append("3) 优势与薄弱点必须有逐题证据；证据不足时应明确说明样本有限，不得强行凑数。\n");
+    builder.append("4) 给出与错题内容直接相关、可执行的下一步训练建议。\n");
+    builder.append("5) 只输出纯文本，不要 Markdown，不要项目符号。\n");
     return builder.toString();
+  }
+
+  private String compact(String value, int maxLength) {
+    String normalized = normalize(value).replaceAll("\\s+", " ");
+    if (normalized.length() <= maxLength) {
+      return normalized;
+    }
+    return normalized.substring(0, maxLength) + "...";
   }
 
   private String extractText(MultiModalConversationResult result) {

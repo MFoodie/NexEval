@@ -69,7 +69,7 @@
 
                 <section class="report-grid">
                   <div class="report-card">
-                    <h4 class="report-section-title">核心知识点掌握度</h4>
+                    <h4 class="report-section-title">知识点答题正确率</h4>
                     <div v-if="knowledgeMasteryRows.length" class="skill-list">
                       <div
                         v-for="item in knowledgeMasteryRows"
@@ -78,7 +78,11 @@
                       >
                         <div class="skill-label-row">
                           <span>{{ item.label }}</span>
-                          <span>{{ item.percent }}%</span>
+                          <span>
+                            {{ item.percent }}%
+                            <small v-if="item.questionCount">（{{ item.correctCount }}/{{ item.questionCount }}）</small>
+                            <small v-else-if="item.inferred">（AI 推断）</small>
+                          </span>
                         </div>
                         <div class="skill-track">
                           <div
@@ -95,7 +99,11 @@
 
                   <div class="report-card">
                     <h4 class="report-section-title">AI 题目调度轨迹</h4>
-                    <p class="report-card-desc">展示系统根据您的即时对错，动态调整题目难度的过程</p>
+                    <p class="report-card-desc">系统会尽量在答错后降低、答对后提高难度，并结合可用题目选择下一题</p>
+                    <div class="trajectory-legend" aria-label="答题结果图例">
+                      <span class="trajectory-rule trajectory-rule--correct">作答正确</span>
+                      <span class="trajectory-rule trajectory-rule--wrong">作答错误</span>
+                    </div>
                     <div class="report-chart-wrap">
                       <div ref="reportTrajectoryEl" class="report-trajectory-chart"></div>
                     </div>
@@ -250,7 +258,7 @@
         <aside class="exam-aside">
           <div class="card ai-panel">
             <div class="ai-panel-title">CAT 动态调度舱</div>
-            <div class="ai-panel-subtitle">AI 预估掌握度</div>
+            <div class="ai-panel-subtitle">IRT 能力估计（非正确率）</div>
             <div class="dashboard-row">
               <el-progress
                 class="ai-dashboard"
@@ -261,16 +269,16 @@
               />
               <div class="dashboard-caption">
                 <span class="dashboard-caption-value">{{ estimatedScore }}%</span>
-                <span class="dashboard-caption-text">当前预估</span>
+                <span class="dashboard-caption-text">当前能力位置</span>
               </div>
             </div>
             <div class="ai-metrics">
               <div class="ai-metric-card ai-metric-card--primary">
-                <div class="ai-metric-label">AI 预估掌握度</div>
+                <div class="ai-metric-label">IRT 能力估计</div>
                 <div class="ai-metric-value">{{ estimatedScore }}%</div>
               </div>
               <div class="ai-metric-card">
-                <div class="ai-metric-label">系统精准度</div>
+                <div class="ai-metric-label">估计稳定度</div>
                 <div class="ai-metric-value ai-metric-value--accent">{{ systemPrecision }}%</div>
               </div>
             </div>
@@ -398,14 +406,61 @@ const growthXAxis = computed(() => growthPoints.value.map(item => `第${item.que
 const growthSeries = computed(() => growthPoints.value.map(item => item.score));
 const answerGrid = computed(() => {
   return attemptAnswers.value.filter(Boolean).map((answer, index) => {
+    const rawDifficulty = answer?.difficulty;
+    const detailDifficulty = rawDifficulty === null || rawDifficulty === undefined || rawDifficulty === ""
+      ? Number.NaN
+      : Number(rawDifficulty);
+    const historyDifficulty = Number(growthPoints.value[index]?.difficulty);
+    const difficulty = Number.isFinite(detailDifficulty) && detailDifficulty > 0
+      ? detailDifficulty
+      : (Number.isFinite(historyDifficulty) && historyDifficulty > 0 ? historyDifficulty : null);
+    const answeredAt = Date.parse(answer?.answeredAt || "");
+    const previousAnsweredAt = index > 0
+      ? Date.parse(attemptAnswers.value[index - 1]?.answeredAt || "")
+      : Number.NaN;
+    const durationSeconds = Number.isFinite(answeredAt) && Number.isFinite(previousAnsweredAt)
+      ? Math.max(0, Math.round((answeredAt - previousAnsweredAt) / 1000))
+      : null;
+
     return {
       no: index + 1,
-      correct: answer?.correct === true
+      correct: answer?.correct === true,
+      difficulty,
+      type: answer?.type || "choice",
+      durationSeconds
     };
   });
 });
 const reportTrajectoryXAxis = computed(() => answerGrid.value.map(item => `第${item.no}题`));
-const reportTrajectorySeries = computed(() => answerGrid.value.map(item => (item.correct ? 1 : 0)));
+const reportTrajectorySeries = computed(() => answerGrid.value.map((item, index, items) => {
+  const next = items[index + 1];
+  let adjustment = "本次测评已结束";
+  if (next && Number.isFinite(item.difficulty) && Number.isFinite(next.difficulty)) {
+    const delta = next.difficulty - item.difficulty;
+    if (Math.abs(delta) < 0.001) {
+      adjustment = "下一题难度保持稳定";
+    } else if (delta > 0) {
+      adjustment = "下一题难度较本题提高";
+    } else {
+      adjustment = "下一题难度较本题降低";
+    }
+  }
+
+  return {
+    value: item.difficulty,
+    questionNo: item.no,
+    correct: item.correct,
+    type: item.type,
+    durationSeconds: item.durationSeconds,
+    adjustment,
+    nextDifficulty: Number.isFinite(next?.difficulty) ? next.difficulty : null,
+    itemStyle: {
+      color: item.correct ? "#22a06b" : "#e5484d",
+      borderColor: "#ffffff",
+      borderWidth: 2
+    }
+  };
+}));
 const selectedReviewAnswer = computed(() => {
   if (selectedReviewIndex.value < 0) {
     return null;
@@ -461,9 +516,12 @@ function normalizeGrowthPoints(items) {
     .map((item, index) => {
       const questionNo = Number(item?.questionNo);
       const score = Number(item?.score);
+      const difficulty = Number(item?.difficulty);
       return {
         questionNo: Number.isFinite(questionNo) && questionNo > 0 ? questionNo : index + 1,
-        score: Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 0
+        score: Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 0,
+        difficulty: Number.isFinite(difficulty) && difficulty > 0 ? difficulty : null,
+        correct: item?.correct === true
       };
     })
     .filter((item) => item.questionNo > 0);
@@ -497,7 +555,10 @@ function buildAiMasteryRows(items) {
     rows.push({
       key: label,
       label,
-      percent
+      percent,
+      correctCount: Number(item?.correctCount || 0),
+      questionCount: Number(item?.questionCount || 0),
+      inferred: item?.inferred === true
     });
     seen.add(label);
     if (rows.length >= 4) {
@@ -621,7 +682,7 @@ function buildGrowthChartOption() {
         if (!point) {
           return "";
         }
-        return `${point.axisValue}<br/>AI预估掌握度：${point.value}%`;
+        return `${point.axisValue}<br/>IRT能力估计：${point.value}%（非正确率）`;
       }
     },
     xAxis: {
@@ -665,7 +726,7 @@ function buildGrowthChartOption() {
     },
     series: [
       {
-        name: "AI预估掌握度",
+        name: "IRT能力估计",
         type: "line",
         smooth: true,
         symbol: "circle",
@@ -692,78 +753,168 @@ function buildGrowthChartOption() {
 }
 
 function buildReportTrajectoryOption() {
+  const dark = document.documentElement.getAttribute("data-theme") === "dark";
+  const values = reportTrajectorySeries.value.map(item => Number(item.value)).filter(Number.isFinite);
+  const hasDifficultyData = values.length > 0;
+  const normalizedScale = hasDifficultyData && Math.max(...values) <= 1;
+  const scale = normalizedScale
+    ? { min: 0, max: 1, lowEnd: 0.4, mediumEnd: 0.7, interval: 0.2 }
+    : { min: 1, max: 5, lowEnd: 2.5, mediumEnd: 3.5, interval: 1 };
+  const labelStep = Math.max(1, Math.ceil(reportTrajectoryXAxis.value.length / 8));
+  const axisColor = dark ? "rgba(176, 184, 195, 0.42)" : "rgba(111, 102, 89, 0.42)";
+  const splitColor = dark ? "rgba(176, 184, 195, 0.14)" : "rgba(111, 102, 89, 0.14)";
+  const labelColor = dark ? "#b0b8c3" : "#6f6659";
+  const lineColor = dark ? "#f0b35b" : "#27364b";
+  const typeLabels = {
+    choice: "单选题",
+    judge: "判断题",
+    blank: "填空题",
+    essay: "主观题"
+  };
+
   return {
     animationDuration: 700,
     animationDurationUpdate: 700,
     animationEasing: "cubicOut",
     animationEasingUpdate: "cubicOut",
     grid: {
-      left: 34,
-      right: 20,
-      top: 24,
-      bottom: 28
+      left: 54,
+      right: 24,
+      top: 26,
+      bottom: 48
     },
+    graphic: hasDifficultyData ? [] : [
+      {
+        type: "text",
+        left: "center",
+        top: "middle",
+        style: {
+          text: "暂无题目难度数据，请重启后端后重新完成一次 CAT",
+          fill: labelColor,
+          fontSize: 13
+        }
+      }
+    ],
     tooltip: {
       trigger: "item",
-      formatter: (params) => `第 ${params.dataIndex + 1} 题`
+      backgroundColor: dark ? "rgba(20, 24, 31, 0.96)" : "rgba(255, 255, 255, 0.97)",
+      borderColor: dark ? "#343d49" : "#d9d4cc",
+      textStyle: {
+        color: dark ? "#eef1f5" : "#2c2925"
+      },
+      formatter: (params) => {
+        const point = params?.data || {};
+        const result = point.correct ? "正确" : "错误";
+        const resultColor = point.correct ? "#22a06b" : "#e5484d";
+        const duration = Number.isFinite(point.durationSeconds) ? `${point.durationSeconds} 秒` : "未记录";
+        const nextDifficulty = Number.isFinite(point.nextDifficulty)
+          ? `<br/>下一题难度：${Number(point.nextDifficulty).toFixed(2)}`
+          : "";
+        return [
+          `<strong>第 ${point.questionNo} 题</strong>`,
+          `题型：${typeLabels[point.type] || "选择题"}`,
+          `难度：${Number(point.value).toFixed(2)}`,
+          `耗时：${duration}`,
+          `结果：<span style="color:${resultColor};font-weight:700">${result}</span>`,
+          `${point.adjustment}${nextDifficulty}`
+        ].join("<br/>");
+      }
     },
     xAxis: {
       type: "category",
       boundaryGap: false,
       data: reportTrajectoryXAxis.value,
       axisLabel: {
-        show: false
+        color: labelColor,
+        fontSize: 11,
+        interval: (index) => {
+          const lastIndex = reportTrajectoryXAxis.value.length - 1;
+          return index === 0 || index === lastIndex || index % labelStep === 0;
+        }
       },
       axisLine: {
         lineStyle: {
-          color: "rgba(111, 102, 89, 0.4)"
+          color: axisColor
         }
       },
       axisTick: {
         show: false
       }
     },
+    dataZoom: reportTrajectoryXAxis.value.length > 10
+      ? [
+          {
+            type: "inside",
+            xAxisIndex: 0,
+            filterMode: "none",
+            zoomOnMouseWheel: true,
+            moveOnMouseMove: true,
+            moveOnMouseWheel: true
+          }
+        ]
+      : [],
     yAxis: {
       type: "value",
-      min: 0,
-      max: 1,
-      interval: 1,
-      axisLabel: {
-        color: "#6f6659",
+      name: "题目难度",
+      nameTextStyle: {
+        color: labelColor,
         fontSize: 11,
-        formatter: (value) => (value === 1 ? "1" : "0")
+        padding: [0, 0, 6, 0]
+      },
+      min: scale.min,
+      max: scale.max,
+      interval: scale.interval,
+      axisLabel: {
+        color: labelColor,
+        fontSize: 11,
+        formatter: (value) => Number(value).toFixed(normalizedScale ? 1 : 0)
       },
       axisLine: {
         show: false
       },
       splitLine: {
         lineStyle: {
-          color: "rgba(111, 102, 89, 0.16)"
+          color: splitColor
         }
       }
     },
     series: [
       {
-        name: "正确性",
+        name: "题目难度",
         type: "line",
-        smooth: true,
+        step: "end",
         symbol: "circle",
-        symbolSize: 6,
+        symbolSize: 12,
         data: reportTrajectorySeries.value,
         lineStyle: {
           width: 3,
-          color: "#111111"
+          color: lineColor
         },
-        itemStyle: {
-          color: "#111111",
-          borderColor: "#ffffff",
-          borderWidth: 2
+        emphasis: {
+          scale: 1.35
         },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: "rgba(17, 17, 17, 0.26)" },
-            { offset: 1, color: "rgba(17, 17, 17, 0.04)" }
-          ])
+        markArea: {
+          silent: true,
+          label: {
+            show: true,
+            position: "insideTopLeft",
+            color: labelColor,
+            fontSize: 10
+          },
+          data: [
+            [
+              { name: "低难度区", yAxis: scale.min, itemStyle: { color: dark ? "rgba(34, 160, 107, 0.10)" : "rgba(34, 160, 107, 0.08)" } },
+              { yAxis: scale.lowEnd }
+            ],
+            [
+              { name: "中等难度区", yAxis: scale.lowEnd, itemStyle: { color: dark ? "rgba(64, 128, 214, 0.11)" : "rgba(64, 128, 214, 0.08)" } },
+              { yAxis: scale.mediumEnd }
+            ],
+            [
+              { name: "高难度区", yAxis: scale.mediumEnd, itemStyle: { color: dark ? "rgba(177, 92, 214, 0.11)" : "rgba(177, 92, 214, 0.08)" } },
+              { yAxis: scale.max }
+            ]
+          ]
         }
       }
     ]
@@ -1498,13 +1649,55 @@ onBeforeUnmount(() => {
 
 .report-chart-wrap {
   width: 100%;
-  height: 160px;
+  height: 250px;
   margin: 12px auto 0;
 }
 
 .report-trajectory-chart {
   width: 100%;
   height: 100%;
+}
+
+.trajectory-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.trajectory-rule {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.trajectory-rule::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  content: "";
+}
+
+.trajectory-rule--correct {
+  color: #16784d;
+  background: rgba(34, 160, 107, 0.1);
+}
+
+.trajectory-rule--correct::before {
+  background: #22a06b;
+}
+
+.trajectory-rule--wrong {
+  color: #b4232a;
+  background: rgba(229, 72, 77, 0.1);
+}
+
+.trajectory-rule--wrong::before {
+  background: #e5484d;
 }
 
 /* ── 技能进度条 ── */

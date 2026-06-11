@@ -8,6 +8,7 @@ server/target/
 server/build/
 server/answer-images/
 server/.gradle/
+server/.gradle-agent/
 *.log
 *.class
 

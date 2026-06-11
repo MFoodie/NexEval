@@ -449,7 +449,7 @@
         >
           <div class="mb-6">
             <h2 class="text-2xl font-semibold">CAT 智能自适应练习</h2>
-            <p class="text-sm">基于实时作答表现自动调整难度，提供个性化练习路径。点击“CAT练习”即可练习，点击其右侧省略号查看错题</p>
+            <p class="text-sm">基于实时作答表现自动调整难度，仅从选择题题库选题。点击“CAT练习”即可练习，点击其右侧省略号查看错题</p>
           </div>
 
           <div v-if="studentLoading" class="placeholder">正在加载教学班...</div>

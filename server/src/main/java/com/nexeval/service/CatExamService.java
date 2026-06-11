@@ -84,7 +84,8 @@ public class CatExamService {
 
   private static final int DEFAULT_EXAM_DURATION_MINUTES = 60;
   private static final int CAT_MAX_QUESTIONS = 20;
-  private static final double CAT_SE_THRESHOLD = 0.35;
+  private static final double CAT_DIFFICULTY_STEP = 0.5;
+  private static final double CAT_DIFFICULTY_EPSILON = 1e-9;
   private static final List<String> JUDGE_OPTIONS = List.of("true", "false");
   private final ExamWebSocketHub webSocketHub;
   private final ExamDefinitionRepository examDefinitionRepository;
@@ -112,6 +113,8 @@ public class CatExamService {
   private final Map<String, ExamSession> sessions = new ConcurrentHashMap<>();
 
   private final Map<String, List<QuestionItem>> examQuestionCache = new ConcurrentHashMap<>();
+
+  private final Map<String, Set<String>> recentCatQuestionIds = new ConcurrentHashMap<>();
 
   public CatExamService(
     ExamWebSocketHub webSocketHub,
@@ -216,7 +219,7 @@ public class CatExamService {
 
     List<QuestionItem> catBank = loadCatQuestionBank(normalizedCourseNo);
     if (catBank.isEmpty()) {
-      throw new IllegalArgumentException("No objective questions configured for course: " + normalizedCourseNo);
+      throw new IllegalArgumentException("No choice questions configured for course: " + normalizedCourseNo);
     }
 
     int maxQuestions = Math.min(CAT_MAX_QUESTIONS, catBank.size());
@@ -232,6 +235,10 @@ public class CatExamService {
 
     String cacheKey = SessionMode.CAT.name() + ":SESSION:" + session.getSessionId();
     examQuestionCache.put(cacheKey, catBank);
+    recentCatQuestionIds.put(
+      session.getSessionId(),
+      loadLatestCompletedCatQuestionIds(userId, normalizedCourseNo)
+    );
     return toStartResponse(session);
   }
 
@@ -326,7 +333,10 @@ public class CatExamService {
       IrtCatService.IrtEstimate estimate = irtCatService.estimateThetaEap(prefix);
       points.add(Map.of(
         "questionNo", i + 1,
-        "score", thetaToPercent(estimate.theta())
+        "score", thetaToPercent(estimate.theta()),
+        "questionId", history.get(i).questionId(),
+        "difficulty", history.get(i).questionDifficulty(),
+        "correct", history.get(i).correct()
       ));
     }
     return points;
@@ -651,7 +661,8 @@ public class CatExamService {
 
     int safeEstimated = clampPercent(estimatedScore);
     int safePrecision = clampPercent(systemPrecision);
-    int safeAnswered = Math.max(0, answeredCount == null ? 0 : answeredCount);
+    List<ExamAnswerDetailView> answers = getAttemptAnswers(normalizedSessionId);
+    int safeAnswered = answers.size();
     int safeMax = Math.max(1, maxQuestions == null ? 20 : maxQuestions);
     String safeCourseNo = normalizeSourceId(courseNo);
     String safeCourseName = courseName == null ? "" : courseName.trim();
@@ -662,7 +673,8 @@ public class CatExamService {
       safeEstimated,
       safePrecision,
       safeAnswered,
-      safeMax
+      safeMax,
+      answers
     );
 
     Map<String, Object> payload = new LinkedHashMap<>();
@@ -936,6 +948,9 @@ public class CatExamService {
     String answerImagePath = normalizeAnswerImagePath(request.answerImagePath());
 
     QuestionItem question = requireQuestion(session, questionId);
+    if (session.getMode() == SessionMode.CAT && question.type() != QuestionType.CHOICE) {
+      throw new IllegalStateException("CAT sessions only accept choice questions.");
+    }
     validateAnswerPayload(question, answerText, answerImagePath);
     boolean scoreEnabled = question.scorable();
     boolean correct = scoreEnabled && matchesAnswer(question.answerKey(), answerText);
@@ -943,7 +958,13 @@ public class CatExamService {
     boolean alreadyAnswered = session.getAnsweredQuestionIds().contains(question.id());
     session.markAnswered(question.id(), correct, question.difficulty(), scoreEnabled && session.getMode() != SessionMode.CAT);
     if (session.getMode() == SessionMode.CAT && scoreEnabled && !alreadyAnswered) {
-      session.recordIrtAnswer(question.id(), question.discriminationA(), question.difficultyB(), correct);
+      session.recordIrtAnswer(
+        question.id(),
+        question.difficulty(),
+        question.discriminationA(),
+        effectiveCatDifficultyB(question),
+        correct
+      );
       updateCatEstimate(session);
       if (shouldFinishCat(session)) {
         session.finish();
@@ -996,30 +1017,81 @@ public class CatExamService {
 
     Set<String> answered = session.getAnsweredQuestionIds();
     Set<String> used = session.getUsedQuestionIds();
+    List<ExamSession.IrtAnswerRecord> history = session.getIrtHistory();
+    ExamSession.IrtAnswerRecord latestAnswer = history.isEmpty()
+      ? null
+      : history.get(history.size() - 1);
 
-    QuestionItem best = null;
-    double bestInfo = -1.0;
     double theta = session.getTheta();
+    List<QuestionItem> available = questionBank.stream()
+      .filter(item -> item.scorable() && item.type() == QuestionType.CHOICE)
+      .filter(item -> !answered.contains(item.id()) && !used.contains(item.id()))
+      .toList();
+    if (available.isEmpty()) {
+      return null;
+    }
 
-    for (QuestionItem item : questionBank) {
-      if (!item.scorable() || item.type() == QuestionType.ESSAY) {
-        continue;
-      }
-      if (answered.contains(item.id()) || used.contains(item.id())) {
-        continue;
-      }
-      double info = irtCatService.information(theta, item.discriminationA(), item.difficultyB());
-      if (info > bestInfo) {
-        bestInfo = info;
-        best = item;
+    double targetDifficulty = 3.0;
+    if (latestAnswer != null) {
+      double previousDifficulty = latestAnswer.questionDifficulty();
+      targetDifficulty = previousDifficulty
+        + (latestAnswer.correct() ? CAT_DIFFICULTY_STEP : -CAT_DIFFICULTY_STEP);
+    }
+
+    Set<String> recentIds = recentCatQuestionIds.getOrDefault(session.getSessionId(), Set.of());
+    QuestionItem selected = selectCatCandidate(available, targetDifficulty, theta, recentIds);
+    session.markQuestionUsed(selected.id());
+    return selected;
+  }
+
+  private QuestionItem selectCatCandidate(
+    List<QuestionItem> candidates,
+    double targetDifficulty,
+    double theta,
+    Set<String> recentIds
+  ) {
+    double bestDistance = Double.POSITIVE_INFINITY;
+    boolean bestIsRecent = true;
+    double bestInformation = -1.0;
+    List<QuestionItem> bestCandidates = new ArrayList<>();
+
+    for (QuestionItem item : candidates) {
+      double distance = Math.abs(item.difficulty() - targetDifficulty);
+      boolean isRecent = recentIds.contains(item.id());
+      double information = irtCatService.information(
+        theta,
+        item.discriminationA(),
+        effectiveCatDifficultyB(item)
+      );
+
+      if (distance < bestDistance - CAT_DIFFICULTY_EPSILON
+        || (Math.abs(distance - bestDistance) <= CAT_DIFFICULTY_EPSILON
+          && bestIsRecent && !isRecent)
+        || (Math.abs(distance - bestDistance) <= CAT_DIFFICULTY_EPSILON
+          && bestIsRecent == isRecent
+          && information > bestInformation + CAT_DIFFICULTY_EPSILON)) {
+        bestDistance = distance;
+        bestIsRecent = isRecent;
+        bestInformation = information;
+        bestCandidates.clear();
+        bestCandidates.add(item);
+      } else if (Math.abs(distance - bestDistance) <= CAT_DIFFICULTY_EPSILON
+        && bestIsRecent == isRecent
+        && Math.abs(information - bestInformation) <= CAT_DIFFICULTY_EPSILON) {
+        bestCandidates.add(item);
       }
     }
 
-    if (best != null) {
-      session.markQuestionUsed(best.id());
-    }
+    return bestCandidates.get(ThreadLocalRandom.current().nextInt(bestCandidates.size()));
+  }
 
-    return best;
+  private double effectiveCatDifficultyB(QuestionItem item) {
+    if (item == null) {
+      return 0.0;
+    }
+    // Legacy questions often kept difficulty_b at its 0.00 default. The
+    // display difficulty is consistently populated on the project's 1-5 scale.
+    return Math.max(-2.0, Math.min(2.0, item.difficulty() - 3.0));
   }
 
   private void updateCatEstimate(ExamSession session) {
@@ -1028,10 +1100,7 @@ public class CatExamService {
   }
 
   private boolean shouldFinishCat(ExamSession session) {
-    if (session.getAnsweredCount() >= session.getMaxQuestions()) {
-      return true;
-    }
-    return session.getStandardError() > 0.0 && session.getStandardError() < CAT_SE_THRESHOLD;
+    return session.getAnsweredCount() >= session.getMaxQuestions();
   }
 
   private void saveAnswer(
@@ -1393,23 +1462,34 @@ public class CatExamService {
   }
 
   private List<QuestionItem> loadCatQuestionBank(String courseNo) {
-    List<QuestionItem> items = new ArrayList<>();
-
-    items.addAll(questionBankRepository.findAllByActiveTrueAndCno(courseNo).stream()
+    return questionBankRepository.findAllByActiveTrueAndCno(courseNo).stream()
       .map(this::toQuestionItem)
-      .toList());
-
-    items.addAll(judgeQuestionBankRepository.findAllByActiveTrueAndCno(courseNo).stream()
-      .map(this::toQuestionItem)
-      .toList());
-
-    items.addAll(blankQuestionBankRepository.findAllByActiveTrueAndCno(courseNo).stream()
-      .map(this::toQuestionItem)
-      .toList());
-
-    return items.stream()
-      .filter(item -> item.scorable() && item.type() != QuestionType.ESSAY)
       .collect(Collectors.toCollection(ArrayList::new));
+  }
+
+  private Set<String> loadLatestCompletedCatQuestionIds(String userId, String courseNo) {
+    try {
+      List<ExamAttempt> previousAttempts = examAttemptRepository
+        .findAllByUserIdAndCourseNoAndModeOrderByStartedAtDesc(userId, courseNo, SessionMode.CAT);
+      Optional<ExamAttempt> latestCompleted = previousAttempts.stream()
+        .filter(attempt -> attempt.getStatus() == ExamAttemptStatus.SUBMITTED
+          || attempt.getStatus() == ExamAttemptStatus.EXPIRED)
+        .findFirst();
+      if (latestCompleted.isEmpty()) {
+        return Set.of();
+      }
+
+      return examAnswerRepository
+        .findAllBySessionIdOrderByAnsweredAtAsc(latestCompleted.get().getSessionId())
+        .stream()
+        .map(ExamAnswer::getQuestionId)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toSet());
+    } catch (DataAccessException ex) {
+      log.warn("Failed to load previous CAT questions for userId={}, courseNo={}: {}",
+        userId, courseNo, ex.getMessage());
+      return Set.of();
+    }
   }
 
   private List<QuestionItem> loadPracticeQuestionBank(String paperId, String courseNo) {
@@ -1840,7 +1920,9 @@ public class CatExamService {
       answer.isReviewed(),
       answer.getReviewNote(),
       answer.getAiReviewLog(),
-      resolveQuestionMaxScore(answer.getQuestionType(), answer.getQuestionId())
+      resolveQuestionMaxScore(answer.getQuestionType(), answer.getQuestionId()),
+      resolveQuestionDifficulty(answer.getQuestionType(), answer.getQuestionId()),
+      answer.getAnsweredAt() == null ? null : answer.getAnsweredAt().toString()
     );
   }
 
@@ -1903,6 +1985,27 @@ public class CatExamService {
         .orElse(null);
       case ESSAY -> essayQuestionBankRepository.findById(questionId)
         .map(EssayQuestionBank::getPoints)
+        .orElse(null);
+    };
+  }
+
+  private Double resolveQuestionDifficulty(QuestionType type, String questionId) {
+    if (type == null || questionId == null || questionId.isBlank()) {
+      return null;
+    }
+
+    return switch (type) {
+      case CHOICE -> questionBankRepository.findById(questionId)
+        .map(QuestionBank::getDifficulty)
+        .orElse(null);
+      case JUDGE -> judgeQuestionBankRepository.findById(questionId)
+        .map(JudgeQuestionBank::getDifficulty)
+        .orElse(null);
+      case BLANK -> blankQuestionBankRepository.findById(questionId)
+        .map(BlankQuestionBank::getDifficulty)
+        .orElse(null);
+      case ESSAY -> essayQuestionBankRepository.findById(questionId)
+        .map(EssayQuestionBank::getDifficulty)
         .orElse(null);
     };
   }

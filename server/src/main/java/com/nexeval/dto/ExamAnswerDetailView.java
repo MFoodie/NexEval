@@ -17,6 +17,8 @@ public record ExamAnswerDetailView(
   Boolean reviewed,
   String reviewNote,
   String aiReviewLog,
-  Integer maxScore
+  Integer maxScore,
+  Double difficulty,
+  String answeredAt
 ) {
 }

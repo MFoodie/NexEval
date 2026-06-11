@@ -24,8 +24,12 @@ import com.nexeval.dto.WeaknessTrainingResponse;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -40,6 +44,8 @@ import org.springframework.stereotype.Service;
 public class AiWeaknessService {
 
   private static final Logger log = LoggerFactory.getLogger(AiWeaknessService.class);
+  private static final Pattern KNOWLEDGE_POINT_PATTERN =
+    Pattern.compile("【\\s*知识点\\s*[：:]\\s*([^】]+)】");
 
   private final ObjectMapper objectMapper;
   private final String apiKey;
@@ -99,13 +105,18 @@ public class AiWeaknessService {
     String courseName,
     List<ExamAnswerDetailView> answers
   ) {
-    if (apiKey.isBlank()) {
-      throw new IllegalStateException("DashScope API Key 鏈厤缃?");
-    }
-
     List<ExamAnswerDetailView> safeAnswers = answers == null ? List.of() : answers;
     if (safeAnswers.isEmpty()) {
       return new CatKnowledgeInsightsResponse(List.of(), List.of());
+    }
+
+    CatKnowledgeInsightsResponse measured = calculateLabeledKnowledgeInsights(safeAnswers);
+    if (!measured.masteryPoints().isEmpty()) {
+      return measured;
+    }
+
+    if (apiKey.isBlank()) {
+      throw new IllegalStateException("DashScope API Key 未配置");
     }
 
     String prompt = buildCatKnowledgePrompt(courseNo, courseName, safeAnswers);
@@ -479,7 +490,7 @@ public class AiWeaknessService {
     return builder.toString();
   }
 
-  private CatKnowledgeInsightsResponse sanitizeCatKnowledgeInsights(
+  CatKnowledgeInsightsResponse sanitizeCatKnowledgeInsights(
     CatKnowledgeInsightsResponse payload,
     List<ExamAnswerDetailView> answers
   ) {
@@ -491,6 +502,8 @@ public class AiWeaknessService {
     java.util.Set<String> masterySeen = new java.util.LinkedHashSet<>();
     List<CatKnowledgeInsightsResponse.MasteryPoint> rawMastery =
       payload.masteryPoints() == null ? List.of() : payload.masteryPoints();
+    boolean hasCorrectAnswer = answers != null
+      && answers.stream().anyMatch(answer -> answer != null && Boolean.TRUE.equals(answer.correct()));
 
     for (CatKnowledgeInsightsResponse.MasteryPoint item : rawMastery) {
       String point = normalize(item == null ? null : item.point());
@@ -499,7 +512,10 @@ public class AiWeaknessService {
       }
       masteryPoints.add(new CatKnowledgeInsightsResponse.MasteryPoint(
         point,
-        clampScore(item == null ? null : item.score())
+        hasCorrectAnswer ? clampScore(item == null ? null : item.score()) : 0,
+        null,
+        null,
+        true
       ));
       if (masteryPoints.size() >= 4) {
         break;
@@ -510,8 +526,6 @@ public class AiWeaknessService {
       clampScore(right == null ? null : right.score()),
       clampScore(left == null ? null : left.score())
     ));
-    masteryPoints = calibrateMasteryScores(masteryPoints, answers);
-
     List<String> weakPoints = new java.util.ArrayList<>();
     java.util.Set<String> weakSeen = new java.util.LinkedHashSet<>();
     List<String> rawWeakPoints = payload.weakPoints() == null ? List.of() : payload.weakPoints();
@@ -527,6 +541,68 @@ public class AiWeaknessService {
     }
 
     return new CatKnowledgeInsightsResponse(masteryPoints, weakPoints);
+  }
+
+  private CatKnowledgeInsightsResponse calculateLabeledKnowledgeInsights(
+    List<ExamAnswerDetailView> answers
+  ) {
+    Map<String, KnowledgePointStats> statsByPoint = new LinkedHashMap<>();
+    for (ExamAnswerDetailView answer : answers) {
+      String point = extractKnowledgePoint(answer == null ? null : answer.stem());
+      if (point.isBlank()) {
+        continue;
+      }
+      KnowledgePointStats stats = statsByPoint.computeIfAbsent(point, ignored -> new KnowledgePointStats());
+      stats.questionCount += 1;
+      if (Boolean.TRUE.equals(answer.correct())) {
+        stats.correctCount += 1;
+      }
+    }
+
+    List<CatKnowledgeInsightsResponse.MasteryPoint> masteryPoints = statsByPoint.entrySet().stream()
+      .map(entry -> {
+        KnowledgePointStats stats = entry.getValue();
+        int score = stats.questionCount == 0
+          ? 0
+          : (int) Math.round(stats.correctCount * 100.0 / stats.questionCount);
+        return new CatKnowledgeInsightsResponse.MasteryPoint(
+          entry.getKey(),
+          score,
+          stats.correctCount,
+          stats.questionCount,
+          false
+        );
+      })
+      .sorted(
+        Comparator.comparingInt((CatKnowledgeInsightsResponse.MasteryPoint item) -> item.questionCount())
+          .reversed()
+          .thenComparingInt(item -> item.score())
+          .thenComparing(CatKnowledgeInsightsResponse.MasteryPoint::point)
+      )
+      .limit(4)
+      .toList();
+
+    List<String> weakPoints = masteryPoints.stream()
+      .filter(item -> item.score() < 60)
+      .sorted(Comparator.comparingInt(CatKnowledgeInsightsResponse.MasteryPoint::score))
+      .map(CatKnowledgeInsightsResponse.MasteryPoint::point)
+      .limit(3)
+      .toList();
+
+    return new CatKnowledgeInsightsResponse(masteryPoints, weakPoints);
+  }
+
+  private String extractKnowledgePoint(String stem) {
+    Matcher matcher = KNOWLEDGE_POINT_PATTERN.matcher(normalize(stem));
+    if (!matcher.find()) {
+      return "";
+    }
+    return normalize(matcher.group(1));
+  }
+
+  private static final class KnowledgePointStats {
+    private int correctCount;
+    private int questionCount;
   }
 
   private QuestionAIDraftResponse sanitizeTeacherQuestionDraft(QuestionAIDraftResponse payload, String questionType) {
@@ -819,30 +895,6 @@ public class AiWeaknessService {
 
   private String generateTempId(String prefix) {
     return prefix + "-" + System.nanoTime();
-  }
-
-  private List<CatKnowledgeInsightsResponse.MasteryPoint> calibrateMasteryScores(
-    List<CatKnowledgeInsightsResponse.MasteryPoint> points,
-    List<ExamAnswerDetailView> answers
-  ) {
-    if (points == null || points.isEmpty()) {
-      return List.of();
-    }
-
-    int total = answers == null ? 0 : answers.size();
-    long correctCount = answers == null ? 0 : answers.stream().filter(item -> Boolean.TRUE.equals(item.correct())).count();
-    int baseScore = total == 0 ? 60 : (int) Math.round(correctCount * 100.0 / total);
-    int spread = Math.min(18, Math.max(8, total == 0 ? 8 : (int) Math.round((1 - correctCount * 1.0 / total) * 20)));
-
-    List<CatKnowledgeInsightsResponse.MasteryPoint> calibrated = new java.util.ArrayList<>();
-    for (int i = 0; i < points.size(); i++) {
-      CatKnowledgeInsightsResponse.MasteryPoint item = points.get(i);
-      int aiScore = clampScore(item == null ? null : item.score());
-      int target = clampScore(baseScore + spread / 2 - i * Math.max(4, spread / 3));
-      int finalScore = clampScore((int) Math.round(aiScore * 0.35 + target * 0.65));
-      calibrated.add(new CatKnowledgeInsightsResponse.MasteryPoint(item.point(), finalScore));
-    }
-    return calibrated;
   }
 
   private String extractText(MultiModalConversationResult result) {

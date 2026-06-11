@@ -12,6 +12,9 @@ public record CatKnowledgeInsightsResponse(
   @JsonIgnoreProperties(ignoreUnknown = true)
   public record MasteryPoint(
     String point,
-    Integer score
+    Integer score,
+    Integer correctCount,
+    Integer questionCount,
+    Boolean inferred
   ) {}
 }

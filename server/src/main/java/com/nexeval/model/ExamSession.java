@@ -204,12 +204,18 @@ public class ExamSession {
     usedQuestionIds.add(questionId);
   }
 
-  public synchronized void recordIrtAnswer(String questionId, double discriminationA, double difficultyB, boolean correct) {
+  public synchronized void recordIrtAnswer(
+    String questionId,
+    double questionDifficulty,
+    double discriminationA,
+    double difficultyB,
+    boolean correct
+  ) {
     if (questionId == null || questionId.isBlank()) {
       return;
     }
     usedQuestionIds.add(questionId);
-    irtHistory.add(new IrtAnswerRecord(discriminationA, difficultyB, correct));
+    irtHistory.add(new IrtAnswerRecord(questionId, questionDifficulty, discriminationA, difficultyB, correct));
   }
 
   public synchronized void updateIrtEstimate(double theta, double standardError) {
@@ -217,5 +223,11 @@ public class ExamSession {
     this.standardError = standardError;
   }
 
-  public record IrtAnswerRecord(double discriminationA, double difficultyB, boolean correct) {}
+  public record IrtAnswerRecord(
+    String questionId,
+    double questionDifficulty,
+    double discriminationA,
+    double difficultyB,
+    boolean correct
+  ) {}
 }
