@@ -3929,7 +3929,7 @@ mark {
 }
 
 .filter-item {
-  width: 140px;
+  width: 75px;
 }
 
 .exam-create-search-input {

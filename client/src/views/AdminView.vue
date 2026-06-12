@@ -236,10 +236,37 @@
       </section>
 
       <section class="card panel-card" v-if="activeMenu === 'review'">
-        <h2 class="panel-title">成绩复核审理</h2>
+        <div class="panel-head">
+          <h2 class="panel-title">成绩复核审理</h2>
+          <div class="vip-toolbar admin-search-bar">
+            <el-input
+              v-model="appealKeyword"
+              clearable
+              placeholder="按卡号或课程号搜索"
+              class="vip-search search-input"
+              size="small"
+            >
+              <template #prefix>
+                <img :src="iconQuery" alt="" aria-hidden="true" class="search-prefix-icon" />
+              </template>
+            </el-input>
+            <el-select
+              v-model="appealStatus"
+              class="vip-filter search-select"
+              placeholder="复核状态"
+              size="small"
+            >
+              <el-option label="全部" value="all" />
+              <el-option label="待处理" value="pending" />
+              <el-option label="已同意" value="approved" />
+              <el-option label="已拒绝" value="rejected" />
+            </el-select>
+            <el-button class="search-button action-primary" size="small" type="primary" :loading="appealLoading" @click="loadScoreAppeals">查询</el-button>
+          </div>
+        </div>
         <div v-if="appealLoading" class="placeholder">正在加载复核申请...</div>
-        <div v-else-if="scoreAppeals.length === 0" class="placeholder">暂无成绩复核申请</div>
-        <el-table v-else :data="scoreAppeals" size="small">
+        <div v-else-if="filteredScoreAppeals.length === 0" class="placeholder">暂无成绩复核申请</div>
+        <el-table v-else :data="filteredScoreAppeals" size="small">
           <el-table-column prop="userId" label="卡号" width="90" />
           <el-table-column prop="courseNo" label="课程号" width="90" />
           <el-table-column prop="reason" label="申请说明" width="240" show-overflow-tooltip />
@@ -294,7 +321,7 @@
 
       <section class="card panel-card" v-if="activeMenu === 'teacher-vip'">
         <div class="panel-head">
-          <h2 class="panel-title">教师权限</h2>
+          <h2 class="panel-title">教师 VIP 权限</h2>
           <div class="vip-toolbar admin-search-bar">
             <el-input
               v-model="vipKeyword"
@@ -490,6 +517,8 @@ const importResult = ref(null);
 const scoreAppeals = ref([]);
 const appealLoading = ref(false);
 const appealActionLoading = ref(null);
+const appealKeyword = ref("");
+const appealStatus = ref("all");
 const vipTeachers = ref([]);
 const vipLoading = ref(false);
 const vipUpdatingId = ref("");
@@ -589,6 +618,20 @@ const passwordStrengthTagType = computed(() => {
   }
 
   return "success";
+});
+
+const filteredScoreAppeals = computed(() => {
+  const keyword = appealKeyword.value.trim().toLowerCase();
+  const status = appealStatus.value;
+
+  return scoreAppeals.value.filter((item) => {
+    const normalizedStatus = String(item?.status || "").trim().toLowerCase();
+    const matchesStatus = status === "all" || normalizedStatus === status;
+    const matchesKeyword = !keyword
+      || String(item?.userId || "").toLowerCase().includes(keyword)
+      || String(item?.courseNo || "").toLowerCase().includes(keyword);
+    return matchesStatus && matchesKeyword;
+  });
 });
 
 const saving = ref(false);
