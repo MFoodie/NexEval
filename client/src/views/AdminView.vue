@@ -590,18 +590,18 @@ const passwordStrengthScore = computed(() => {
 
 const passwordStrengthText = computed(() => {
   if (!editForm.value.newPassword) {
-    return "鏈缃?";
+    return "未设置";
   }
 
   if (passwordStrengthScore.value <= 1) {
-    return "寮?";
+    return "低";
   }
 
   if (passwordStrengthScore.value === 2) {
-    return "涓?";
+    return "中";
   }
 
-  return "寮?";
+  return "高";
 });
 
 const passwordStrengthTagType = computed(() => {
