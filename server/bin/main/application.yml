@@ -5,8 +5,8 @@ spring:
   mail:
     host: ${SMTP_HOST:smtp.qq.com}
     port: ${SMTP_PORT:587}
-    username: ${SMTP_USERNAME:382178825@qq.com}
-    password: ${SMTP_PASSWORD:wklooaxidtezbhja}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -17,7 +17,7 @@ spring:
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/sedb?useUnicode=true&characterEncoding=utf8&connectionCollation=utf8mb4_0900_ai_ci&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:root}
+    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
@@ -32,7 +32,7 @@ server:
   ssl:
     enabled: ${SSL_ENABLED:true}
     key-store: ${SSL_KEY_STORE:file:./certs/nexeval.p12}
-    key-store-password: ${SSL_KEY_STORE_PASSWORD:changeit}
+    key-store-password: ${SSL_KEY_STORE_PASSWORD:}
     key-store-type: ${SSL_KEY_STORE_TYPE:PKCS12}
     key-alias: ${SSL_KEY_ALIAS:nexeval}
   http2:
@@ -55,6 +55,6 @@ nexeval:
     reset-page-url: ${RESET_PAGE_URL:https://localhost:5173/reset-password}
 
 dashscope:
-  api-key: "sk-f5396c4057cb49a4a3ffb16117d0e37e"
+  api-key: ${DASHSCOPE_API_KEY:}
   model: ${DASHSCOPE_MODEL:qwen3-vl-flash}
   confidence-threshold: ${DASHSCOPE_CONFIDENCE_THRESHOLD:0.8}

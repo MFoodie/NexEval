@@ -4,7 +4,7 @@
 
 ```powershell
 mkdir certs -ErrorAction SilentlyContinue
-keytool -genkeypair -alias nexeval -keyalg RSA -keysize 2048 -storetype PKCS12 -keystore .\certs\nexeval.p12 -validity 3650 -storepass changeit -keypass changeit -dname "CN=localhost, OU=NexEval, O=NexEval, L=Local, ST=Local, C=CN"
+keytool -genkeypair -alias nexeval -keyalg RSA -keysize 2048 -storetype PKCS12 -keystore .\certs\nexeval.p12 -validity 3650 -storepass "<本地证书密码>" -keypass "<本地证书密码>" -dname "CN=localhost, OU=NexEval, O=NexEval, L=Local, ST=Local, C=CN"
 gradle bootRun
 ```
 

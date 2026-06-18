@@ -24,6 +24,7 @@ Thumbs.db
 # Env
 .env
 .env.*
+!infra/.env.example
 
 ~$*.xlsx
 ~$*.xls
