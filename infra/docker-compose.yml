@@ -4,12 +4,12 @@ services:
     container_name: nexeval-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in infra/.env}
       MYSQL_DATABASE: sedb
     ports:
       - "3306:3306"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -37,8 +37,8 @@ services:
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
-      DB_USERNAME: root
-      DB_PASSWORD: root
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in infra/.env}
       SERVER_PORT: 8080
       SSL_ENABLED: "false"
       ALLOWED_ORIGINS: http://localhost,http://127.0.0.1
@@ -47,8 +47,9 @@ services:
       RESET_PAGE_URL: http://localhost/reset-password
       SMTP_HOST: smtp.qq.com
       SMTP_PORT: 587
-      SMTP_USERNAME: 382178825@qq.com
-      SMTP_PASSWORD: wklooaxidtezbhja
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
     ports:
       - "8080:8080"
     volumes:

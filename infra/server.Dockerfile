@@ -21,7 +21,6 @@ ENV SERVER_PORT=8080 \
     DB_HOST=mysql \
     DB_PORT=3306 \
     DB_USERNAME=root \
-    DB_PASSWORD=root \
     ALLOWED_ORIGINS=http://localhost,http://127.0.0.1
 
 EXPOSE 8080

@@ -30,7 +30,7 @@ NexEval/
 ```powershell
 cd server
 mkdir certs -ErrorAction SilentlyContinue
-keytool -genkeypair -alias nexeval -keyalg RSA -keysize 2048 -storetype PKCS12 -keystore .\certs\nexeval.p12 -validity 3650 -storepass changeit -keypass changeit -dname "CN=localhost, OU=NexEval, O=NexEval, L=Local, ST=Local, C=CN"
+keytool -genkeypair -alias nexeval -keyalg RSA -keysize 2048 -storetype PKCS12 -keystore .\certs\nexeval.p12 -validity 3650 -storepass "<本地证书密码>" -keypass "<本地证书密码>" -dname "CN=localhost, OU=NexEval, O=NexEval, L=Local, ST=Local, C=CN"
 ```
 
 启动后端：
@@ -167,11 +167,14 @@ docker compose up -d
 $env:DB_HOST = "localhost"
 $env:DB_PORT = "3306"
 $env:DB_USERNAME = "root"
-$env:DB_PASSWORD = "123456"
+$env:DB_PASSWORD = "<本地数据库密码>"
 $env:SSL_ENABLED = "true"
 $env:SSL_KEY_STORE = "file:./certs/nexeval.p12"
-$env:SSL_KEY_STORE_PASSWORD = "changeit"
+$env:SSL_KEY_STORE_PASSWORD = "<本地证书密码>"
 $env:SSL_KEY_ALIAS = "nexeval"
+$env:SMTP_USERNAME = "<发件邮箱>"
+$env:SMTP_PASSWORD = "<SMTP 授权码>"
+$env:DASHSCOPE_API_KEY = "<DashScope API Key>"
 cd server
 gradle bootRun
 ```

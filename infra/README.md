@@ -20,6 +20,8 @@
 
 ```powershell
 cd D:\NexEval
+Copy-Item infra/.env.example infra/.env
+# Edit infra/.env and replace every placeholder before starting containers.
 docker compose -f infra/docker-compose.yml up -d --build
 ```
 

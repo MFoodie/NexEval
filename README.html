@@ -161,7 +161,7 @@
 <p>先生成本地 TLS 证书（仅首次需要）：</p>
 <pre><code class="language-powershell"><span class="hljs-built_in">cd</span> server
 mkdir certs <span class="hljs-literal">-ErrorAction</span> SilentlyContinue
-keytool <span class="hljs-literal">-genkeypair</span> <span class="hljs-literal">-alias</span> nexeval <span class="hljs-literal">-keyalg</span> RSA <span class="hljs-literal">-keysize</span> <span class="hljs-number">2048</span> <span class="hljs-literal">-storetype</span> PKCS12 <span class="hljs-literal">-keystore</span> .\certs\nexeval.p12 <span class="hljs-literal">-validity</span> <span class="hljs-number">3650</span> <span class="hljs-literal">-storepass</span> changeit <span class="hljs-literal">-keypass</span> changeit <span class="hljs-literal">-dname</span> <span class="hljs-string">&quot;CN=localhost, OU=NexEval, O=NexEval, L=Local, ST=Local, C=CN&quot;</span>
+keytool <span class="hljs-literal">-genkeypair</span> <span class="hljs-literal">-alias</span> nexeval <span class="hljs-literal">-keyalg</span> RSA <span class="hljs-literal">-keysize</span> <span class="hljs-number">2048</span> <span class="hljs-literal">-storetype</span> PKCS12 <span class="hljs-literal">-keystore</span> .\certs\nexeval.p12 <span class="hljs-literal">-validity</span> <span class="hljs-number">3650</span> <span class="hljs-literal">-storepass</span> <span class="hljs-string">&quot;&lt;本地证书密码&gt;&quot;</span> <span class="hljs-literal">-keypass</span> <span class="hljs-string">&quot;&lt;本地证书密码&gt;&quot;</span> <span class="hljs-literal">-dname</span> <span class="hljs-string">&quot;CN=localhost, OU=NexEval, O=NexEval, L=Local, ST=Local, C=CN&quot;</span>
 </code></pre>
 <p>启动后端：</p>
 <pre><code class="language-powershell"><span class="hljs-built_in">cd</span> server
@@ -211,11 +211,14 @@ docker compose up <span class="hljs-literal">-d</span>
 <pre><code class="language-powershell"><span class="hljs-variable">$env:DB_HOST</span> = <span class="hljs-string">&quot;localhost&quot;</span>
 <span class="hljs-variable">$env:DB_PORT</span> = <span class="hljs-string">&quot;3306&quot;</span>
 <span class="hljs-variable">$env:DB_USERNAME</span> = <span class="hljs-string">&quot;root&quot;</span>
-<span class="hljs-variable">$env:DB_PASSWORD</span> = <span class="hljs-string">&quot;123456&quot;</span>
+<span class="hljs-variable">$env:DB_PASSWORD</span> = <span class="hljs-string">&quot;&lt;本地数据库密码&gt;&quot;</span>
 <span class="hljs-variable">$env:SSL_ENABLED</span> = <span class="hljs-string">&quot;true&quot;</span>
 <span class="hljs-variable">$env:SSL_KEY_STORE</span> = <span class="hljs-string">&quot;file:./certs/nexeval.p12&quot;</span>
-<span class="hljs-variable">$env:SSL_KEY_STORE_PASSWORD</span> = <span class="hljs-string">&quot;changeit&quot;</span>
+<span class="hljs-variable">$env:SSL_KEY_STORE_PASSWORD</span> = <span class="hljs-string">&quot;&lt;本地证书密码&gt;&quot;</span>
 <span class="hljs-variable">$env:SSL_KEY_ALIAS</span> = <span class="hljs-string">&quot;nexeval&quot;</span>
+<span class="hljs-variable">$env:SMTP_USERNAME</span> = <span class="hljs-string">&quot;&lt;发件邮箱&gt;&quot;</span>
+<span class="hljs-variable">$env:SMTP_PASSWORD</span> = <span class="hljs-string">&quot;&lt;SMTP 授权码&gt;&quot;</span>
+<span class="hljs-variable">$env:DASHSCOPE_API_KEY</span> = <span class="hljs-string">&quot;&lt;DashScope API Key&gt;&quot;</span>
 <span class="hljs-built_in">cd</span> server
 gradle bootRun
 </code></pre>
